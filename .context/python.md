@@ -32,6 +32,8 @@ It mirrors the Go programs behaviour for behaviour, and the Go code is the refer
 
 ## What's different
 
+`machine/config.py` mirrors Go's `internal/command/config.go`: the `agent-machine config` permission menu. `tests/test_machine_config.py` mirrors the Go selection, cancellation and preservation tests. Both installers call it before machine sign-in.
+
 Only how, never what:
 
 - Updates pip-install the wheel instead of swapping binaries. `agent-machine update --with-agent` runs `AI_PROXY_AGENT update --server` first when that's set, as Go does; otherwise the agent is this same package and only its agent-proxy is stopped.

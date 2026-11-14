@@ -23,9 +23,16 @@ The installer comes with each [release](https://github.com/joeyenfield/ai-contro
 1. It downloads the server, with its console already built, and checks its SHA-256.
 2. It installs the server into a Python environment of its own (`venv` in the folder below) and starts it with `agent-server local start`.
 3. It downloads `agent` and `agent-machine` for your computer (the Python versions where there's no Go build), checks them, and installs them into `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\agent-proxy`, added to your PATH). `agent-server` goes there too.
-4. It signs `agent` and `agent-machine` in to the new server, with launches and files on, and starts the machine. Each sign-in prints a link and a code: open the link, sign in as `admin` with the password it printed, enter the code and approve.
+4. It signs `agent` and `agent-machine` in to the new server and starts the machine. Before machine sign-in, it opens `agent-machine config` so you can choose what this machine allows. Each program needs its own approval, in this order:
+
+   - **Agent (`agent` and `agent-proxy`):** lets coding agents launched on this computer use the server's permitted models and providers, with requests recorded under your account.
+   - **Machine (`agent-machine`):** adds this computer to your fleet with the functions you selected. The menu explains launches, terminals, file viewing, updates, model-server management and containers. Enter several numbers or names separated by commas. Press Enter to keep current settings, or enter `none` to switch them all off. On Termux, this is the dedicated Ubuntu environment.
+
+For each approval, open the printed link in your browser and sign in as `admin` with the password printed during setup. Enter the code for that program if asked, approve, then return to the setup terminal. Use the same account for both approvals. The second program prints a new code; the first code cannot be reused.
 
 Then add a folder for the console to start agents in: `agent-machine roots add ~/projects`.
+
+Run `agent-machine config` again to change permissions later. Only the selected functions remain on; all others turn off. On a new machine they start off. The menu changes permissions; it does not install model servers or Docker/Podman. With `--no-login`, or without a terminal, setup leaves permissions unchanged and prints the configuration and sign-in commands for later. See [Choose machine functions](machines.md#choose-machine-functions) for what each permission allows.
 
 Run it again to update: it stops the server, replaces its files and starts it again. Your data stays. When it's done it says again where the console is and where the `admin` password is kept. [Remove it](#remove-it) has its twin, which takes it all out.
 
@@ -34,7 +41,7 @@ Run it again to update: it stops the server, replaces its files and starts it ag
 | `--port N`, `-Port N` and `--auth-port N`, `-AuthPort N` | Other ports for the console and `agent-auth` (default 19999 and 20000). The choice is kept. |
 | `--prefix DIR`, `-Prefix DIR` | Where `agent-server`, `agent` and `agent-machine` go. The sh installer's default is `~/.local/bin`, or `/usr/local/bin` when run as root. |
 | `--no-client`, `-NoClient` | Only the server: no `agent` or `agent-machine` |
-| `--no-login`, `-NoLogin` | Don't sign them in; print the commands instead |
+| `--no-login`, `-NoLogin` | Skip sign-in and the machine permission menu; print the commands instead |
 | `--python`, `-Python` | The Python `agent` and `agent-machine` rather than the Go builds. They go into the server's Python environment. It's used anyway on a system without a Go build. |
 | `--no-tray`, `-NoTray` | No [tray icon](#the-tray-icon). Without a desktop (a Linux server over SSH, say) it's left out by itself. |
 

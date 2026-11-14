@@ -30,6 +30,7 @@ Usage: agent-machine                           this machine as the fleet sees it
        agent-machine login [url] --code CODE   ...or with a setup code from the console's Machines page
                      [--enable LIST]           then switch toggles on, for example launches,commands
        agent-machine logout [url]
+       agent-machine config                    choose machine functions with explanations
        agent-machine start                     join the fleet in the background
        agent-machine stop
        agent-machine run [--server url]        join the fleet in the foreground (Ctrl+C leaves)
@@ -94,6 +95,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                            setup=login.Setup(list(settings.TOGGLES), settings.parse_toggles, enable))
     if command == "logout":
         return login.logout(args[1:], program="agent-machine", credentials_path=settings.credentials_path)
+    if command == "config":
+        from .config import configure_features
+        return configure_features(args[1:], sys.stdin, sys.stdout)
     if command == "run":
         return run(args[1:])
     if command == "start":

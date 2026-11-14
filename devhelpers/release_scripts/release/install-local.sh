@@ -10,7 +10,7 @@
 #   --prefix DIR              where agent-server, agent and agent-machine go (default
 #                             ~/.local/bin, or /usr/local/bin as root)
 #   --no-client               only the server: no agent or agent-machine
-#   --no-login                don't sign agent and agent-machine in; print the commands instead
+#   --no-login                skip sign-in and machine permission choices; print commands instead
 #   --python                  the Python agent and agent-machine rather than the Go builds (used
 #                             anyway when there's no Go build for this system)
 #   --no-tray                 no tray icon (agent-tray, put in on a desktop: it shows what runs,
@@ -40,7 +40,7 @@ Installs AI Control Mesh on this computer, for you alone, and starts it (docs/lo
   --prefix DIR              where agent-server, agent and agent-machine go (default
                             ~/.local/bin, or /usr/local/bin as root)
   --no-client               only the server: no agent or agent-machine
-  --no-login                don't sign agent and agent-machine in; print the commands instead
+  --no-login                skip sign-in and machine permission choices; print commands instead
   --python                  the Python agent and agent-machine rather than the Go builds (used
                             anyway when there's no Go build for this system)
   --no-tray                 no tray icon (agent-tray, put in on a desktop: it shows what runs,
@@ -347,25 +347,41 @@ if [ $login -eq 1 ] && [ -n "$installed" ] && ! (: </dev/tty) 2>/dev/null; then
     say "No terminal to sign in from; run the commands below yourself."
     login=0
 fi
+if [ $login -eq 1 ] && [ -n "$installed" ]; then
+    say ""
+    say "Setup signs in each installed program separately: first the agent, then the machine."
+    say "Each sign-in has its own device code. Approve one, return here, then approve the next."
+    say "Use the same AI Control Mesh account for both."
+fi
 for component in $installed; do
     if [ "$component" = agent ]; then
         if [ $login -eq 1 ]; then
             say ""
-            say "Signing agent in to $server (sign in as admin in the browser)"
+            say "Authorize the agent (agent and agent-proxy) to use $server"
+            say "This lets coding agents launched here use your server's permitted models and providers,"
+            say "with their requests recorded under your account."
+            say "Open the link printed below in your browser, sign in as admin with the password printed earlier,"
+            say "and enter this agent's device code if asked. Approve, then return to this terminal."
             "$prefix/agent" login "$server" </dev/tty || say "Sign in later with: agent login $server"
         else
             say "Next: agent login $server"
         fi
     elif [ $login -eq 1 ]; then
         say ""
-        say "Signing agent-machine in to $server"
-        if "$prefix/agent-machine" login "$server" --enable launches,files </dev/tty; then
+        "$prefix/agent-machine" config </dev/tty || fail "machine setup cancelled; run agent-machine config to choose functions later"
+        say "Authorize this machine (agent-machine) to connect to $server"
+        say "This adds this computer to your fleet with the functions you just chose."
+        say "For launches, file viewing or terminal starting folders, allow projects with: agent-machine roots add <folder>"
+        say "On Termux, this machine is the Ubuntu environment created for AI Control Mesh."
+        say "Open the link printed below and use the same admin account. Enter this machine's new device code"
+        say "if asked, approve, then return here. The earlier agent code cannot be reused."
+        if "$prefix/agent-machine" login "$server" --enable= </dev/tty; then
             "$prefix/agent-machine" start || true
         else
-            say "Sign in later with: agent-machine login $server --enable launches,files, then agent-machine start"
+            say "Sign in later with: agent-machine login $server, then agent-machine start"
         fi
     else
-        say "Next: agent-machine login $server --enable launches,files, then agent-machine start"
+        say "Next: agent-machine config, then agent-machine login $server, then agent-machine start"
     fi
 done
 

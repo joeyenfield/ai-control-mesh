@@ -36,6 +36,7 @@ Usage: agent-machine                           this machine as the fleet sees it
        agent-machine login [url] --code CODE   ...or with a setup code from the console's Machines page
                      [--enable LIST]           then switch toggles on, for example launches,commands
        agent-machine logout [url]
+       agent-machine config                    choose machine functions with explanations
        agent-machine start                     join the fleet in the background
        agent-machine stop
        agent-machine run [--server url]        join the fleet in the foreground (Ctrl+C leaves)
@@ -94,6 +95,8 @@ func Main(args []string) int {
 		return login.Login(args[1:])
 	case "logout":
 		return login.Logout(args[1:])
+	case "config":
+		return configCommand(args[1:], os.Stdin, os.Stdout)
 	case "run":
 		return run(args[1:])
 	case "start":
