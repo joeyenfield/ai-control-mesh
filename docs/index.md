@@ -56,6 +56,7 @@ The documentation has two halves. The **guides** (from *Start here* to *Run a se
 | Use terminals from a phone | | Running agents (sign in on the phone) | [Accounts](accounts.md#running-agents-on-your-phone) |
 | Share a shell | `agent --shell [folder]` | A machine's Terminal tab | [Machines](machines.md#terminals) |
 | Join a machine to the fleet | `agent-machine login`, `start`, `stop`, `run` | Machines › Add a machine | [Machines](machines.md#quick-start) |
+| Choose machine permissions | `agent-machine config` | | [Machines](machines.md#choose-machine-functions) |
 | Add a machine's model server as a provider | | Add as a provider | [Providers](providers.md#where-providers-come-from) |
 | Manage models (pull, load, delete, search) | `agent-machine servers on` | A machine's model server tabs | [Providers](providers.md#managing-models) |
 | Start, stop and configure Ollama and Strata | `agent-machine servers on` | Providers → Ollama → Server settings; Providers → Strata | [Providers](providers.md#ollamas-server-settings) |

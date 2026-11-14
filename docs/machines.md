@@ -33,11 +33,27 @@ agent-machine updates on           # let the console update agent-machine and ag
 
 Settings changes reach the server within a minute, with the machine's next update.
 
+### Choose machine functions
+
+Run `agent-machine config` to choose several permissions at once. The menu explains each function and shows whether it is currently on. Enter comma-separated numbers or names, such as `1,3` or `launches,files`. Only the selected functions remain on; all other functions turn off. Press Enter to keep the current settings, or enter `none` to turn all six off. Invalid input asks again. Closing input or cancelling leaves permissions unchanged.
+
+| Function | What it allows |
+| --- | --- |
+| `launches` | Launch coding agents as your user, in allowed project folders. |
+| `commands` (terminals) | Open a shell as your user. Its starting folder must be allowed; commands can access anything your user can. |
+| `files` | Browse and read allowed project folders, including hidden files. File contents are sent to the server. |
+| `updates` | Let the machine owner or an admin install the server's verified agent and machine builds. |
+| `servers` | Install llama.cpp, start and stop local model servers, change settings, download and delete models. |
+| `containers` | Run supported model-server containers using Docker or Podman. Docker access can grant root privileges on the computer. |
+
+These are permissions for programs on this machine. Selecting them does not install model servers or a container runtime. Add project folders separately with `agent-machine roots add <folder>`. Existing server permissions and sharing rules still apply. You can rerun the menu without signing in again; it keeps the machine's identity, credentials and project folders. For automation, use the existing individual `on|off` commands or `login --enable LIST`.
+
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `agent-machine` (or `agent-machine status`) | Shows the machine as the fleet sees it. See [Running it](#running-it). |
+| `agent-machine config` | Explains the six machine functions and lets you select several at once. |
 | `agent-machine status --json` | The same in short, as one line of JSON, without looking for model servers or containers: `id`, `name`, `version`, `server`, `signed_in`, `user`, `running`, `state`, `pid`, `features` (each toggle, on or off) and `roots`. The tray icon reads it ([Run it on your own computer](local.md#the-tray-icon)). |
 | `agent-machine login [url]` | Signs the machine in using OIDC device authorization. |
 | `agent-machine login [url] --code CODE [--enable LIST]` | Signs it in with a setup code from the console instead of a browser, then turns the listed toggles on. See [Signing in with a setup code](#signing-in-with-a-setup-code). |

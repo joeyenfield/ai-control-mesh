@@ -9,7 +9,7 @@
 #   -Prefix DIR            where agent-server, agent and agent-machine go (default
 #                          %LOCALAPPDATA%\Programs\agent-proxy, put on your PATH)
 #   -NoClient              only the server: no agent or agent-machine
-#   -NoLogin               don't sign agent and agent-machine in; print the commands instead
+#   -NoLogin               skip sign-in and machine permission choices; print commands instead
 #   -Python                the Python agent and agent-machine rather than the Go builds (used
 #                          anyway when there's no Go build for this processor)
 #   -NoTray                no tray icon (agent-tray: it shows what runs, starts and stops it,
@@ -208,21 +208,37 @@ try {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work
 }
 
+if (-not $NoLogin -and $installed.Count -gt 0) {
+    Write-Output ""
+    Write-Output "Setup signs in each installed program separately: first the agent, then the machine."
+    Write-Output "Each sign-in has its own device code. Approve one, return here, then approve the next."
+    Write-Output "Use the same AI Control Mesh account for both."
+}
 foreach ($component in $installed) {
     $exe = Join-Path $Prefix "$component.exe"
     if ($component -eq "agent") {
         if ($NoLogin) { Write-Output "Next: agent login $server"; continue }
         Write-Output ""
-        Write-Output "Signing agent in to $server (sign in as admin in the browser)"
+        Write-Output "Authorize the agent (agent and agent-proxy) to use $server"
+        Write-Output "This lets coding agents launched here use your server's permitted models and providers,"
+        Write-Output "with their requests recorded under your account."
+        Write-Output "Open the link printed below in your browser, sign in as admin with the password printed earlier,"
+        Write-Output "and enter this agent's device code if asked. Approve, then return to this terminal."
         Invoke-Program { & $exe login $server }
         if ($LASTEXITCODE -ne 0) { Write-Output "Sign in later with: agent login $server" }
     } else {
-        if ($NoLogin) { Write-Output "Next: agent-machine login $server --enable launches,files, then agent-machine start"; continue }
+        if ($NoLogin) { Write-Output "Next: agent-machine config, then agent-machine login $server, then agent-machine start"; continue }
         Write-Output ""
-        Write-Output "Signing agent-machine in to $server"
-        Invoke-Program { & $exe login $server --enable launches,files }
+        Invoke-Program { & $exe config }
+        if ($LASTEXITCODE -ne 0) { throw "Machine setup cancelled; run agent-machine config to choose functions later" }
+        Write-Output "Authorize this machine (agent-machine) to connect to $server"
+        Write-Output "This adds this computer to your fleet with the functions you just chose."
+        Write-Output "For launches, file viewing or terminal starting folders, allow projects with: agent-machine roots add <folder>"
+        Write-Output "Open the link printed below and use the same admin account. Enter this machine's new device code"
+        Write-Output "if asked, approve, then return here. The earlier agent code cannot be reused."
+        Invoke-Program { & $exe login $server --enable= }
         if ($LASTEXITCODE -ne 0) {
-            Write-Output "Sign in later with: agent-machine login $server --enable launches,files, then agent-machine start"
+            Write-Output "Sign in later with: agent-machine login $server, then agent-machine start"
         } else {
             Invoke-Program { & $exe stop } | Out-Null
             Invoke-Program { & $exe start }
