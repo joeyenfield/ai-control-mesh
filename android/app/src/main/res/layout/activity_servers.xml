@@ -90,7 +90,7 @@
                 android:textStyle="bold" />
 
             <EditText
-                android:id="@+id/name"
+                android:id="@+id/server_name_input"
                 style="@style/Field"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

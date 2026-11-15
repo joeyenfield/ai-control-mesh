@@ -143,10 +143,10 @@ class ServersActivity : Activity() {
                 when (result) {
                     is Check.Online -> {
                         CrashLog.note(this, "Saving server")
-                        val name = findViewById<EditText>(R.id.name).text.toString().trim().ifEmpty { host }
+                        val name = findViewById<EditText>(R.id.server_name_input).text.toString().trim().ifEmpty { host }
                         store.add(Server(name, url))
                         findViewById<EditText>(R.id.address).text.clear()
-                        findViewById<EditText>(R.id.name).text.clear()
+                        findViewById<EditText>(R.id.server_name_input).text.clear()
                         showForm(false)
                         render()
                         CrashLog.note(this, "Server saved and list rendered")
