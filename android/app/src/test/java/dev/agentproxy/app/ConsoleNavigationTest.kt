@@ -21,6 +21,22 @@ class ConsoleNavigationTest {
     }
 
     @Test
+    fun localInstanceKeepsItsHttpIssuerAndCallbackInTheApp() {
+        val api = "http://localhost:19999"
+        val issuer = "http://localhost:20000"
+        assertTrue(isLocalHttpAddress(api))
+        assertTrue(isAllowedAuthAddress(issuer, true))
+        assertTrue(isOidcNavigation(listOf(api), issuer, "$issuer/authorize"))
+        assertTrue(isOidcNavigation(listOf(api), issuer, "$api/api/auth/callback?code=one-time"))
+        assertFalse(isOidcNavigation(listOf(api), issuer, "http://localhost:20001/authorize"))
+        assertFalse(isOidcNavigation(listOf(api), issuer, "http://elsewhere.test/api/auth/callback"))
+        assertFalse(isAllowedAuthAddress(issuer, false))
+        assertFalse(isAllowedAuthAddress("http://localhost.evil.test:20000", true))
+        assertFalse(isAllowedAuthAddress("http://user@localhost:20000", true))
+        assertFalse(isAllowedAuthAddress("http://localhost:20000/?code=one-time", true))
+    }
+
+    @Test
     fun splitHostingSignInStaysInTheAppOnTheApiItsCallbacksName() {
         // The app was given aicontrolmesh.com; the console it redirects to calls api.aicontrolmesh.com.
         val apis = listOf("https://aicontrolmesh.com", "https://api.aicontrolmesh.com/api/auth/callback")
