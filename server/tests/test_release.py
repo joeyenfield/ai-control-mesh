@@ -141,7 +141,7 @@ def test_termux_quickstart_signs_in_and_preserves_machine_choices_on_rerun(tmp_p
         sign_in=lambda path, password: signed.append((path, password)),
     ))
     commands: list[list[str]] = []
-    monkeypatch.setattr(subprocess, "run", lambda args, check: commands.append(args))
+    monkeypatch.setattr(subprocess, "run", lambda args, check, stdout: commands.append(args))
     assert helper.main() == 0
     assert signed == [(tmp_path / "credentials.json", "secret")]
     assert (tmp_path / "projects").is_dir()

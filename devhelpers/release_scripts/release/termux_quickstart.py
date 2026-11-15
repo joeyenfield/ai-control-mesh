@@ -28,11 +28,11 @@ def main() -> int:
     projects.mkdir(exist_ok=True)
     if fresh:
         for feature in ("launches", "commands", "files", "updates", "servers"):
-            subprocess.run(["agent-machine", feature, "on"], check=True)
+            subprocess.run(["agent-machine", feature, "on"], check=True, stdout=subprocess.DEVNULL)
     # PRoot cannot run Docker or Podman, even if an earlier install enabled containers.
-    subprocess.run(["agent-machine", "containers", "off"], check=True)
-    subprocess.run(["agent-machine", "roots", "add", str(projects)], check=True)
-    subprocess.run(["agent-machine", "start"], check=True)
+    subprocess.run(["agent-machine", "containers", "off"], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["agent-machine", "roots", "add", str(projects)], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["agent-machine", "start"], check=True, stdout=subprocess.DEVNULL)
     print(f"Ready: {machine.API}; projects: {projects}", flush=True)
     return 0
 
