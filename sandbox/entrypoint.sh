@@ -2,12 +2,11 @@
 # Joins the agent-server's fleet as a machine that takes launches in the workspace only.
 #
 #   AI_PROXY_SERVER          the API, for example https://api.aicontrolmesh.com (required)
-#   On first start, approve both printed OIDC device codes in your browser.
+#   On first start, approve one OIDC device code for both programs in your browser.
 #   Later starts reuse rotating credentials in the persistent home volume.
 #   AI_PROXY_MACHINE_SETUP_CODE  a setup code from the console's Machines page: agent-machine
 #                            login uses it instead of a device code (and AI_PROXY_MACHINE_ENABLE)
-#   AI_PROXY_SETUP_CODE      the same for agent's own sign-in (the console sets both to one code,
-#                            with a use for each); later starts don't spend it again
+#   AI_PROXY_SETUP_CODE      accepted by agent login for the same shared auth profile
 #   AI_PROXY_MACHINE_NAME    the name the console shows (default: the container's hostname)
 #   AGENT_WORKSPACE          where agents may start (default /workspace)
 #   AGENT_APT_PACKAGES       more apt packages to install on start, space-separated (needs the
@@ -39,7 +38,7 @@
 #   AGENT_REPOS              git URLs to clone into the workspace on start (space-separated;
 #                            ones already there are left alone)
 #
-# Both components sign in separately: agent-machine joins the fleet, agent launches agents.
+# One sign-in serves both programs: agent-machine joins the fleet, agent launches agents.
 set -eu
 
 server=${AI_PROXY_SERVER:-}
@@ -81,20 +80,13 @@ if [ -n "${AGENT_DATA_DIR:-}" ]; then
     # agent-machine puts llama.cpp's builds, its models and Ollama's models there.
     export AI_PROXY_MACHINE_DATA="$AGENT_DATA_DIR"
 fi
-config=${XDG_CONFIG_HOME:-$HOME/.config}
-
-# sign_in signs one component in, unless its credentials already name this server. A login that
+# sign_in asks the CLI to select the shared server and reuse a valid sign-in. A login that
 # fails (a code nobody approved, a used-up setup code, the sign-in service refusing) is tried again
 # after a wait that doubles up to 15 minutes. Exiting instead would have the container's restart
 # policy start it again at once, and every start asks the sign-in service for a new code: a
 # container left like that sent the server thousands of requests an hour.
 sign_in() {
     program=$1
-    credentials=$2
-    if grep -Fqs "\"url\": \"$server\"" "$credentials" && grep -qs '"refresh_token": "[^"]' "$credentials"; then
-        echo "$program: already signed in to $server"
-        return 0
-    fi
     wait=30
     until "$program" login "$server" </dev/null; do
         echo "agent-sandbox: $program couldn't sign in to $server. Trying again in ${wait}s: approve its code when it shows one, or start the container with a setup code (AI_PROXY_MACHINE_SETUP_CODE)." >&2
@@ -115,8 +107,7 @@ until curl -fsS -o /dev/null "$server/health"; do
     sleep 2
 done
 
-sign_in agent-machine "$config/agent-machine/credentials.json"
-sign_in agent "$config/agent-proxy/credentials.json"
+sign_in agent-machine
 
 mkdir -p "$workspace"
 

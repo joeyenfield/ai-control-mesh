@@ -3230,12 +3230,13 @@ export interface ServerStats {
   timestamp: number;
   hostname: string;
   platform: string;
-  boot_time: number;
-  cpu: { percent: number; count: number; load_average: number[] | null };
-  memory: { total: number; used: number; available: number; percent: number };
-  swap: { total: number; used: number; percent: number };
-  /** open_files: descriptors (handles on Windows); connections: its sockets. Null where the system won't say. */
-  process: { pid: number; rss: number; cpu_percent: number; threads: number; started_at: number; open_files: number | null; connections: number | null };
+  /** OS probes are null where the system denies access; a missing CPU count is 0. */
+  boot_time: number | null;
+  cpu: { percent: number | null; count: number; load_average: number[] | null };
+  memory: { total: number | null; used: number | null; available: number | null; percent: number | null };
+  swap: { total: number | null; used: number | null; percent: number | null };
+  /** open_files: descriptors (handles on Windows); connections: its sockets. */
+  process: { pid: number; rss: number | null; cpu_percent: number | null; threads: number | null; started_at: number | null; open_files: number | null; connections: number | null };
   /** Running totals since the computer started, loopback left out; null when there's no other interface. */
   network: NetworkTotals | null;
   /** What this server process is doing now. */

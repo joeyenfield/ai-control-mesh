@@ -23,12 +23,12 @@ The installer comes with each [release](https://github.com/joeyenfield/ai-contro
 1. It downloads the server, with its console already built, and checks its SHA-256.
 2. It installs the server into a Python environment of its own (`venv` in the folder below) and starts it with `agent-server local start`.
 3. It downloads `agent` and `agent-machine` for your computer (the Python versions where there's no Go build), checks them, and installs them into `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\agent-proxy`, added to your PATH). `agent-server` goes there too.
-4. It signs `agent` and `agent-machine` in to the new server and starts the machine. Before machine sign-in, it opens `agent-machine config` so you can choose what this machine allows. Each program needs its own approval, in this order:
+4. It signs `agent` and `agent-machine` in to the new server and starts the machine. Before machine sign-in, it opens `agent-machine config` so you can choose what this machine allows. Both programs share one account and server, so only one approval is needed:
 
    - **Agent (`agent` and `agent-proxy`):** lets coding agents launched on this computer use the server's permitted models and providers, with requests recorded under your account.
    - **Machine (`agent-machine`):** adds this computer to your fleet with the functions you selected. The menu explains launches, terminals, file viewing, updates, model-server management and containers. Enter several numbers or names separated by commas. Press Enter to keep current settings, or enter `none` to switch them all off. On Termux, this is the dedicated Ubuntu environment.
 
-For each approval, open the printed link in your browser and sign in as `admin` with the password printed during setup. Enter the code for that program if asked, approve, then return to the setup terminal. Use the same account for both approvals. The second program prints a new code; the first code cannot be reused.
+Open the printed link in your browser and sign in as `admin` with the password printed during setup. Enter the device code if asked, approve, then return to the setup terminal. Machine setup reuses that sign-in while keeping its own permission choices.
 
 Then add a folder for the console to start agents in: `agent-machine roots add ~/projects`.
 
@@ -50,6 +50,8 @@ Pass options like this: `curl -fsSL <url>/install-local.sh | sh -s -- --port 299
 The installer only trusts the SHA-256 of each download that was written into it when the release was made. On Debian and Ubuntu, Python's environments need `sudo apt install python3-venv`.
 
 ## Android with Termux
+
+Android can restrict access to `/proc` even inside Ubuntu. The server starts with unavailable host stats left blank, and Prometheus leaves those measurements out. If the system also hides the process identity required by `agent-server local`, background startup fails with an explanation and stops the child it just launched. Run the server and sign-in service in the foreground with the [OIDC configuration](oidc.md) instead; process identity checks are still required to stop a background instance safely.
 
 The shell installer detects native Termux and takes a separate path: it installs Ubuntu 24.04 through [PRoot-Distro](https://github.com/termux/proot-distro), then runs the full installer inside Ubuntu. Use release 2.1.65 or later for PRoot-Distro 5.3.0 compatibility. This includes the server, sign-in service, built console and Python client programs. It does not require root, Docker or Podman. Ubuntu provides the Linux environment for the server's native dependencies; installing directly into Android's Python is not supported.
 
@@ -93,7 +95,7 @@ docker logs mesh
 - **The machine is called `my-machine`** on the **Machines** page. `-e MESH_MACHINE_NAME=...` (or `--hostname`) gives it another name.
 - **Tools:** it's Ubuntu with the sandbox's everyday tools (git, gh, ssh and sftp, ping, dig, build tools, Python; [the list](machines.md#a-sandbox-machine-in-docker)). `-e AGENT_APT_PACKAGES="nmap postgresql-client"` adds packages on start, and agents can `sudo apt-get install` more.
 - **An NVIDIA GPU.** This image runs models on the CPU: it leaves out Ollama's GPU libraries, which are most of their size. `ghcr.io/joeyenfield/ai-control-mesh-gpu` is the same system with the CUDA ones (about 4 GB). Run it instead, and give the container the GPU: `--gpus all` with Docker, `--device nvidia.com/gpu=all` with Podman, after `--name mesh`. [GPUs in containers](gpu.md) sets up either engine.
-- **Your own computer can join too.** `agent login http://localhost:19999` and `agent-machine login http://localhost:19999` sign it in like any machine.
+- **Your own computer can join too.** `agent login http://localhost:19999` signs both programs in. Then start the machine with `agent-machine start`.
 
 It's for trying the system. For a server other people use, see [Getting started](getting-started.md).
 

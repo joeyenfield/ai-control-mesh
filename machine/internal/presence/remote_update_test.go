@@ -13,6 +13,7 @@ import (
 
 func TestARemoteUpdateRunsOnlyWhenTheMachineTakesThem(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"server_version": "9.9.9", "version": "9.9.9", "exact": true, "files": []any{}})
 	}))

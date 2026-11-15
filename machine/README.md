@@ -7,7 +7,7 @@ run Strata or Ollama here in containers, and start agents here, once the machine
 each.
 
 ```bash
-agent-machine login https://your-server:9999   # once: its own sign-in, apart from `agent login`
+agent-machine login https://your-server:9999   # once: shared with `agent login`
 agent-machine servers on                       # optional: let the console manage the model servers here (start, stop, settings, models)
 agent-machine containers on                    # optional: let the server run containers here (Docker or Podman)
 agent-machine start                            # join the fleet, in the background
@@ -35,13 +35,16 @@ agent-machine                                  # how the fleet sees this machine
 ## How it works
 
 Sign-in is mandatory, including on loopback. URLs require HTTPS except loopback development.
-OAuth access and rotating refresh credentials are kept in the machine's own
-`credentials.json`, separate from `agent login`; concurrent refresh is serialized.
+OAuth access and rotating refresh credentials are shared with `agent` in the user's
+`agent-proxy/credentials.json` (or `AI_PROXY_CREDENTIALS`), with one refresh lock.
+Either login command selects the account and server for both; the second reuses it.
+Machine settings and permission choices stay in agent-machine's own folder.
 Logout revokes the refresh credential and removes the local login, reporting revocation
 failures. Password and access-key sign-ins are not supported. For automation obtain a
 service-account OAuth access token directly from the issuer and set
-`AI_PROXY_MACHINE_TOKEN`; use `run --server <url>` to select its API. `AI_PROXY_TOKEN`
-remains the agent command's credential and is never used for the fleet connection.
+`AI_PROXY_TOKEN`; `AI_PROXY_MACHINE_TOKEN` is a legacy alias understood by both programs.
+Use `AI_PROXY_URL` before login; a saved login selects the server for both programs.
+A conflicting `--server` is refused: use either login command to switch both.
 
 `agent-machine run` (which `start` runs detached) keeps one WebSocket open to the server
 (`/api/machines/connect`), signed with its token, and reconnects when it drops. Over it:
@@ -126,7 +129,7 @@ launchd: no terminal) is stopped and its service starts it again from the new fi
 running in a terminal is left for you to restart.
 
 Its state lives in its own folder (`%APPDATA%\agent-machine`, `~/.config/agent-machine`,
-or `AI_PROXY_MACHINE_HOME`): `credentials.json`, `machine.json` (the id the server knows
+or `AI_PROXY_MACHINE_HOME`): `machine.json` (the id the server knows
 the machine by, and its settings), `status.json` (how a running agent-machine is doing)
 and `agent-machine.log`. A `machine.json` from before agent-machine existed (beside
 `agent login`'s credentials) is carried over once, so the machine keeps its id and the

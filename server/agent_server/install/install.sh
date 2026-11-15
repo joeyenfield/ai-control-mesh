@@ -274,7 +274,7 @@ for component in $components; do
     else
         if [ $login -eq 1 ]; then
             say ""
-            say "Signing agent-machine in to $SERVER"
+            say "Using the shared agent sign-in for agent-machine on $SERVER (signing in only if needed)"
             if signin "$(program agent-machine)" login "$SERVER"; then
                 # A service retries by itself; otherwise join the fleet now, in the background.
                 if [ $service -eq 0 ] && [ $start -eq 1 ]; then "$(program agent-machine)" start || true; fi

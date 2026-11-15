@@ -40,7 +40,7 @@ The server is one program. Small installs run it as one process, which keeps its
 
 ## Design principles (apply to every component)
 
-1. **Components talk only over HTTP and WebSockets, never by importing each other.** Each folder is its own build (Python package, Go modules, npm project, Gradle project).
+1. **Components talk only over HTTP and WebSockets, never by importing each other.** Each folder is its own build (Python package, Go modules, npm project, Gradle project). The client and machine share the OS user's auth file and lock so one login selects their common server; their runtime state and permissions stay separate.
 2. **The server owns the logic.** Agent definitions (the database's `agents` table, shipped ones from `defaults.py`), template rendering and backend choice (`serves()`, `backend_for()`) are Python. Clients, the console and machines take them from the API and never re-derive them.
 3. **The server never manages a model server.** It forwards agents' traffic only. Everything else is a request to the machine that runs the model server, over the fleet socket.
 4. **Everything dials the server; the server dials nothing behind NAT.** Agent-proxies tunnel account HTTPS and terminals over WebSockets; machines dial back a tunnel per agent connection to a model server.
@@ -94,7 +94,7 @@ The agent gets URLs on its agent-proxy that carry the session id, rendered by th
 | Server database (`AI_PROXY_DATABASE_URL`; schema `mesh`, role `mesh_api` on PostgreSQL; else `logs/agent-server.sqlite3`) | settings (network, backends, Ollama model tuning, agents, retention), accounts (users, organizations, teams), generated secrets (the intercept CA, the browser state key, container keys), the fleet, sessions with their request records, traces, chat indexes and terminal output |
 | Issuer database (`AI_PROXY_AUTH_DATABASE_URL`, else schema `mesh_auth` of the same PostgreSQL, role `mesh_auth`; else `issuer-state.sqlite3` in `AI_PROXY_OIDC_STATE_DIR` or `certs/oidc/`) | OAuth grants and token hashes, service clients, the signing key; accounts are read-only from the server's tables |
 | Server files | `logs/proxy/proxy.log`, the CA's public files (`logs/ca/`), `certs/first-user-password`; an older install's `config/`, `certs/` and `logs/sessions/` files are only read once, by the import into an empty database |
-| Agent computer | `credentials.json` (+ `agent-proxy.log`), `~/.cache/agent-proxy/` (CA copy, per-session files) |
+| Agent and machine user | shared `agent-proxy/credentials.json` and its refresh lock (+ `agent-proxy.log`), `~/.cache/agent-proxy/` (CA copy, per-session files) |
 | Server database, provider accounts | `provider_accounts` and their assignments, hourly usage and events; `provider_credentials` (Copilot tokens, AES-GCM under `AI_PROXY_VAULT_KEYS`, which never enters the database) |
 | Server database, API providers | `backends.options` (protocols, auth, models, headers, priority, fallback, orgs; API step 8); keys in `provider_credentials` as `backend:<name>` (AES-GCM under `AI_PROXY_VAULT_KEYS`, bound to the provider's origin) or an `AI_PROXY_API_KEY_*` variable; health and discovered models in each process's memory |
 | Server database, usage limits | `provider_usage` (hourly tokens and calls per organization, person and provider), `usage_limits` (an organization's token limits per person or everyone, provider and window) |
@@ -102,7 +102,7 @@ The agent gets URLs on its agent-proxy that carry the session id, rendered by th
 | Blob storage (`AI_PROXY_BLOB_URL`, optional) | traces (messages once per session, by hash) and terminal chunks under `tenant/<org>/<yyyy>/<mm>/<session>/`; audit checkpoints and exports under `audit/` |
 | Redis (`AI_PROXY_REDIS_URL`, several processes only) | which process holds each machine, terminal and tunnel; heartbeats; request and usage counters; leases; launch grants; revocations; messages between processes. Machines' keys only sealed. |
 | Server database, peering | `links` (peer, url, state, the peer's public keys), `peer_codes` (digests of one-use link and bridge codes), `bridges`, `peer_policies` (each side's signed link and bridge policies, every version); the link keys in `secrets` (`link-keys`); the mesh id in meta `mesh_id` (or `AI_PROXY_MESH_ID`); `agents.org` (an organization's own definitions) |
-| Machine | its folder: `credentials.json`, `machine.json`, `status.json`, `mcp.json`, `servers.json`, `ollama.json`, `llamacpp.json`, `llamacpp-install.json`, `llamacpp/` (installed builds), logs |
+| Machine | its folder: `machine.json`, `status.json`, `mcp.json`, `servers.json`, `ollama.json`, `llamacpp.json`, `llamacpp-install.json`, `llamacpp/` (installed builds), logs |
 
 ## Ports
 

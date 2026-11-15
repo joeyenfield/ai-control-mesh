@@ -4,7 +4,7 @@ A guide for changing this repository. [`AGENTS.md`](../AGENTS.md) at the root ha
 
 ## Layout
 
-The components live in a folder each and talk only over HTTP and WebSockets, never by importing each other.
+The components live in a folder each and use HTTP and WebSockets at runtime, never importing each other. The client and machine share the OS user's auth file and refresh lock so one login selects their common account and server. Machine settings and permissions stay separate.
 
 ```text
 server/          The server, in Python (FastAPI): agent-server, agent-auth and agent-benchmark, its Dockerfile

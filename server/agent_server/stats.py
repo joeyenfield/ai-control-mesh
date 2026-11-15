@@ -17,7 +17,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 import psutil
 
@@ -25,6 +25,16 @@ import psutil
 # Walking a folder can take seconds, so folder sizes (and the database's) are measured in the
 # background and kept this long.
 FOLDER_TTL = 300
+
+T = TypeVar("T")
+
+
+def _optional(read: Callable[[], T]) -> T | None:
+    """A restricted OS can refuse any host or process probe, including during startup."""
+    try:
+        return read()
+    except (psutil.Error, OSError, AttributeError, NotImplementedError):
+        return None
 
 
 @dataclass
@@ -41,10 +51,11 @@ class ServerStats:
         ]
         # Sessions, their records and traces, accounts and settings: all in the database.
         self.db = getattr(settings, "db", None)
-        self.process = psutil.Process()
+        self.process = _optional(psutil.Process)
         # psutil's CPU figures are since the previous call; the first one only starts the clock.
-        psutil.cpu_percent(interval=None)
-        self.process.cpu_percent(interval=None)
+        _optional(lambda: psutil.cpu_percent(interval=None))
+        if self.process is not None:
+            _optional(lambda: self.process.cpu_percent(interval=None))
         self._lock = threading.Lock()
         self._sizes: dict[str, int | None] = {}
         self._measured_at: float | None = None
@@ -52,32 +63,30 @@ class ServerStats:
 
     def sample(self) -> dict[str, Any]:
         self._measure_if_stale()
-        memory = psutil.virtual_memory()
-        swap = psutil.swap_memory()
-        with self.process.oneshot():
-            process = {
-                "pid": self.process.pid,
-                "rss": self.process.memory_info().rss,
-                "cpu_percent": self.process.cpu_percent(interval=None),
-                "threads": self.process.num_threads(),
-                "started_at": self.process.create_time(),
-                "open_files": _open_files(self.process),
-                "connections": _connections(self.process),
-            }
-        try:
-            load = list(os.getloadavg())
-        except (AttributeError, OSError):  # Windows has none
-            load = None
+        memory = _optional(psutil.virtual_memory)
+        swap = _optional(psutil.swap_memory)
+        # Probe separately: a denied /proc/<pid>/stat must not hide readable memory or fd data.
+        process = {
+            "pid": os.getpid(),
+            "rss": _optional(lambda: self.process.memory_info().rss),
+            "cpu_percent": _optional(lambda: self.process.cpu_percent(interval=None)),
+            "threads": _optional(lambda: self.process.num_threads()),
+            "started_at": _optional(lambda: self.process.create_time()),
+            "open_files": _open_files(self.process),
+            "connections": _connections(self.process),
+        }
+        load = _optional(lambda: list(os.getloadavg()))
         with self._lock:
             sizes, measured_at, measuring = dict(self._sizes), self._measured_at, self._measuring
         return {
             "timestamp": time.time(),
             "hostname": socket.gethostname(),
             "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
-            "boot_time": psutil.boot_time(),
-            "cpu": {"percent": psutil.cpu_percent(interval=None), "count": psutil.cpu_count() or 0, "load_average": load},
-            "memory": {"total": memory.total, "used": memory.total - memory.available, "available": memory.available, "percent": memory.percent},
-            "swap": {"total": swap.total, "used": swap.used, "percent": swap.percent},
+            "boot_time": _optional(psutil.boot_time),
+            "cpu": {"percent": _optional(lambda: psutil.cpu_percent(interval=None)), "count": _optional(psutil.cpu_count) or 0, "load_average": load},
+            "memory": {"total": memory.total if memory else None, "used": memory.total - memory.available if memory else None,
+                       "available": memory.available if memory else None, "percent": memory.percent if memory else None},
+            "swap": {"total": swap.total if swap else None, "used": swap.used if swap else None, "percent": swap.percent if swap else None},
             "process": process,
             "network": _network(),
             "disks": self._disks(),
@@ -92,17 +101,21 @@ class ServerStats:
 
     def _disks(self) -> list[dict[str, Any]]:
         """Each filesystem holding one of the server's folders, once, with the folders on it."""
-        mounts = sorted((part.mountpoint for part in psutil.disk_partitions(all=False)), key=len, reverse=True)
+        try:
+            mounts = sorted((part.mountpoint for part in psutil.disk_partitions(all=False)), key=len, reverse=True)
+        except (psutil.Error, OSError):
+            # Termux can deny /proc/filesystems; disk discovery must not break the stats response.
+            return []
         found: dict[str, dict[str, Any]] = {}
         for folder in self.folders:
-            path = _existing(folder.path)
+            path = _optional(lambda: _existing(folder.path))
             if path is None:
                 continue
             mount = next((point for point in mounts if _within(path, point)), path.anchor or str(path))
             if mount not in found:
                 try:
                     usage = psutil.disk_usage(mount)
-                except OSError:
+                except (psutil.Error, OSError):
                     continue
                 found[mount] = {"mountpoint": mount, "total": usage.total, "used": usage.used, "free": usage.free, "percent": usage.percent, "folders": []}
             found[mount]["folders"].append(folder.name)
@@ -123,7 +136,7 @@ class ServerStats:
             self._sizes, self._measured_at, self._measuring = sizes, time.time(), False
 
 
-def _open_files(process: psutil.Process) -> int | None:
+def _open_files(process: psutil.Process | None) -> int | None:
     """File descriptors (handles on Windows) the server holds: sockets, files and pipes together."""
     try:
         return process.num_handles() if hasattr(process, "num_handles") else process.num_fds()
@@ -131,7 +144,7 @@ def _open_files(process: psutil.Process) -> int | None:
         return None
 
 
-def _connections(process: psutil.Process) -> int | None:
+def _connections(process: psutil.Process | None) -> int | None:
     """The server's own sockets, listening ones included. Some systems refuse it without privileges."""
     try:
         return len(process.net_connections(kind="inet"))
@@ -259,11 +272,8 @@ def server_metrics(runtime: Any) -> list[Metric]:
     """The dashboard's numbers for Prometheus: what `live` counts, the computer's network and memory, the process's memory."""
     now = live(runtime)
     network = _network() or {}
-    memory = psutil.virtual_memory()
-    try:
-        rss = psutil.Process().memory_info().rss
-    except (psutil.Error, OSError):
-        rss = None
+    memory = _optional(psutil.virtual_memory)
+    rss = _optional(lambda: psutil.Process().memory_info().rss)
     one = lambda value: [({}, value)]  # noqa: E731
     return [
         ("agent_server_requests_total", "counter", "Requests and WebSockets this process answered, by how they ended",
@@ -276,8 +286,8 @@ def server_metrics(runtime: Any) -> list[Metric]:
         ("agent_server_intercept_tunnels", "gauge", "Account agents' HTTPS tunnels open here", one(now["intercept_tunnels"])),
         ("agent_server_links_connected", "gauge", "Linked servers connected", one(now["links"]["connected"])),
         ("agent_server_process_resident_memory_bytes", "gauge", "The server process's memory", one(rss)),
-        ("agent_server_host_memory_used_bytes", "gauge", "Memory in use on the server's computer", one(memory.total - memory.available)),
-        ("agent_server_host_memory_total_bytes", "gauge", "Memory of the server's computer", one(memory.total)),
+        ("agent_server_host_memory_used_bytes", "gauge", "Memory in use on the server's computer", one(memory.total - memory.available if memory else None)),
+        ("agent_server_host_memory_total_bytes", "gauge", "Memory of the server's computer", one(memory.total if memory else None)),
         ("agent_server_host_network_receive_bytes_total", "counter", "Bytes the server's computer received, loopback left out", one(network.get("bytes_recv"))),
         ("agent_server_host_network_transmit_bytes_total", "counter", "Bytes the server's computer sent, loopback left out", one(network.get("bytes_sent"))),
     ]
@@ -349,7 +359,7 @@ def _within(path: Path, mount: str) -> bool:
 
 def _size(path: Path) -> int | None:
     """Bytes in a folder tree, not following links; None when it doesn't exist."""
-    if not path.is_dir():
+    if not _optional(path.is_dir):
         return None
     total, pending = 0, [path]
     while pending:

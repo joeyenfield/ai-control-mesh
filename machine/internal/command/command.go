@@ -263,6 +263,10 @@ func signInFirst(server string) int {
 		fmt.Fprintln(os.Stderr, "agent-machine: couldn't sign in with the setup code:", err)
 		return 1
 	}
+	if err := settings.LoadCredentials().CheckServer(server); err != nil {
+		fmt.Fprintln(os.Stderr, "agent-machine:", err)
+		return 1
+	}
 	return 0
 }
 
@@ -278,7 +282,7 @@ func running() *settings.Status {
 // run stays in the fleet until interrupted, reconnecting whenever the connection drops.
 func run(args []string) int {
 	flags := flag.NewFlagSet("agent-machine run", flag.ContinueOnError)
-	server := flags.String("server", "", "The agent-server to join (default: the one from agent-machine login, then "+settings.DefaultServer+")")
+	server := flags.String("server", "", "The shared login's server (before login: AI_PROXY_URL, then "+settings.DefaultServer+"); use login to switch both programs")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -299,13 +303,22 @@ func run(args []string) int {
 	logger.Printf("agent-machine %s joining %s", settings.Version, status.Server)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	selectedServer := func() {
+		server := upstream.Server()
+		if settings.Normalize(status.Server) != settings.Normalize(server) {
+			status.ServerVersion = ""
+		}
+		status.Server = server
+	}
 	member := &presence.Presence{
 		Upstream: upstream, Logger: logger,
 		OnStatus: func(state string) {
+			selectedServer()
 			status.State = state
 			_ = status.Save()
 		},
 		OnServerVersion: func(version string) {
+			selectedServer()
 			status.ServerVersion = version
 			_ = status.Save()
 		},
@@ -450,7 +463,7 @@ func showJSON(machine *settings.Machine) int {
 	if entry := settings.LoadCredentials().Servers[settings.Normalize(server)]; entry != nil && entry.AccessToken != "" {
 		status.SignedIn, status.User = true, entry.User
 	}
-	if os.Getenv(settings.TokenEnvironment) != "" {
+	if settings.EnvironmentToken() != "" {
 		status.SignedIn = true
 	}
 	if run := running(); run != nil {
@@ -478,7 +491,7 @@ func show(machine *settings.Machine) {
 			signedIn = "OAuth sign-in required (agent-machine login " + server + ")"
 		}
 	}
-	if os.Getenv(settings.TokenEnvironment) != "" {
+	if settings.EnvironmentToken() != "" {
 		signedIn = "with an injected OAuth access token"
 	}
 	fmt.Printf("Machine   : %s (%s)\nServer    : %s, %s\n", machine.DisplayName(), machine.ID, server, signedIn)

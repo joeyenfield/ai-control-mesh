@@ -86,6 +86,7 @@ func TestLaunchArgumentsRunTheAgentHeadless(t *testing.T) {
 
 func TestPresenceSaysHelloAndAnswersLaunches(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	t.Setenv("AI_PROXY_MACHINE_TOKEN", "oauth-machine")
 	messages := make(chan map[string]any, 10)
 	upgrader := websocket.Upgrader{}
@@ -182,6 +183,7 @@ func TestPresenceSaysHelloAndAnswersLaunches(t *testing.T) {
 
 func TestPresenceAnswersContainerRequests(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	messages := make(chan map[string]any, 10)
 	upgrader := websocket.Upgrader{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -244,6 +246,7 @@ func TestPresenceAnswersContainerRequests(t *testing.T) {
 
 func TestPresenceAnswersProviderRequestsAndSendsStrataKeys(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	profiles := t.TempDir()
 	t.Setenv("STRATA_PROFILE_DIR", profiles)
 	t.Setenv("STRATA_RUNTIME_DIR", t.TempDir())
@@ -335,6 +338,7 @@ func TestPresenceAnswersProviderRequestsAndSendsStrataKeys(t *testing.T) {
 
 func TestPresenceRenewsItsTokenOverTheOpenConnection(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	t.Setenv(settings.TokenEnvironment, "")
 	old := renewEvery
 	renewEvery = 50 * time.Millisecond

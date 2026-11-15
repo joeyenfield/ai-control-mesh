@@ -322,12 +322,14 @@ def test_login_saves_a_token_and_logout_revokes_it(tmp_path, monkeypatch, capsys
         assert agent_login(url) == 1
 
 
-def test_agent_machine_keeps_its_own_oauth_sign_in(tmp_path, monkeypatch, capsys):
+def test_agent_and_machine_use_the_same_injected_oauth_token(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AI_PROXY_MACHINE_HOME", str(tmp_path / "machine-home"))
     monkeypatch.setenv("AI_PROXY_TOKEN", "client-only")
     monkeypatch.setenv("AI_PROXY_MACHINE_TOKEN", "machine-only")
     assert machine_main.main(["login", "--user", "bob"]) == 2
     upstream = common.Upstream(lambda: tmp_path / "machine-home" / "credentials.json", use_env=False)
+    assert upstream.token("https://server.example") == "client-only"
+    monkeypatch.delenv("AI_PROXY_TOKEN")
     assert upstream.token("https://server.example") == "machine-only"
 
 

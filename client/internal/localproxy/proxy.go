@@ -16,6 +16,7 @@ package localproxy
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,6 +37,8 @@ type route struct {
 	method string
 	path   *regexp.Regexp
 }
+
+type requestServerKey struct{}
 
 // LauncherAPI is the server API the launcher uses, and nothing more: any program on this
 // machine can reach the proxy, and what it forwards here is signed as you.
@@ -132,12 +135,15 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			refuse(w)
 			return
 		}
-		token, err := p.Upstream.AccessToken(p.Upstream.Server())
+		server := p.Upstream.Server()
+		token, err := p.Upstream.AccessToken(server)
 		if err != nil {
 			writeJSON(w, tokenStatus(err), map[string]any{"detail": err.Error()})
 			return
 		}
 		r.Header.Set(settings.TokenHeader, token)
+		// Keep the token bound to its server if another process switches the shared login now.
+		r = r.WithContext(context.WithValue(r.Context(), requestServerKey{}, server))
 		p.agents.ServeHTTP(w, r)
 	default:
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": "Not found"})
@@ -213,8 +219,9 @@ func (p *Proxy) launcherAPI(w http.ResponseWriter, r *http.Request) {
 // rewriteAgent sends an agent's request to the same path on the server, unchanged apart
 // from the headers that belong to this hop or to a browser.
 func (p *Proxy) rewriteAgent(r *httputil.ProxyRequest) {
-	target, err := url.Parse(p.Upstream.Server() + r.In.URL.RequestURI())
-	if err != nil {
+	server, _ := r.In.Context().Value(requestServerKey{}).(string)
+	target, err := url.Parse(server + r.In.URL.RequestURI())
+	if err != nil || server == "" {
 		target = &url.URL{Scheme: "http", Host: "invalid", Path: "/"}
 	}
 	r.Out.URL = target

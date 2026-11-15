@@ -32,6 +32,8 @@ from test_client import (  # noqa: F401  (the tests are collected from here, wit
     test_the_launcher_runs_the_servers_agent_with_the_rendered_environment,
     test_the_programs_speak_the_servers_protocol,
     test_device_sign_in_authenticates_all_proxy_traffic_and_logout_revokes_it,
+    test_one_login_and_logout_apply_to_agent_and_machine,
+    test_shared_login_switches_the_running_proxy_and_fleet_together,
 )
 
 

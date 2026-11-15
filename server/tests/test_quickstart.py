@@ -50,7 +50,8 @@ def test_quickstart_credentials_work_with_real_issuer_and_survive_restart(tmp_pa
                 return response.text
 
         monkeypatch.setattr(machine, "Browser", Browser)
-        paths = [tmp_path / name / "credentials.json" for name in ("agent-machine", "agent-proxy")]
+        monkeypatch.setenv("AI_PROXY_CREDENTIALS", str(tmp_path / "shared" / "credentials.json"))
+        paths = [machine.credentials_path()]
         tokens = []
         for path in paths:
             machine.sign_in(path, "secret")
@@ -73,7 +74,15 @@ def test_quickstart_credentials_work_with_real_issuer_and_survive_restart(tmp_pa
             rotated = issuer.post("/token", data={"client_id": entry["client_id"],
                                   "grant_type": "refresh_token", "refresh_token": entry["refresh_token"]})
             assert rotated.status_code == 200
-        assert tokens[0] != tokens[1]
+        assert len(tokens) == 1
+        assert sum(path == "/device_authorization" for path, _ in requests) == 1
+        # An old saved entry for the requested API must not hide a different active server.
+        saved["default"] = "https://other.example"
+        saved["servers"][saved["default"]] = {"url": saved["default"], "refresh_token": "other"}
+        path.write_text(json.dumps(saved))
+        machine.sign_in(path, "secret")
+        assert json.loads(path.read_text())["default"] == machine.API
+        assert sum(path == "/device_authorization" for path, _ in requests) == 2
         assert all("password" not in (data or {}) or path == "/device" for path, data in requests)
 
 

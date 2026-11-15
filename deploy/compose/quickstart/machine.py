@@ -41,8 +41,8 @@ class Browser:
 def sign_in(path, password):
     if path.exists():
         saved = json.loads(path.read_text())
-        entry = saved.get("servers", {}).get(API, {})
-        if entry.get("refresh_token") and entry.get("issuer") == ISSUER:
+        entry = saved.get("servers", {}).get(saved.get("default"), {})
+        if entry.get("url", "").rstrip("/").lower() == API.rstrip("/").lower() and entry.get("refresh_token") and entry.get("issuer") == ISSUER:
             print(f"Reusing {path.parent.name} sign-in", flush=True)
             return  # The normal Go client owns refresh and its cross-process lock.
 
@@ -82,11 +82,16 @@ def sign_in(path, password):
     print(f"Signed {path.parent.name} in as {USER}", flush=True)
 
 
+def credentials_path():
+    """The Unix auth profile shared by agent and agent-machine inside the containers."""
+    if os.getenv("AI_PROXY_CREDENTIALS"):
+        return Path(os.environ["AI_PROXY_CREDENTIALS"]).expanduser()
+    return Path(os.getenv("XDG_CONFIG_HOME") or Path.home() / ".config") / "agent-proxy" / "credentials.json"
+
+
 def main():
     password = os.environ.pop("QUICKSTART_PASSWORD")
-    config = Path.home() / ".config"
-    sign_in(config / "agent-machine" / "credentials.json", password)
-    sign_in(config / "agent-proxy" / "credentials.json", password)
+    sign_in(credentials_path(), password)
     del password
     if os.getenv("QUICKSTART_OLLAMA") == "1":
         # The relay accepts connections before Ollama answers, so wait for a real reply.
@@ -127,8 +132,11 @@ def share_mcp(servers: str) -> None:
 
 def api(method, path, body=None):
     """The server's API as this machine's owner, with agent-machine's current access token (it refreshes it)."""
-    saved = json.loads((Path.home() / ".config" / "agent-machine" / "credentials.json").read_text())
-    token = saved["servers"][API]["access_token"]
+    saved = json.loads(credentials_path().read_text())
+    entry = saved["servers"][saved["default"]]
+    if entry["url"].rstrip("/").lower() != API.rstrip("/").lower():
+        raise ValueError("The shared sign-in now selects another server")
+    token = entry["access_token"]
     request = Request(API + path, method=method, data=json.dumps(body).encode() if body is not None else None,
                       headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
     with build_opener(ProxyHandler({})).open(request, timeout=15) as response:

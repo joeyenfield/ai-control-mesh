@@ -6,7 +6,7 @@
    the host and the processes in here both reach.
 2. On the first start, agent-machine and agent sign in as admin through the issuer's device flow
    (deploy/compose/quickstart/machine.py's sign_in, as a browser would), with the first password: the one the
-   server made (printed below) or MESH_ADMIN_PASSWORD. Later starts reuse those sign-ins.
+   server made (printed below) or MESH_ADMIN_PASSWORD. Later starts reuse the shared sign-in.
 3. This container becomes a machine of its own fleet: launches, files, terminals and model servers
    on, for /workspace, under a name people can read (machine_name). Then agent-machine runs in the
    foreground.
@@ -29,9 +29,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from agent_server import local  # noqa: E402
-from quickstart_machine import sign_in  # noqa: E402
+from quickstart_machine import credentials_path, sign_in  # noqa: E402
 
-CONFIG = Path.home() / ".config"
 WORKSPACE = "/workspace"
 
 
@@ -88,14 +87,13 @@ def main() -> int:
     instance = local.Instance.load(instance.home)
 
     password = first_password(instance, chosen)
-    signed = all((CONFIG / name / "credentials.json").is_file() for name in ("agent-machine", "agent-proxy"))
+    signed = credentials_path().is_file()
     if not signed and not password:
         say("This machine has no sign-in yet and the first password is gone: set MESH_ADMIN_PASSWORD to admin's password.")
         local.stop(instance, quiet=True)
         return 1
     try:
-        sign_in(CONFIG / "agent-machine" / "credentials.json", password)
-        sign_in(CONFIG / "agent-proxy" / "credentials.json", password)
+        sign_in(credentials_path(), password)
     except Exception as error:  # a changed password, say: the server stays up to fix it from the console
         say(f"Couldn't sign this machine in as admin ({error}). Set MESH_ADMIN_PASSWORD to admin's password and restart.")
     name = machine_name()

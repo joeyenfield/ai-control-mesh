@@ -29,6 +29,7 @@ type fakeIssuer struct {
 
 func newIssuer(t *testing.T) *fakeIssuer {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	t.Setenv(settings.TokenEnvironment, "")
 	t.Setenv(settings.SetupCodeEnvironment, "")
 	t.Setenv(EnableEnvironment, "")

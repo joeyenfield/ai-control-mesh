@@ -61,6 +61,8 @@ flowchart LR
 
 `stop` stops the issuer first, then the API, the reverse of start. For each, it terminates the process and its children, waits 15 seconds, then kills what's left. It never looks a process up by name or by port, so it can't stop another program that holds the same port. `start` refuses a port that another program holds rather than taking it.
 
+Restricted `/proc` access can prevent these identity checks. If the identity cannot be read just after launch, startup stops and waits for that child through its subprocess handle, then reports the error. It never saves an unverifiable process as running. If only child enumeration is denied during stop, it still attempts to terminate the verified parent.
+
 When only one of the two runs (say the issuer crashed), `start` stops the one left and starts both again in order. Nothing restarts a process that exits on its own: run `agent-server local` again, or use the tray icon.
 
 ### Its environment
@@ -208,7 +210,7 @@ Its first process, under `tini`, is `devhelpers/allinone/entrypoint.py`:
 1. It installs any missing `AGENT_APT_PACKAGES` with the image's sudo. A failure is reported and skipped.
 2. It calls `local.start()` with three overrides: `AI_PROXY_HOST` and `AI_PROXY_AUTH_HOST` set to `0.0.0.0`, so the host's published ports reach the two processes, and `AI_PROXY_UI_BUILD=0`. The public addresses stay `http://localhost:19999` and `:20000`, which both the host's browser and the processes inside reach. That's why the host must publish the same port numbers.
 3. With `MESH_ADMIN_PASSWORD` set, it removes it from its own environment and passes it only to the two processes as `AI_PROXY_USERNAME=admin` and `AI_PROXY_PASSWORD`, so `admin` is an environment account and no first password is made. Otherwise it reads the first password from its file.
-4. If `agent-machine` and `agent-proxy` have no credentials yet, it signs both in as `admin` through the issuer's device flow, approving its own codes through the issuer's form as a browser would (`sign_in` from `deploy/compose/quickstart/machine.py`, copied in). Without a password to do this it stops. If the sign-in fails (a changed password, say), it reports it and carries on, so the console stays up to fix it.
+4. If the shared auth file is missing, it signs in once as `admin` for both `agent-machine` and `agent-proxy` through the issuer's device flow, approving its code through the issuer's form as a browser would (`sign_in` and `credentials_path` from `deploy/compose/quickstart/machine.py`, copied in). Without a password to do this it stops. If the sign-in fails (a changed password, say), it reports it and carries on, so the console stays up to fix it.
 5. It names the machine `MESH_MACHINE_NAME`, else a hostname someone chose (`--hostname`), else `my-machine` (a container's own hostname is its id, which says nothing), turns launches, files, terminals and model servers on and containers off, and adds `/workspace` as a launch folder.
 6. It runs `agent-machine run` in the foreground and checks every 2 seconds that it and both server processes still run. When one stops, or the container gets SIGTERM or SIGINT, it stops the others and exits.
 

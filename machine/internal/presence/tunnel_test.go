@@ -69,8 +69,9 @@ func tunnelServer(t *testing.T, got chan<- string) *httptest.Server {
 }
 
 func testPresence(t *testing.T, server *httptest.Server) *Presence {
-	// The tunnel reads its token for renewals: from a home of the test's own, never this computer's.
+	// Renewals read the shared profile, so isolate it as well as the machine state.
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	return &Presence{Dial: func(base, path string) (*websocket.Conn, *http.Response, error) {
 		return websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(base, "http")+path, nil)
 	}}

@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import psutil
 import pytest
 
 from agent_server import local
@@ -73,6 +74,66 @@ def test_secrets_never_go_on_a_command_line(tmp_path, monkeypatch):
     secret = instance.secrets()["introspection_secret"]
     assert local.MARK in seen["command"][-1]
     assert not any(secret in part for part in seen["command"])
+
+
+@pytest.mark.parametrize("error", [PermissionError, psutil.AccessDenied])
+@pytest.mark.parametrize("needs_kill", [False, True])
+def test_unreadable_child_identity_does_not_leave_an_untracked_process(tmp_path, monkeypatch, error, needs_kill):
+    calls = []
+
+    class Child:
+        pid = 123
+
+        def terminate(self):
+            calls.append("terminate")
+
+        def wait(self, timeout=None):
+            calls.append("wait")
+            if needs_kill and timeout is not None:
+                raise subprocess.TimeoutExpired("child", timeout)
+
+        def kill(self):
+            calls.append("kill")
+
+    def denied(pid):
+        raise error()
+
+    monkeypatch.setattr(local.subprocess, "Popen", lambda *args, **kwargs: Child())
+    monkeypatch.setattr(psutil, "Process", denied)
+    with pytest.raises(RuntimeError, match="foreground"):
+        local.spawn("server", local.Instance(tmp_path), {})
+    assert calls == (["terminate", "wait", "kill", "wait"] if needs_kill else ["terminate", "wait"])
+
+
+def test_local_start_reports_an_unreadable_identity(tmp_path, monkeypatch, capsys):
+    def denied(*args):
+        raise RuntimeError("Cannot read the local process identity. Run in the foreground instead.")
+
+    monkeypatch.setattr(local, "spawn", denied)
+    monkeypatch.setattr(local, "port_free", lambda port: True)
+    instance = local.Instance(tmp_path)
+    assert local.start(instance) == 1
+    assert not instance.processes
+    assert "foreground" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("error", [PermissionError, psutil.AccessDenied])
+def test_stop_can_stop_a_verified_parent_when_other_processes_are_hidden(monkeypatch, error):
+    stopped = []
+
+    class Parent:
+        def children(self, recursive=False):
+            raise error()
+
+        def terminate(self):
+            stopped.append(self)
+
+    parent = Parent()
+    monkeypatch.setattr(local, "running", lambda process: True)
+    monkeypatch.setattr(psutil, "Process", lambda pid: parent)
+    monkeypatch.setattr(psutil, "wait_procs", lambda family, timeout: (family, []))
+    local.stop_process(local.Process(123, 1.0))
+    assert stopped == [parent]
 
 
 def _sleeper(marked: bool) -> subprocess.Popen:

@@ -41,7 +41,7 @@ func Main(name string, args []string) int {
 			"status says which server it signs in to, as whom, and whether it's running.\n\n", name, name, name)
 		flags.PrintDefaults()
 	}
-	server := flags.String("server", "", "The agent-server to use (default: AI_PROXY_URL, then the one from `agent login`, then "+settings.DefaultServer+")")
+	server := flags.String("server", "", "The shared login's server (before login: AI_PROXY_URL, then "+settings.DefaultServer+"); use login to switch both programs")
 	port := flags.Int("port", settings.ProxyPort(), "HTTP port on 127.0.0.1")
 	interceptPort := flags.Int("intercept-port", settings.InterceptPort(), "HTTPS proxy port on 127.0.0.1 for account agents")
 	if err := flags.Parse(args); err != nil {
@@ -56,6 +56,10 @@ func Main(name string, args []string) int {
 	}
 	logger := openLog()
 	upstream := settings.Upstream{Fixed: *server}
+	if err := settings.LoadCredentials().CheckServer(upstream.Server()); err != nil {
+		fmt.Fprintln(os.Stderr, "agent-proxy:", err)
+		return 1
+	}
 	httpListener, err := Listen(*port)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "agent-proxy: %v\n", err)
@@ -118,6 +122,9 @@ func CurrentStatus() Status {
 	status := Status{Server: server, Port: settings.ProxyPort()}
 	if entry := settings.LoadCredentials().Servers[settings.Normalize(server)]; entry != nil && entry.AccessToken != "" {
 		status.SignedIn, status.User = true, entry.User
+	}
+	if settings.EnvironmentToken() != "" {
+		status.SignedIn = true
 	}
 	if running := api.Health(settings.ProxyURL()); running != nil && running["role"] == "agent-proxy" {
 		status.Running = true

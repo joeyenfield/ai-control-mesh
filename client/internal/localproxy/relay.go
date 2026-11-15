@@ -130,6 +130,10 @@ func (s *serverSide) renew(upstream settings.Upstream, server, token string) {
 			return
 		case <-ticker.C:
 			next, err := upstream.AccessToken(server)
+			if errors.Is(err, settings.ErrServerChanged) || errors.Is(err, settings.ErrLoginRequired) {
+				_ = s.conn.Close()
+				return
+			}
 			if err != nil || (next == token && time.Since(sent) < resendEvery) {
 				continue
 			}

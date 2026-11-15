@@ -157,25 +157,29 @@ type ServerEntry struct {
 	RevocationEndpoint string `json:"revocation_endpoint,omitempty"`
 }
 
-// CredentialsPath is credentials.json in the user's config folder, or AI_PROXY_CREDENTIALS.
+// CredentialsPath is shared by agent and agent-machine for this OS user.
 func CredentialsPath() string {
 	if path := os.Getenv("AI_PROXY_CREDENTIALS"); path != "" {
 		return expandHome(path)
 	}
+	return filepath.Join(configDir(), "agent-proxy", "credentials.json")
+}
+
+func configDir() string {
 	if runtime.GOOS == "windows" {
 		base := os.Getenv("APPDATA")
 		if base == "" {
 			home, _ := os.UserHomeDir()
 			base = filepath.Join(home, "AppData", "Roaming")
 		}
-		return filepath.Join(base, "agent-proxy", "credentials.json")
+		return base
 	}
 	base := os.Getenv("XDG_CONFIG_HOME")
 	if base == "" {
 		home, _ := os.UserHomeDir()
 		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "agent-proxy", "credentials.json")
+	return base
 }
 
 func expandHome(path string) string {
@@ -195,7 +199,7 @@ func Normalize(server string) string {
 // LoadCredentials reads the file; a missing or unreadable one is empty.
 func LoadCredentials() *Credentials {
 	credentials := &Credentials{}
-	if data, err := os.ReadFile(CredentialsPath()); err == nil {
+	if data := credentialData(); data != nil {
 		_ = json.Unmarshal(data, credentials)
 	}
 	if credentials.Servers == nil {
@@ -246,7 +250,7 @@ func (c *Credentials) DefaultEntry() *ServerEntry {
 // Upstream is the agent-server this machine uses and its sign-in. It's read from the
 // credentials file on every call, so `agent login` and `agent logout` apply at once.
 type Upstream struct {
-	// Fixed is the server from --server; it wins over everything else.
+	// Fixed pins the destination; a conflicting shared sign-in is refused.
 	Fixed string
 }
 
@@ -257,13 +261,13 @@ func (u Upstream) Server() string {
 	return DefaultServerURL()
 }
 
-// DefaultServerURL is AI_PROXY_URL, then the server from `agent login`, then this computer.
+// DefaultServerURL is the shared sign-in, then AI_PROXY_URL before login, then this computer.
 func DefaultServerURL() string {
-	if server := os.Getenv("AI_PROXY_URL"); server != "" {
-		return strings.TrimRight(server, "/")
-	}
 	if entry := LoadCredentials().DefaultEntry(); entry != nil && entry.URL != "" {
 		return strings.TrimRight(entry.URL, "/")
+	}
+	if server := os.Getenv("AI_PROXY_URL"); server != "" {
+		return strings.TrimRight(server, "/")
 	}
 	return DefaultServer
 }

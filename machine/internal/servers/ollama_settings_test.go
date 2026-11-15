@@ -102,8 +102,8 @@ func TestTheDataFolderHoldsTheModelsAndBuildsWhenSet(t *testing.T) {
 	if joined := strings.Join(Environment(nil, config), "\n"); !strings.Contains(joined, "OLLAMA_MODELS=/models") || strings.Contains(joined, "ollama-models") {
 		t.Fatalf("%s", joined)
 	}
-	// The sign-in stays in agent-machine's own folder.
-	if settings.CredentialsPath() != filepath.Join(home, "credentials.json") {
+	// Moving machine data or settings does not move the shared sign-in.
+	if settings.CredentialsPath() == filepath.Join(home, "credentials.json") {
 		t.Fatal(settings.CredentialsPath())
 	}
 }

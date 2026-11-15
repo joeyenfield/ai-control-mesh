@@ -5,7 +5,7 @@ A **machine** is a computer that has joined the server's **fleet** with `agent-m
 - They supply every local LLM provider. Ollama, llama.cpp, Strata and Docker Model Runner run on machines, and so do the containers the server asks a machine to run. See [LLM providers](providers.md).
 - They run things for you when you allow it: agents started from the console, terminals, [MCP servers](mcp.md) and updates.
 
-`agent-machine` is its own program, apart from the `agent` client. It has its own sign-in and its own folder, so a machine can supply models to one server (or as one account) while its agents use another. It shares no code with `agent`. When it starts an agent, it runs `agent` as a program.
+`agent-machine` is its own program with its own settings and permissions. It shares the OS user's login and selected server with `agent`, so signing in once configures both. It shares no code with `agent`. When it starts an agent, it runs `agent` as a program.
 
 [Quick start](#quick-start) and [Commands](#commands) are all most setups need; [What a machine runs for you](#what-a-machine-runs-for-you) and [Who may use a machine](#who-may-use-a-machine) cover launches, terminals, updates and access. The rest is reference: the fleet protocol, every file on disk, running it as a service, and [the sandbox](#a-sandbox-machine-in-docker).
 
@@ -80,7 +80,7 @@ These are permissions for programs on this machine. Selecting them does not inst
 
 ### Signing in
 
-`agent-machine login` signs this machine in. The URL defaults to the server signed in to last, or `http://127.0.0.1:9999`. A URL without a scheme gets `https://`.
+`agent-machine login` and `agent login` share one sign-in and selected server for this OS user. Sign in with either command once; the other reuses it without another approval. Either logout command signs both out. To change account on the same server, logout first. The URL defaults to the shared login, then `AI_PROXY_URL` before login, or `http://127.0.0.1:9999`. A URL without a scheme gets `https://`.
 
 Open the printed OIDC verification URL in your browser, sign in and approve the displayed device code. If you're already signed in to the console, you can instead enter the code on **Machines › Approve a device**, without typing your password again ([Console](console.md#approve-a-device)). The CLI never collects your password. Access tokens refresh automatically using rotating credentials. Authentication is mandatory; old password and access-key options are removed. See [OIDC authentication](oidc.md).
 
@@ -90,7 +90,9 @@ The machine belongs to whoever signed it in: that user is its **owner**. A machi
 
 ### Signing in with a setup code
 
-Where nobody is at a browser (a container, a script, a computer you set up remotely), a setup code approves the sign-in for you. Create one in the console on **Machines**: **Add a machine**, then **Create a setup code**. A code starts with `msc_`, expires after a while and can be used a limited number of times. The machine it signs in belongs to you, as if you had approved the device code yourself. Treat it as a password: agent-machine never prints or logs it.
+Where nobody is at a browser (a container, a script, a computer you set up remotely), a setup code approves the sign-in for you. Create one in the console on **Machines**: **Add a machine**, then **Create a setup code**. A code starts with `msc_`, expires after a while and can be used a limited number of times. Each computer uses it once, including when both agent and agent-machine are installed; the machine count in the console is the number of allowed uses. The machine it signs in belongs to you, as if you had approved the device code yourself. Treat it as a password: agent-machine never prints or logs it.
+
+![One setup-code use per computer](screenshots/shared-login-setup.png)
 
 ```bash
 agent-machine login https://api.example.com --code msc_... --enable launches,commands
@@ -100,11 +102,11 @@ agent-machine login https://api.example.com --code msc_... --enable launches,com
 - `--enable LIST` turns toggles on once signed in, as `agent-machine <toggle> on` does: a comma-separated list of `launches`, `commands` (or `terminals`), `files`, `updates`, `servers` and `containers`. Without `--enable`, `login` uses `AI_PROXY_MACHINE_ENABLE`. It works with a browser sign-in too. An unknown name stops `login` (exit status 2) before it signs in.
 - A code that has expired, been used up, or whose account changed is refused with "The setup code isn't valid: it may have expired or been used up. Create a new one on the console's Machines page." Nothing is saved and no toggle changes.
 
-`agent-machine start` and `agent-machine run` sign in by themselves when `AI_PROXY_MACHINE_SETUP_CODE` is set and there's no sign-in for their server yet (`--server`, else the last one, else `http://127.0.0.1:9999`), and apply `AI_PROXY_MACHINE_ENABLE` too. That's a container's first start. Once credentials exist the code is ignored, so a restarted container doesn't spend another use. If the code is refused, they exit with the message and status 1. They remove the code from their environment either way, so agents and terminals started on the machine never see it. With `AI_PROXY_MACHINE_TOKEN` set no sign-in is needed, and the code is ignored.
+`agent-machine start` and `agent-machine run` sign in by themselves when `AI_PROXY_MACHINE_SETUP_CODE` is set and there's no sign-in for their server yet (`--server`, else the last one, else `http://127.0.0.1:9999`), and apply `AI_PROXY_MACHINE_ENABLE` too. That's a container's first start. Once credentials exist the code is ignored, so a restarted container doesn't spend another use. If the code is refused, they exit with the message and status 1. They remove the code from their environment either way, so agents and terminals started on the machine never see it. With `AI_PROXY_TOKEN` (or its `AI_PROXY_MACHINE_TOKEN` alias) set no sign-in is needed, and the code is ignored.
 
 ### Running it
 
-- `run` stays in the foreground and reconnects whenever the connection drops. It waits 2, 5, 10, then 30 seconds between tries, and starts over after a connection that lasted more than a minute. It renews its access token over the open connection, so the token's expiry doesn't drop it. `--server` joins another server than the signed-in one.
+- `run` stays in the foreground and reconnects whenever the connection drops. It waits 2, 5, 10, then 30 seconds between tries, and starts over after a connection that lasted more than a minute. It renews its access token over the open connection, so the token's expiry doesn't drop it. `--server` must match the shared login once signed in. Use `agent login <url>` or `agent-machine login <url>` to switch both programs to another server.
 - `start` runs `agent-machine run` detached from the terminal, and waits up to 15 seconds for it to connect or fail. It prints the log's path.
 - `stop` stops the running one and waits up to 10 seconds for it to go.
 
@@ -161,7 +163,7 @@ A binary installed by a package manager (`/usr/bin`, `Program Files`) belongs to
 
 ## Files and environment variables
 
-agent-machine keeps everything in one folder:
+agent-machine keeps its settings and runtime state in one folder:
 
 - `AI_PROXY_MACHINE_HOME`, when set;
 - else `%APPDATA%\agent-machine` on Windows;
@@ -169,7 +171,6 @@ agent-machine keeps everything in one folder:
 
 | File | What it holds |
 |---|---|
-| `credentials.json` | Each server's URL, user, access token, rotating refresh token, expiry and issuer endpoints, plus the default server. No passwords. Keep it private. |
 | `machine.json` | The machine's id and settings: name, address, launches, roots, containers and the container CLI, servers, commands, updates. |
 | `status.json` | How the running agent-machine is doing: process id, server, state, the server's version, and how it was started. |
 | `agent-machine.log` | Its log. A run in a terminal also prints it there. |
@@ -185,11 +186,13 @@ agent-machine keeps everything in one folder:
 | `ollama-models/` | Only with `AI_PROXY_MACHINE_DATA` set: the models of the Ollama agent-machine starts, unless its settings name another folder. In the data folder. |
 | `mcp.json` | The MCP servers it shares: commands, environments, folders, URLs and headers. |
 
+Authentication is shared with `agent` in `%APPDATA%\agent-proxy\credentials.json` on Windows, or `$XDG_CONFIG_HOME/agent-proxy/credentials.json` (default `~/.config/agent-proxy/credentials.json`) elsewhere. `AI_PROXY_CREDENTIALS` names a different shared profile; `AI_PROXY_MACHINE_HOME` does not move it. On upgrade, existing agent credentials win over separate old machine credentials. If only the machine credentials exist, they move under the shared refresh lock. Update and restart both programs together.
+
 Files are written readable by this user only. The machine's id is made the first time it's needed. A `machine.json` from before agent-machine existed (in the client's `agent-proxy` folder) is carried over once, so the server still knows the machine by its id. That doesn't happen when `AI_PROXY_MACHINE_HOME` is set.
 
 **The data folder.** The large files, llama.cpp's builds and models (gigabytes), go in the data folder: `AI_PROXY_MACHINE_DATA` when it's set, else agent-machine's folder.
 
-- Set it where the sign-in's folder is small, or where the only writable space is `/tmp` or a scratch volume, as in a pod under OpenShift's restricted policy: `AI_PROXY_MACHINE_DATA=/tmp/agent-data`. The sign-in and settings stay in agent-machine's folder.
+- Set it where the sign-in's folder is small, or where the only writable space is `/tmp` or a scratch volume, as in a pod under OpenShift's restricted policy: `AI_PROXY_MACHINE_DATA=/tmp/agent-data`. Settings stay in agent-machine's folder; the shared auth file stays in the user's config folder.
 - With it set, an Ollama agent-machine starts keeps its models in `ollama-models` there too, unless Ollama's **Models directory** setting names a folder. Without it, Ollama keeps them where it always does (`~/.ollama/models`).
 - Moving it doesn't move files already downloaded: they're downloaded again.
 
@@ -198,7 +201,10 @@ It reads these environment variables:
 | Variable | What it does |
 |---|---|
 | `AI_PROXY_MACHINE_HOME` | agent-machine's folder |
-| `AI_PROXY_MACHINE_TOKEN` | A pre-issued OAuth access token, over the stored sign-in (automation; obtain a replacement before it expires) |
+| `AI_PROXY_TOKEN` | A pre-issued OAuth access token shared by both programs (automation; obtain a replacement before it expires) |
+| `AI_PROXY_MACHINE_TOKEN` | Legacy alias for `AI_PROXY_TOKEN`, accepted by both programs when that variable is absent |
+| `AI_PROXY_CREDENTIALS` | The shared auth file for agent and agent-machine |
+| `AI_PROXY_URL` | The server before login; the saved shared selection wins |
 | `AI_PROXY_MACHINE_DATA` | The data folder: llama.cpp's builds and models, and the models of an Ollama it starts (default: agent-machine's folder, and Ollama's own for Ollama's models) |
 | `AI_PROXY_MACHINE_SETUP_CODE` | A setup code for `login` without `--code`, and for `start` and `run` to sign in with when there's no sign-in yet ([Signing in with a setup code](#signing-in-with-a-setup-code)) |
 | `AI_PROXY_MACHINE_ENABLE` | Toggles to turn on after such a sign-in, comma-separated, for `login` without `--enable` |
@@ -294,7 +300,7 @@ with `AI_PROXY_URL` set to its server, and `AI_PROXY_MACHINE_ID` and `AI_PROXY_M
 
 The server accepts a successful launch only when the reported session belongs to the machine's owner and matches that machine, launch id and agent. An unrelated session is refused with `502`; it never grants the requester access to that session.
 
-The agent's traffic goes through this computer's agent-proxy, signed in with `agent login`. So that has to be the same server: if the agent-proxy here is already running for another server, the launch is refused with `agent login <server>` as the fix. Install the client and sign it in to the same server to take launches.
+The agent's traffic goes through this computer's agent-proxy, signed in with `agent login`. So that has to be the same server: if the agent-proxy here is already running for another server, the launch is refused with `agent login <server>` as the fix. Install the client to take launches; it uses the machine's shared login.
 
 The server records the last 30 launches per machine, with who asked, the agent, the folder and the session or the error. The machine's page shows the last 10. Machine launch history only includes sessions you may view, plus your own pending or failed launches. Sessions carry `machine`, `machine_name` and `launch` tags. Agents started by hand on the computer only carry `hostname`, and the server puts them under the same owner's machine with that hostname, so the machine's page lists both.
 
@@ -430,7 +436,7 @@ It has the tools a person at a terminal reaches for, so the agents can use them 
 On start it:
 
 1. waits up to two minutes for the server's `/health`;
-2. signs both agent-machine and agent in to the server, unless their credentials already name it. A sign-in that fails (nobody approved the code in time, a used-up setup code) is tried again after 30 seconds, then a wait that doubles up to 15 minutes, until it works; `docker logs agent-sandbox` shows each new code. It doesn't exit, so a restart policy can't make it ask for codes over and over;
+2. signs in once for both agent-machine and agent, unless the shared credentials already name the server. A sign-in that fails (nobody approved the code in time, a used-up setup code) is tried again after 30 seconds, then a wait that doubles up to 15 minutes, until it works; `docker logs agent-sandbox` shows each new code. It doesn't exit, so a restart policy can't make it ask for codes over and over;
 3. copies SSH keys from `/ssh`, sets git's user, and clones `AGENT_REPOS`;
 4. relays the model servers named by `AGENT_OLLAMA` and `AGENT_LLAMACPP` to its own loopback (see [Model servers for a sandbox](#model-servers-for-a-sandbox));
 5. sets the machine's name, turns launches on and adds the workspace as a launch root (roots persist on the home volume, so a fresh volume has only the workspace), turns containers off, and turns servers on unless `AGENT_SERVERS=off`;
@@ -485,7 +491,7 @@ docker compose logs -f agent-sandbox
 | `--build-arg AGENT_SUDO=0` | No `sudo` for the agent user |
 | `--build-arg OLLAMA_VERSION=...` | The Ollama release to copy in (from the `ollama/ollama` image), when you build the image yourself |
 
-- **Sign-ins.** On first start, open the verification URL printed in the logs and approve each of the two device codes. With `AI_PROXY_MACHINE_SETUP_CODE` set, agent-machine's is approved by the code instead, and the code is kept out of the agents' environment. Credentials and the machine id persist in `/home/agent`; subsequent starts renew automatically and don't use the code again. Password/key environment bootstrap is removed.
+- **Sign-in.** On first start, open the verification URL printed in the logs and approve one device code for both programs. With `AI_PROXY_MACHINE_SETUP_CODE` set, it is approved by the setup code instead, and the code is kept out of the agents' environment. The shared credentials and machine id persist in `/home/agent`; subsequent starts renew automatically and don't use the code again. Password/key environment bootstrap is removed.
 - **Git over SSH.** The keys are copied rather than used in place, because a mount from Windows or macOS usually has permissions ssh refuses. Without your own `config`, a host's key is trusted the first time it's seen, so a clone doesn't stop at a question nobody can answer. Agents in the sandbox can read the key: use a deploy key or one made for the sandbox.
 - **Account agents.** Their sign-ins (Claude, Copilot, ChatGPT) also live in `/home/agent`. Sign in once from the agent's terminal in the console.
 - **OpenShift and OKD.** The image runs under the restricted policy, as a random user in group 0: its home and workspace are writable by group 0, and the entrypoint gives that user a name in `/etc/passwd`. If the home folder isn't writable (a read-only root file system with no volume there), it uses `/tmp/agent-home`, so sign-ins last only as long as the pod: sign in with a setup code that allows enough sign-ins, or mount a volume at `/home/agent`. Set `AGENT_DATA_DIR=/tmp/agent-data` (or a scratch volume) to keep llama.cpp and the models out of the home volume.

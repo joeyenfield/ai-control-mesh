@@ -110,7 +110,7 @@ def fleet_machine(m, machine_binary: Path, tmp_path: Path, *settings: list[str],
         done = subprocess.run([str(machine_binary), *args], env=machine_env, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
         assert done.returncode == 0, done.stdout + done.stderr
 
-    save_credentials(Path(machine_env["AI_PROXY_MACHINE_HOME"]) / "credentials.json", m.server, m.tokens, m.issuer)
+    # agent-machine uses agent's existing auth profile; no second sign-in or token copy.
     for args in settings:
         command(*args)
     process = subprocess.Popen([str(machine_binary), "run"], env=machine_env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -299,8 +299,11 @@ def machine(tmp_path, agent_binary, accounts: bool = False, prepare=None):
         runtime.intercept_client = runtime.client
         port, intercept_port = free_port(), free_port()
         env = {key: value for key, value in os.environ.items() if key not in CLEARED}
+        profile = tmp_path / "user-home"
+        profile.mkdir(parents=True, exist_ok=True)
         env.update(AI_PROXY_CREDENTIALS=str(tmp_path / "machine" / "credentials.json"), AI_PROXY_URL=server,
-                   AI_PROXY_LOCAL_PORT=str(port), AI_PROXY_LOCAL_INTERCEPT_PORT=str(intercept_port))
+                   AI_PROXY_LOCAL_PORT=str(port), AI_PROXY_LOCAL_INTERCEPT_PORT=str(intercept_port),
+                   USERPROFILE=str(profile), HOME=str(profile))
         if not accounts:
             save_credentials(Path(env["AI_PROXY_CREDENTIALS"]), server, tokens, issuer)
         if prepare:
@@ -308,7 +311,12 @@ def machine(tmp_path, agent_binary, accounts: bool = False, prepare=None):
         process = subprocess.Popen([str(agent_binary), "proxy"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         proxy = f"http://127.0.0.1:{port}"
         try:
-            wait_for(proxy)
+            try:
+                wait_for(proxy, alive=lambda: process.poll() is None)
+            except AssertionError as error:
+                if process.poll() is not None:
+                    raise AssertionError("agent-proxy exited: " + process.stderr.read().decode(errors="replace")) from error
+                raise
             yield SimpleNamespace(server=server, proxy=proxy, runtime=runtime, seen=seen, intercept_port=intercept_port,
                                   env=env, binary=agent_binary, issuer=issuer, tokens=tokens, token=tokens["access_token"],
                                   headers={"x-ai-proxy-token": tokens["access_token"]})
@@ -478,6 +486,79 @@ def test_device_sign_in_authenticates_all_proxy_traffic_and_logout_revokes_it(tm
         assert httpx.get(m.server + "/api/sessions", headers={"x-ai-proxy-token": access}).status_code == 200
         assert run_agent(m, "logout").returncode == 0
         assert httpx.get(m.server + "/api/sessions", headers={"x-ai-proxy-token": access}).status_code == 401
+
+
+def device_login_program(binary: Path, server: str, issuer: str, env: dict) -> None:
+    process = subprocess.Popen([str(binary), "login", server], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        prompt = process.stdout.readline()
+        match = re.search(r"enter code ([A-Z0-9-]+)", prompt)
+        assert match, prompt
+        approve_device(issuer, match.group(1))
+        stdout, stderr = process.communicate(timeout=30)
+        assert process.returncode == 0, prompt + stdout + stderr
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=10)
+
+
+@pytest.mark.parametrize("machine_first", [False, True])
+def test_one_login_and_logout_apply_to_agent_and_machine(tmp_path, agent_binary, machine_binary, machine_first):
+    with machine(tmp_path, agent_binary, accounts=True) as m:
+        env = {**m.env, "AI_PROXY_MACHINE_HOME": str(tmp_path / "machine-home")}
+        first, second = (machine_binary, agent_binary) if machine_first else (agent_binary, machine_binary)
+        device_login_program(first, m.server, m.issuer, env)
+        before = json.loads(Path(env["AI_PROXY_CREDENTIALS"]).read_text())
+        # Even an unusable setup code is ignored when this computer is already signed in.
+        reused = subprocess.run([str(second), "login", m.server, "--code", "unused-setup-code"], env=env,
+                                capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+        assert reused.returncode == 0 and "enter code" not in reused.stdout, reused.stdout + reused.stderr
+        assert json.loads(Path(env["AI_PROXY_CREDENTIALS"]).read_text()) == before
+        assert not (tmp_path / "machine-home" / "credentials.json").exists()
+        for binary, args in ((agent_binary, ["proxy", "status", "--json"]), (machine_binary, ["status", "--json"])):
+            shown = json.loads(subprocess.check_output([str(binary), *args], env=env, text=True, timeout=30))
+            assert shown["signed_in"] and shown["user"] == "dave" and shown["server"] == m.server
+        with fleet_machine(m, machine_binary, tmp_path) as fleet:
+            assert fleet.box["owner"] == "dave"
+            done = subprocess.run([str(second), "logout"], env=env, capture_output=True, text=True, timeout=30)
+            assert done.returncode == 0, done.stdout + done.stderr
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                rows = httpx.get(m.server + "/api/machines", headers=m.headers).json()["machines"]
+                if not any(row["connected"] for row in rows):
+                    break
+                time.sleep(0.2)
+            assert not any(row["connected"] for row in rows)
+        assert httpx.get(m.proxy + "/api/remote").status_code == 401
+        for binary, args in ((agent_binary, ["proxy", "status", "--json"]), (machine_binary, ["status", "--json"])):
+            shown = json.loads(subprocess.check_output([str(binary), *args], env=env, text=True, timeout=30))
+            assert not shown["signed_in"]
+
+
+def test_shared_login_switches_the_running_proxy_and_fleet_together(tmp_path, agent_binary, machine_binary):
+    with machine(tmp_path / "first", agent_binary) as first, machine(tmp_path / "second", agent_binary, accounts=True) as second:
+        with fleet_machine(first, machine_binary, tmp_path) as fleet:
+            env = {**first.env, "AI_PROXY_MACHINE_HOME": str(tmp_path / "machine-home")}
+            # The old AI_PROXY_URL remains in the running processes' environment; the shared login wins.
+            device_login_program(machine_binary, second.server, second.issuer, env)
+            assert httpx.get(first.proxy + "/health").json()["server"] == second.server
+            assert httpx.get(first.proxy + "/api/remote").status_code == 200
+            deadline = time.monotonic() + 25
+            while time.monotonic() < deadline:
+                old = httpx.get(first.server + "/api/machines", headers=first.headers).json()["machines"]
+                new = httpx.get(second.server + "/api/machines", headers=second.headers).json()["machines"]
+                saved = json.loads((tmp_path / "machine-home" / "status.json").read_text())
+                if not any(row["connected"] for row in old) and any(row["connected"] for row in new) and saved["server"] == second.server:
+                    break
+                time.sleep(0.2)
+            assert not any(row["connected"] for row in old)
+            assert any(row["connected"] and row["id"] == fleet.box["id"] for row in new)
+            assert saved["server"] == second.server
+            pinned = subprocess.run([str(agent_binary), "proxy", "--server", first.server,
+                                     "--port", str(free_port()), "--intercept-port", str(free_port())],
+                                    env=env, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+            assert pinned.returncode == 1 and "shared sign-in" in pinned.stderr.lower(), pinned.stdout + pinned.stderr
 
 
 def test_the_agent_proxy_alone_doesnt_join_the_fleet(tmp_path, agent_binary):

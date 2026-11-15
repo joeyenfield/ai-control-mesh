@@ -9,12 +9,12 @@ There is no separate pairing step any more. Every device pairs with the server b
 | Device | How it pairs | What it gets | What it's tied to |
 |---|---|---|---|
 | A computer that runs agents | `agent login https://<server>`: the [device approval](#device-approval) below | Access and refresh tokens in `agent`'s `credentials.json` | You. Its sessions are yours. |
-| A fleet machine | `agent-machine login https://<server>`: the same device approval, with its own tokens | Tokens in agent-machine's own `credentials.json`, and a machine id | You: the machine is yours, as [below](#pairing-how-each-device-joins) |
+| A fleet machine | `agent-machine login https://<server>` or an existing `agent login`: one shared device approval | Tokens shared with agent in `agent-proxy/credentials.json`, and a separate machine id | You: the machine is yours, as [below](#pairing-how-each-device-joins) |
 | A browser or a phone's browser | Open the console and sign in on the issuer's page (authorization code with PKCE) | `HttpOnly` cookies on the API's own host | You, in that browser |
 | The Android app | Add the server's address, then sign in as in a browser | The same cookies, in the app's own WebView | You, on that phone |
 | A script or service | An admin creates API credentials in the organization, or provisions a service client at the issuer | A client ID and secret for the client-credentials grant | The selected account's tenant and permissions. Administrator permissions require an explicitly managed credential; bootstrap credentials show a warning until revoked. See [automation](oidc.md#automation). |
 
-A computer that runs agents *and* is in the fleet pairs twice, once for each program, and you approve two codes. They're kept apart on purpose: logging `agent` out doesn't take the machine out of the fleet, and the other way round.
+A computer that runs agents and is in the fleet signs in once per OS user. Both programs share one account, selected server and refresh lock. Either login command configures both; either logout command signs both out. Machine permissions and its id remain separate from authentication. A conflicting server override is refused, so an old environment setting cannot split the programs across two servers.
 
 **A machine becomes yours.**
 
@@ -81,7 +81,7 @@ Step by step:
    - **On the issuer's `/device` page**: type the code, your username and password, and choose approve or deny. The form is bound to a one-time transaction cookie and checks its `Origin`.
 4. **The computer collects its tokens.** It polls the token endpoint every 5 seconds. Polling faster adds 5 seconds to its interval (`slow_down`). Once you've approved, it receives an access token and a refresh token; once you've denied, it gets `access_denied`, and that code can never be approved.
 
-`agent-machine login` is the same flow, with the same CLI client but its own credentials file, so a computer that runs agents and is in the fleet signs in twice and you approve two codes.
+`agent-machine login` uses the same flow and shares the credentials file with `agent` for the same OS user. One approval signs both programs in to the same server; either logout command signs both out.
 
 ### What protects a device code
 

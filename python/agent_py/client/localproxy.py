@@ -33,7 +33,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from .. import common
+from .. import common, oauth
 from . import settings
 
 # The server API the launcher uses, and nothing more: any program on this machine can reach
@@ -183,6 +183,10 @@ class ServerSide:
                 self.token = latest
             except asyncio.CancelledError:
                 raise
+            except (common.ServerChangedError, oauth.OAuthError) as error:
+                if isinstance(error, common.ServerChangedError) or error.code == "login_required":
+                    await self.conn.close()
+                    return
             except Exception:  # noqa: BLE001 - try again; the server closes the socket with 4410 if it never comes
                 continue
 
@@ -645,11 +649,11 @@ def current_status() -> Dict[str, Any]:
     upstream = settings.upstream()
     server = upstream.server()
     entry = upstream.credentials().servers.get(common.normalize(server))
-    signed_in = bool(entry and entry.access_token)
+    signed_in = bool(entry and entry.access_token) or bool(common.environment_token())
     running = common.health(settings.proxy_url())
     alive = bool(running and running.get("role") == "agent-proxy")
     return {
-        "server": server, "signed_in": signed_in, "user": (entry.user if signed_in else "") or "",
+        "server": server, "signed_in": signed_in, "user": (entry.user if entry and entry.access_token else "") or "",
         "running": alive, "port": settings.proxy_port(), "version": str(running.get("version") or "") if alive else "",
     }
 
@@ -677,10 +681,15 @@ def main(name: str, args: List[str]) -> int:
     parser = argparse.ArgumentParser(prog=name, description=(
         "The proxy on this agent machine. Agents started with `agent` register with it, and it carries their "
         "traffic to the agent-server this machine signed in to with `agent login <server>`."))
-    parser.add_argument("--server", default="", help=f"The agent-server to use (default: AI_PROXY_URL, then the one from `agent login`, then {common.DEFAULT_SERVER})")
+    parser.add_argument("--server", default="", help=f"The shared login's server (before login: AI_PROXY_URL, then {common.DEFAULT_SERVER}); use login to switch both programs")
     parser.add_argument("--port", type=int, default=settings.proxy_port(), help="HTTP port on 127.0.0.1")
     parser.add_argument("--intercept-port", type=int, default=settings.intercept_port(), help="HTTPS proxy port on 127.0.0.1 for account agents")
     options = parser.parse_args(args)
+    try:
+        common.Credentials.load(settings.credentials_path()).check_server(settings.upstream(options.server).server())
+    except common.ServerChangedError as error:
+        print(f"agent-proxy: {error}", file=sys.stderr)
+        return 1
     problem = check_ports(options.port, options.intercept_port)
     if problem:
         print(problem, file=sys.stderr)

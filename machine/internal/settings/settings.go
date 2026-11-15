@@ -1,10 +1,5 @@
-// Package settings holds agent-machine's own state, in its own folder (Home): the server
-// it signed in to with `agent-machine login` (credentials.json), the machine's settings
-// (machine.json), its log and how its connection is doing (status.json).
-//
-// It's separate from the agent command's sign-in on purpose: a machine can supply models
-// to one server, or as one account, while its agents use another. Nothing here reads the
-// server's config/ files or the client's: the machine knows the server only by its URL.
+// Package settings holds agent-machine's settings, logs and connection state in Home.
+// Authentication and the selected server are shared with agent through credentials.json.
 package settings
 
 import (
@@ -80,8 +75,8 @@ func Home() string {
 }
 
 // DataEnv moves the large files agent-machine installs or downloads (llama.cpp's builds, its
-// GGUF models, and the models of an Ollama it starts) out of its folder, which holds the sign-in
-// and has to persist: a pod whose only writable space is /tmp or a scratch volume points it there.
+// GGUF models, and the models of an Ollama it starts) out of its settings folder. Settings and
+// the user's shared auth profile must persist; a pod can put large files on a scratch volume.
 const DataEnv = "AI_PROXY_MACHINE_DATA"
 
 // Data is where those files go: AI_PROXY_MACHINE_DATA, else agent-machine's folder.
@@ -117,7 +112,13 @@ func configDir() string {
 	return filepath.Join(home, ".config")
 }
 
-func CredentialsPath() string { return filepath.Join(Home(), "credentials.json") }
+// CredentialsPath is shared by agent and agent-machine for this OS user.
+func CredentialsPath() string {
+	if path := os.Getenv("AI_PROXY_CREDENTIALS"); path != "" {
+		return expandHome(path)
+	}
+	return filepath.Join(configDir(), "agent-proxy", "credentials.json")
+}
 
 func LogPath() string { return filepath.Join(Home(), "agent-machine.log") }
 
@@ -151,7 +152,7 @@ func IsLoopbackURL(raw string) bool {
 	return err == nil && loopback[strings.ToLower(parsed.Hostname())]
 }
 
-// Credentials stores agent-machine's separate OAuth credentials, in Python's format.
+// Credentials stores the shared OAuth sign-in, in Python's format.
 type Credentials struct {
 	Servers map[string]*ServerEntry `json:"servers"`
 	Default string                  `json:"default,omitempty"`
@@ -179,7 +180,7 @@ func Normalize(server string) string {
 // LoadCredentials reads the file; a missing or unreadable one is empty.
 func LoadCredentials() *Credentials {
 	credentials := &Credentials{}
-	if data, err := os.ReadFile(CredentialsPath()); err == nil {
+	if data := credentialData(); data != nil {
 		_ = json.Unmarshal(data, credentials)
 	}
 	if credentials.Servers == nil {
@@ -203,7 +204,7 @@ func (c *Credentials) DefaultEntry() *ServerEntry {
 // Upstream is the agent-server this machine supplies and its sign-in, read from the
 // credentials file on every call, so `agent-machine login` and `logout` apply at once.
 type Upstream struct {
-	// Fixed is the server from --server; it wins over everything else.
+	// Fixed pins the destination; a conflicting shared sign-in is refused.
 	Fixed string
 }
 
@@ -214,10 +215,13 @@ func (u Upstream) Server() string {
 	return DefaultServerURL()
 }
 
-// DefaultServerURL is the server from `agent-machine login`, or this computer.
+// DefaultServerURL is the shared sign-in, then AI_PROXY_URL before login, then this computer.
 func DefaultServerURL() string {
 	if entry := LoadCredentials().DefaultEntry(); entry != nil && entry.URL != "" {
 		return strings.TrimRight(entry.URL, "/")
+	}
+	if server := os.Getenv("AI_PROXY_URL"); server != "" {
+		return strings.TrimRight(server, "/")
 	}
 	return DefaultServer
 }

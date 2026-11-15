@@ -41,8 +41,11 @@ machine's OAuth access token, preserving the agent's own vendor Authorization he
 doesn't join the server's fleet: that's agent-machine's job.
 
 Sign-in is required even on loopback. URLs must use HTTPS, except loopback development.
-Access and rotating refresh credentials stay in `credentials.json`; refresh is serialized
-across Go/Python processes. `agent logout` revokes the refresh credential and forgets the
+Access and rotating refresh credentials stay in one `agent-proxy/credentials.json`, shared
+with agent-machine for this OS user. Either login command selects the server for both;
+the second reuses the sign-in. Either logout command signs both out. The saved selection
+wins over an inherited `AI_PROXY_URL`, and conflicting pinned servers are refused. Refresh
+is serialized across Go/Python processes. `agent logout` revokes the refresh credential and forgets the
 local sign-in, reporting any issuer revocation failure. Old password and access-key
 sign-ins are not accepted. Automation can obtain a service-account OAuth access token
 directly from the issuer and supply it with `AI_PROXY_TOKEN` (and `AI_PROXY_URL`).

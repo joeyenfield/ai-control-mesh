@@ -13,9 +13,9 @@ import (
 // token is used, the refresh isn't tried again at once (it may have been consumed), and it's tried
 // again after RefreshRetry. Only a refused refresh means signing in again.
 func TestAFailedRefreshKeepsAValidTokenAndBacksOff(t *testing.T) {
-	// agent-machine keeps its credentials under AI_PROXY_MACHINE_HOME (the client reads AI_PROXY_CREDENTIALS):
-	// never the real ones.
+	// Isolate both the shared sign-in and the machine state.
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	t.Setenv(TokenEnvironment, "")
 	oldRetry := RefreshRetry
 	RefreshRetry = 200 * time.Millisecond

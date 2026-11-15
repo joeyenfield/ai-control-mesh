@@ -259,7 +259,7 @@ function withSetup(command: string, env: [string, string][], windows: boolean): 
  * Setup codes: instead of approving each machine's sign-in code, make a short-lived code that signs
  * machines in as you, a number of times, and optionally switches some of their features on.
  */
-function SetupCodes({ both, setup, onSetup }: { both: boolean; setup: Setup | null; onSetup: (setup: Setup | null) => void }) {
+function SetupCodes({ setup, onSetup }: { setup: Setup | null; onSetup: (setup: Setup | null) => void }) {
   const notify = useToast();
   const client = useQueryClient();
   const [lifetime, setLifetime] = useState<Lifetime>("3600");
@@ -267,8 +267,7 @@ function SetupCodes({ both, setup, onSetup }: { both: boolean; setup: Setup | nu
   const [enable, setEnable] = useState<string[]>(["updates"]);
   const codes = useQuery({ queryKey: ["setup-codes"], queryFn: api.setupCodes, retry: false });
   const create = useMutation({
-    // Installing agent too signs in twice per machine.
-    mutationFn: () => api.createSetupCode({ lifetime: Number(lifetime), uses: Math.min(100, machines * (both ? 2 : 1)) }),
+    mutationFn: () => api.createSetupCode({ lifetime: Number(lifetime), uses: Math.min(100, machines) }),
     onSuccess: (made) => {
       onSetup({ code: made.code, enable });
       void client.invalidateQueries({ queryKey: ["setup-codes"] });
@@ -288,6 +287,7 @@ function SetupCodes({ both, setup, onSetup }: { both: boolean; setup: Setup | nu
         A setup code signs machines in as you, with no code to approve on each. It works for a while and a number of times, then
         stops. Anyone who has it can add machines as you until then, so treat it like a password. The commands on this page
         include it once you make one.
+        One use signs in both programs on one computer.
       </p>
       {setup ? (
         <div className="setup-made">
@@ -305,8 +305,8 @@ function SetupCodes({ both, setup, onSetup }: { both: boolean; setup: Setup | nu
           </div>
           <label className="setup-machines">
             <span className="subtle">Machines</span>
-            <input type="number" min={1} max={both ? 50 : 100} value={machines}
-              onChange={(event) => setMachines(Math.max(1, Math.min(both ? 50 : 100, Number(event.target.value) || 1)))} />
+            <input type="number" min={1} max={100} value={machines}
+              onChange={(event) => setMachines(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} />
           </label>
           <fieldset className="setup-enable">
             <legend className="subtle">Switch on as it signs in</legend>
@@ -374,7 +374,7 @@ function JoinSteps({ server }: { server: string }) {
     setup
       ? `Signs ${install === "both" ? "agent and agent-machine" : "agent-machine"} in to this server with the setup code, as you${setup.enable.length ? `, and switches on ${setup.enable.join(", ")}` : ""}. Nothing to approve.`
       : install === "both"
-        ? "Signs agent and agent-machine in to this server: each shows a code for you to approve. It never asks for your password."
+        ? "Signs agent and agent-machine in to this server with one code for you to approve. It never asks for your password."
         : "Signs agent-machine in to this server: it shows a code for you to approve. It never asks for your password.",
     "Starts agent-machine, which joins the fleet and appears in the list above.",
   ];
@@ -396,7 +396,7 @@ function JoinSteps({ server }: { server: string }) {
           </div>
         )}
       </div>
-      {!python && <SetupCodes both={both} setup={setup} onSetup={setSetup} />}
+      {!python && <SetupCodes setup={setup} onSetup={setSetup} />}
       {python && <p className="join-about">{PYTHON_ABOUT}</p>}
       <p className="join-about">{container ? CONTAINER_ABOUT : chosen.about}</p>
       {container ? (
@@ -423,7 +423,7 @@ function JoinSteps({ server }: { server: string }) {
                 <>The machine belongs to you, who made the setup code.</>
               ) : (
                 <>
-                  Approve {install === "both" ? "the codes" : "the code"} on <Link to="/approve-device">Approve a device</Link>, or use a
+                  Approve the code on <Link to="/approve-device">Approve a device</Link>, or use a
                   setup code. The machine belongs to whoever approves it.
                 </>
               )}
@@ -737,7 +737,7 @@ function SandboxSteps({ server, env = [] }: { server: string; env?: [string, str
               <>On its first start it signs in with the setup code, as you, with nothing to approve.</>
             ) : (
               <>
-                On its first start it prints two sign-in codes (<code>{runtime} logs {container}</code>): approve both on{" "}
+                On its first start it prints one sign-in code for both programs (<code>{runtime} logs {container}</code>): approve it on{" "}
                 <Link to="/approve-device">Approve a device</Link>, or use a setup code.
               </>
             )}{" "}

@@ -2,13 +2,13 @@
 say so, sign-in files, and HTTP clients that never take a proxy from the environment.
 
 The Go programs keep these apart (client/ and machine/ share no code). Here the two live in
-one package, so the small part that's the same in both is written once; each still keeps
-its own credentials file in its own folder, in the same format as the Go programs, so a
-sign-in made by either works with the other.
+one package, so the small part that's the same in both is written once. Both use one
+credentials file and refresh lock, in the same format and location as the Go programs.
 """
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import platform as _platform
@@ -240,6 +240,47 @@ class ServerEntry:
         return value
 
 
+class ServerChangedError(ValueError):
+    """A pinned process or old socket must not keep using another server after login."""
+
+
+def credentials_path() -> Path:
+    """One auth profile per OS user; explicit profiles isolate both programs together."""
+    if os.environ.get("AI_PROXY_CREDENTIALS"):
+        return expand_home(os.environ["AI_PROXY_CREDENTIALS"])
+    return config_dir() / "agent-proxy" / "credentials.json"
+
+
+def environment_token() -> str:
+    return os.environ.get("AI_PROXY_TOKEN") or os.environ.get("AI_PROXY_MACHINE_TOKEN", "")
+
+
+def legacy_credentials_path(path: Path) -> Optional[Path]:
+    if path != credentials_path() or os.environ.get("AI_PROXY_CREDENTIALS"):
+        return None
+    if os.environ.get("AI_PROXY_MACHINE_HOME"):
+        return expand_home(os.environ["AI_PROXY_MACHINE_HOME"]) / "credentials.json"
+    return config_dir() / "agent-machine" / "credentials.json"
+
+
+def migrate_credentials(path: Path) -> None:
+    """With the shared lock held, move old machine-only auth instead of copying a refresh token."""
+    legacy = legacy_credentials_path(path)
+    if legacy is not None and not path.exists() and legacy.exists():
+        try:
+            replace_file(legacy, path)
+        except OSError as error:
+            if error.errno != errno.EXDEV and getattr(error, "winerror", None) != 17:
+                raise
+            # A custom machine home can be on another volume: publish privately before removing it.
+            temporary = path.with_name(path.name + ".tmp")
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(legacy.read_bytes())
+            replace_file(temporary, path)
+            legacy.unlink()
+
+
 @dataclass
 class Credentials:
     """A login's file: each server's URL, user and token, and the default server. Passwords are never stored."""
@@ -252,7 +293,14 @@ class Credentials:
     def load(cls, path: Path) -> "Credentials":
         credentials = cls(path)
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            try:
+                text = path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                legacy = legacy_credentials_path(path)
+                if legacy is None:
+                    return credentials
+                text = legacy.read_text(encoding="utf-8")
+            data = json.loads(text)
         except (OSError, ValueError):
             return credentials
         for key, entry in (data.get("servers") or {}).items():
@@ -270,6 +318,14 @@ class Credentials:
     def default_entry(self) -> Optional[ServerEntry]:
         return self.servers.get(self.default) if self.default else None
 
+    def check_server(self, server: str) -> None:
+        entry = self.default_entry()
+        if entry and entry.url and normalize(entry.url) != normalize(server):
+            raise ServerChangedError(f"The shared sign-in selects {entry.url}; run `agent login {server}` to switch both programs")
+        configured = os.environ.get("AI_PROXY_URL")
+        if environment_token() and configured and normalize(configured) != normalize(server):
+            raise ServerChangedError("AI_PROXY_URL conflicts with the token's destination; clear the inherited token/server variables or switch the shared login")
+
 
 @dataclass
 class Upstream:
@@ -278,7 +334,7 @@ class Upstream:
 
     credentials_path: Callable[[], Path]
     fixed: str = ""
-    # Client and machine credentials and explicit token injection are kept separate.
+    # Kept for callers from earlier versions; both programs now share server/token selection.
     use_env: bool = True
 
     def credentials(self) -> Credentials:
@@ -287,11 +343,11 @@ class Upstream:
     def server(self) -> str:
         if self.fixed:
             return self.fixed.rstrip("/")
-        if self.use_env and os.environ.get("AI_PROXY_URL"):
-            return os.environ["AI_PROXY_URL"].rstrip("/")
         entry = self.credentials().default_entry()
         if entry and entry.url:
             return entry.url.rstrip("/")
+        if os.environ.get("AI_PROXY_URL"):
+            return os.environ["AI_PROXY_URL"].rstrip("/")
         return DEFAULT_SERVER
 
     def token(self, server: str) -> str:

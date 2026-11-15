@@ -2,6 +2,7 @@ package presence
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"ai-control-mesh/machine/internal/providers"
+	"ai-control-mesh/machine/internal/settings"
 )
 
 // Tunnel is the server's {"type": "tunnel"} message: carry one connection from the server to
@@ -105,6 +107,10 @@ func (p *Presence) tunnel(server string, request Tunnel, extra []int) error {
 				return
 			case <-ticker.C:
 				next, err := p.Upstream.AccessToken(server)
+				if errors.Is(err, settings.ErrServerChanged) || errors.Is(err, settings.ErrLoginRequired) {
+					_ = conn.Close()
+					return
+				}
 				// A new token at once; the current one again every resendEvery, in case the server missed it.
 				if err != nil || (next == token && time.Since(sent) < resendEvery) {
 					continue

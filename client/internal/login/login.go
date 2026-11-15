@@ -46,7 +46,14 @@ func Login(args []string) int {
 	if !strings.Contains(server, "://") {
 		server = "https://" + server
 	}
-	entry, err := settings.DeviceLogin(server, strings.TrimSpace(setupCode), os.Stdout)
+	entry, err := settings.ExistingLogin(server)
+	if err == nil && entry != nil {
+		fmt.Printf("Signed in to %s as %s (shared with agent-machine).\n", server, entry.User)
+		return 0
+	}
+	if err == nil && entry == nil {
+		entry, err = settings.DeviceLogin(server, strings.TrimSpace(setupCode), os.Stdout)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "login:", err)
 		return 1
@@ -58,7 +65,7 @@ func Login(args []string) int {
 	}
 	defer unlock()
 	credentials := settings.LoadCredentials()
-	credentials.Servers[settings.Normalize(server)] = entry
+	credentials.Servers = map[string]*settings.ServerEntry{settings.Normalize(server): entry}
 	credentials.Default = settings.Normalize(server)
 	if err := credentials.Save(); err != nil {
 		fmt.Fprintln(os.Stderr, "login:", err)
@@ -97,10 +104,7 @@ func Logout(args []string) int {
 	delete(credentials.Servers, key)
 	if credentials.Default == key {
 		credentials.Default = ""
-		for other := range credentials.Servers {
-			credentials.Default = other
-			break
-		}
+		credentials.Servers = map[string]*settings.ServerEntry{}
 	}
 	if err := credentials.Save(); err != nil {
 		fmt.Fprintln(os.Stderr, "logout:", err)

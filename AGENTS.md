@@ -37,7 +37,7 @@ If nothing needed updating, say so when reporting the change.
 
 ## The system in brief
 
-A proxy that every coding-agent request goes through. Components live in their own folders and talk **only over HTTP and WebSockets, never by importing each other**:
+A proxy that every coding-agent request goes through. Components live in their own folders and use **HTTP and WebSockets at runtime, never importing each other**. The client and machine share the OS user's auth file and refresh lock so one login selects their common account and server; machine settings and permissions stay separate:
 
 - **Server** (`server/`, Python, `agent-server`): the hub. API, accounts, recording, routing to providers; owns all configuration and agent definitions, in one database (PostgreSQL in production, SQLite by default). `agent-auth` (`issuer.py`) is its separate OIDC issuer. Servers can link with each other (`links.py`, `bridges.py`: peering) and only ever talk to each other server to server.
 - **Console** (`ui/`, React): only calls the server's API; the server serves its build (`ui/dist`).

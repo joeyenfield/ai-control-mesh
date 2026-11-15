@@ -38,14 +38,14 @@ function useHistory(sample: ServerStats | undefined) {
     if (!sample || sample.timestamp === last.current) return;
     last.current = sample.timestamp;
     const cutoff = sample.timestamp - WINDOW_SECONDS;
-    const push = (series: Sample[], v: number) => {
+    const push = (series: Sample[], v: number | null) => {
       series.push({ t: sample.timestamp, v });
       while (series.length && series[0].t < cutoff) series.shift();
     };
     push(history.current.cpu, sample.cpu.percent);
-    push(history.current.memory, sample.memory.used / GB);
+    push(history.current.memory, sample.memory.used == null ? null : sample.memory.used / GB);
     // psutil gives the process's CPU as a share of one core; the chart is of the whole computer.
-    push(history.current.process, sample.process.cpu_percent / Math.max(1, sample.cpu.count));
+    push(history.current.process, sample.process.cpu_percent == null || !sample.cpu.count ? null : sample.process.cpu_percent / sample.cpu.count);
     push(history.current.inFlight, sample.live.requests.in_flight);
     push(history.current.sockets, sample.live.connections.websockets + sample.live.connections.live_streams);
     setVersion((value) => value + 1);
@@ -53,7 +53,7 @@ function useHistory(sample: ServerStats | undefined) {
   return history.current;
 }
 
-const since = (seconds: number) => span(Date.now() / 1000 - seconds);
+const since = (seconds: number | null) => seconds == null ? "Not available here" : span(Date.now() / 1000 - seconds);
 
 /** Administration › Server stats: what the server is doing now, how hard its computer is working, and how full its disks are. */
 export function ServerStatsPage() {
@@ -172,39 +172,51 @@ export function ServerStatsPage() {
                 format={percent}
                 windowSeconds={WINDOW_SECONDS}
                 detail={[
-                  `${sample.cpu.count} cores`,
+                  sample.cpu.count ? `${sample.cpu.count} cores` : "Core count not available here",
                   sample.cpu.load_average ? `load ${sample.cpu.load_average.map((value) => value.toFixed(2)).join(", ")}` : null,
                 ]
                   .filter(Boolean)
                   .join(", ")}
               />
-              <LineChart
-                label="Memory"
-                samples={history.memory}
-                max={sample.memory.total / GB}
-                format={gigabytes}
-                formatAxis={gigabytesAxis}
-                windowSeconds={WINDOW_SECONDS}
-                detail={`of ${formatBytes(sample.memory.total)}, ${formatBytes(sample.memory.available)} available`}
-              />
+              {sample.memory.total != null ? (
+                <LineChart
+                  label="Memory"
+                  samples={history.memory}
+                  max={sample.memory.total / GB}
+                  format={gigabytes}
+                  formatAxis={gigabytesAxis}
+                  windowSeconds={WINDOW_SECONDS}
+                  detail={`of ${formatBytes(sample.memory.total)}, ${formatBytes(sample.memory.available)} available`}
+                />
+              ) : (
+                <p className="empty">Memory stats are not available here.</p>
+              )}
               <LineChart
                 label="The server's own CPU"
                 samples={history.process}
                 max={100}
                 format={percent}
                 windowSeconds={WINDOW_SECONDS}
-                detail={`of the whole computer, ${sample.process.threads} threads`}
+                detail={!sample.cpu.count ? "Core count not available here" : sample.process.threads == null ? "Thread count not available here" : `of the whole computer, ${sample.process.threads} threads`}
               />
             </div>
             <div className="meter-grid">
-              <Meter
-                label="The server's own memory"
-                value={sample.process.rss}
-                max={sample.memory.total}
-                text={formatBytes(sample.process.rss)}
-                detail={`of ${formatBytes(sample.memory.total)}`}
-              />
-              {sample.swap.total > 0 && (
+              {sample.process.rss != null && sample.memory.total != null ? (
+                <Meter
+                  label="The server's own memory"
+                  value={sample.process.rss}
+                  max={sample.memory.total}
+                  text={formatBytes(sample.process.rss)}
+                  detail={`of ${formatBytes(sample.memory.total)}`}
+                />
+              ) : (
+                <p className="empty">
+                  {sample.process.rss == null
+                    ? "The server's memory use is not available here."
+                    : `The server's own memory: ${formatBytes(sample.process.rss)}. Total memory is not available here.`}
+                </p>
+              )}
+              {sample.swap.total != null && sample.swap.used != null && sample.swap.total > 0 && (
                 <Meter
                   label="Swap"
                   value={sample.swap.used}

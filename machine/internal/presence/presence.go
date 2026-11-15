@@ -338,6 +338,10 @@ func (p *Presence) session(ctx context.Context) error {
 				return
 			case <-renew.C:
 				next, err := p.Upstream.AccessToken(server)
+				if errors.Is(err, settings.ErrServerChanged) || errors.Is(err, settings.ErrLoginRequired) {
+					_ = conn.Close()
+					return
+				}
 				if err != nil || (next == token && time.Since(sent) < resendEvery) {
 					continue
 				}
@@ -350,6 +354,9 @@ func (p *Presence) session(ctx context.Context) error {
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
+			return err
+		}
+		if err := settings.LoadCredentials().CheckServer(server); err != nil {
 			return err
 		}
 		alive()

@@ -215,6 +215,7 @@ if (-not $NoLogin -and $installed.Count -gt 0) {
     Write-Output "Use the same AI Control Mesh account for both."
 }
 foreach ($component in $installed) {
+    # Both login commands reuse the same sign-in; machine setup still selects its permissions.
     $exe = Join-Path $Prefix "$component.exe"
     if ($component -eq "agent") {
         if ($NoLogin) { Write-Output "Next: agent login $server"; continue }
@@ -234,8 +235,8 @@ foreach ($component in $installed) {
         Write-Output "Authorize this machine (agent-machine) to connect to $server"
         Write-Output "This adds this computer to your fleet with the functions you just chose."
         Write-Output "For launches, file viewing or terminal starting folders, allow projects with: agent-machine roots add <folder>"
-        Write-Output "Open the link printed below and use the same admin account. Enter this machine's new device code"
-        Write-Output "if asked, approve, then return here. The earlier agent code cannot be reused."
+        Write-Output "This reuses the shared agent sign-in. No second approval is needed."
+        Write-Output "If not signed in yet, approve the link and device code printed below."
         Invoke-Program { & $exe login $server --enable= }
         if ($LASTEXITCODE -ne 0) {
             Write-Output "Sign in later with: agent-machine login $server, then agent-machine start"

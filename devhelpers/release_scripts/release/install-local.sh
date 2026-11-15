@@ -122,7 +122,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 0' INT TERM HUP
 agent-server local start
-if [ -s /root/.config/agent-machine/credentials.json ]; then
+if [ -s /root/.config/agent-proxy/credentials.json ] || [ -s /root/.config/agent-machine/credentials.json ]; then
     agent-machine start </dev/null || printf 'Start or sign in the machine from mesh-termux shell.\n'
 fi
 printf 'Full server running. Keep this session open; Ctrl+C stops it.\n'
@@ -373,8 +373,8 @@ for component in $installed; do
         say "This adds this computer to your fleet with the functions you just chose."
         say "For launches, file viewing or terminal starting folders, allow projects with: agent-machine roots add <folder>"
         say "On Termux, this machine is the Ubuntu environment created for AI Control Mesh."
-        say "Open the link printed below and use the same admin account. Enter this machine's new device code"
-        say "if asked, approve, then return here. The earlier agent code cannot be reused."
+        say "This reuses the shared agent sign-in. No second approval is needed."
+        say "If not signed in yet, approve the link and device code printed below."
         if "$prefix/agent-machine" login "$server" --enable= </dev/tty; then
             "$prefix/agent-machine" start || true
         else

@@ -8,6 +8,7 @@ import (
 
 func TestALockLeftByADeadProcessIsTakenOverAndOnlyTheRefusedTokenIsRejected(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	t.Setenv(TokenEnvironment, "")
 	// A lock some killed process left behind, long ago: taken over at once, not waited on.
 	lock := CredentialsPath() + ".lock"

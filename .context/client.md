@@ -76,11 +76,15 @@ With `--account`, the session request names the provider account; when the answe
 
 ## State
 
+`agent` and `agent-machine` share one auth profile and selected server per OS user. `internal/settings/shared_auth.go` is mirrored in both Go modules: common token selection, `CheckServer`, login reuse and legacy migration. The saved default wins over `AI_PROXY_URL`; a conflicting `--server` is refused. Either login command selects the server for both and reuses a valid existing login without another approval; logout applies to both. New logins keep one server entry. Logging out of the active server clears inactive historical entries too, so an old saved server cannot become active after logout. To change account on the same server, logout first.
+
+If the shared file is absent, both programs discover the old machine-only file (under `AI_PROXY_MACHINE_HOME`, else the default machine folder) and move it under the common refresh lock. Across volumes they publish a private copy atomically and remove the old file under that lock. An existing shared file wins, including an empty file after logout; explicit `AI_PROXY_CREDENTIALS` profiles never import another profile. `AI_PROXY_MACHINE_HOME` moves settings only, never the auth profile. Upgrade and restart both programs together.
+
 - `credentials.json` in `%APPDATA%\agent-proxy\` or `~/.config/agent-proxy/` (`AI_PROXY_CREDENTIALS`), with `agent-proxy.log` beside it: per server the access token, refresh token, expiry, issuer, client id and token/revocation endpoints. The format is shared with the Python client.
 - `credentials.json.lock`, a directory beside it: the cross-process lock (Go and Python) around every read-refresh-save. Waits 30 s and isn't stolen, since stealing could replay a rotated refresh token, unless it's older than `StaleLock` (2 minutes): no live holder takes that long, so it's one a killed process left. On Windows a `mkdir` racing another process's `rmdir` fails as access denied rather than "exists", so that counts as busy too (`LockCredentials`, `credential_lock`).
-- `AI_PROXY_TOKEN`, when set, is used as the access token instead of the file (no refresh).
+- `AI_PROXY_TOKEN`, when set, is the common access token instead of the file (no refresh). `AI_PROXY_MACHINE_TOKEN` is a legacy alias accepted by both; `AI_PROXY_TOKEN` wins. With an injected token, an `AI_PROXY_URL` that conflicts with the actual destination is refused before any credential is sent.
 - The CA cache and per-session file folders under `~/.cache/agent-proxy/`.
-- The proxy keeps no state of its own; it re-reads credentials on every request, so `agent login`/`logout` apply at once.
+- The proxy re-reads credentials on every request. Agent traffic pins the selected server beside its token in the request context, so a concurrent login switch cannot send that token to another server. Socket renewals close on logout or a changed server; temporary issuer failures retain their retry behavior.
 
 ## Invariants
 
