@@ -59,7 +59,7 @@ This path is available from release 2.1.64 and is experimental until it has been
 
 Start with a current Termux installation and package repositories. Run `pkg update`, then run the shell installer above. It installs `proot-distro` and `curl` with Termux's package manager and creates a dedicated environment named `ai-control-mesh`. It installs Python and its environment support inside Ubuntu, runs the full installer there and starts the server. You do not need to install Ubuntu, enter its shell or install its packages manually. Allow several GB of free space for Ubuntu, downloads and the server; model files need additional space. No model is downloaded automatically.
 
-Keep the installation session open. Once installation and sign-in finish, open **http://localhost:19999** in the phone's browser. Sign-in uses localhost port 20000. Other ports can be passed with `--port` and `--auth-port` as usual. Both ports must be free. `--prefix`, if supplied, names a folder inside Ubuntu.
+Keep the installation session open. Once installation and sign-in finish, open **http://localhost:19999** in the phone's browser or add that address to the Android app. Sign-in uses localhost port 20000. Other ports can be passed with `--port` and `--auth-port` as usual. Both ports must be free. `--prefix`, if supplied, names a folder inside Ubuntu.
 
 The installer adds a Termux command for managing the dedicated environment:
 
