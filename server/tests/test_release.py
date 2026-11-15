@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+from types import SimpleNamespace
 import zipfile
 from pathlib import Path
 
@@ -30,6 +31,8 @@ def checkout(tmp_path: Path) -> Path:
         "server/agent_server/__init__.py": "", "server/agent_server/__pycache__/x.cpython-313.pyc": "junk",
         "ui/dist/index.html": "<div id=\"root\"></div>", "ui/package.json": "{}", "docs/index.md": "# Docs",
         "benchmarks/tests/one.json": "{}",
+        "deploy/compose/quickstart/machine.py": "# OIDC bootstrap",
+        "devhelpers/release_scripts/release/termux_quickstart.py": "# Termux quickstart",
     }.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text, encoding="utf-8")
@@ -79,7 +82,8 @@ def test_a_release_has_the_bundle_every_archive_and_installers_that_check_them(t
         inside = set(bundle.namelist())
         assert bundle.read("BUILD").decode().strip() == VERSION
     assert {"VERSION", "LICENSE", "server/pyproject.toml", "server/agent_server/__init__.py", "ui/dist/index.html",
-            "docs/index.md", "benchmarks/tests/one.json"} <= inside
+            "docs/index.md", "benchmarks/tests/one.json", "deploy/compose/quickstart/machine.py",
+            "devhelpers/release_scripts/release/termux_quickstart.py"} <= inside
     assert not any("__pycache__" in name or name.endswith(".pyc") for name in inside)
     assert "ui/package.json" not in inside
 
@@ -117,6 +121,42 @@ def test_the_filled_in_sh_installer_parses(tmp_path):
     for name, option in (("install-local.sh", "--no-client"), ("uninstall-local.sh", "--purge")):
         piped = subprocess.run(["sh", "-s", "--", "--help"], input=(out / name).read_bytes(), capture_output=True)
         assert piped.returncode == 0 and option in piped.stdout.decode()
+
+
+def test_termux_quickstart_signs_in_and_preserves_machine_choices_on_rerun(tmp_path, monkeypatch):
+    script = SCRIPT.with_name("termux_quickstart.py")
+    spec = importlib.util.spec_from_file_location("termux_quickstart", script)
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setenv("AI_PROXY_LOCAL_HOME", str(tmp_path / "instance"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    home = tmp_path / "instance"
+    (home / "private").mkdir(parents=True)
+    (home / "local.json").write_text('{"port": 29999, "auth_port": 30000}', encoding="utf-8")
+    (home / "private" / "first-user-password").write_text("secret\n", encoding="utf-8")
+    signed: list[tuple[Path, str]] = []
+    monkeypatch.setitem(sys.modules, "machine", SimpleNamespace(
+        API="http://localhost:29999", credentials_path=lambda: tmp_path / "credentials.json",
+        sign_in=lambda path, password: signed.append((path, password)),
+    ))
+    commands: list[list[str]] = []
+    monkeypatch.setattr(subprocess, "run", lambda args, check: commands.append(args))
+    assert helper.main() == 0
+    assert signed == [(tmp_path / "credentials.json", "secret")]
+    assert (tmp_path / "projects").is_dir()
+    assert ["agent-machine", "launches", "on"] in commands
+    assert ["agent-machine", "containers", "off"] in commands
+    assert commands[-2:] == [["agent-machine", "roots", "add", str(tmp_path / "projects")],
+                             ["agent-machine", "start"]]
+    config = tmp_path / "config" / "agent-machine" / "machine.json"
+    config.parent.mkdir(parents=True)
+    config.write_text("{}", encoding="utf-8")
+    commands.clear()
+    assert helper.main() == 0
+    assert commands == [["agent-machine", "containers", "off"],
+                        ["agent-machine", "roots", "add", str(tmp_path / "projects")],
+                        ["agent-machine", "start"]]
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Termux bootstrap needs POSIX shell paths")
@@ -164,7 +204,10 @@ if [ "$1" = install ] && [ "${FAIL_GUEST:-0}" = 1 ]; then exit 7; fi
         assert ".mesh-termux-install.sh" not in calls
         return
     assert result.returncode == 0, result.stderr.decode()
-    assert f"<{BASE}/install-local.sh><--python><--no-tray><--port><35991><--auth-port><35992><--prefix></opt/mesh bin><--no-client><--no-login>" in calls
+    assert f"<{BASE}/install-local.sh><0><--python><--no-tray><--port><35991><--auth-port><35992><--prefix></opt/mesh bin><--no-client>" in calls
+    default = subprocess.run([shutil.which("sh"), "-s"], input=script, env=env, capture_output=True, timeout=20)
+    assert default.returncode == 0, default.stderr.decode()
+    assert f"<{BASE}/install-local.sh><1><--python><--no-tray>" in record.read_text()
     state = data / "ai-control-mesh-termux"
     assert (state.stat().st_mode & 0o777) == 0o700
     assert (state / "home/.mesh-termux-prefix").read_text().strip() == "/opt/mesh bin"
@@ -204,8 +247,10 @@ INSTALLER
     curl.chmod(0o755)
     guest_home = state / "home"
     bootstrap = (guest_home / ".mesh-termux-install.sh").read_text().replace(
-        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        f'PATH="{fake_programs}:/usr/bin:/bin"',
+        "/root/.mesh-termux-prefix", str(guest_home / ".mesh-termux-prefix"),
+    ).replace(
+        'export PATH="$prefix:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"',
+        'export PATH="$prefix:/usr/bin:/bin"',
     ).replace("/root/.mesh-termux-session.sh", f"'{guest_home / '.mesh-termux-session.sh'}'")
     session = (guest_home / ".mesh-termux-session.sh").read_text().replace(
         "/root/.mesh-termux-prefix", f"'{guest_home / '.mesh-termux-prefix'}'",
@@ -217,12 +262,12 @@ INSTALLER
         '#!/bin/sh\nprintf "agent-server:%s\\n" "$*" >> "$RECORD"\n'
         '[ "$*" != "local status" ]\n',
     )
-    booted = subprocess.run(["sh", "-s", "--", f"{BASE}/install-local.sh", "--python", "--no-tray"],
+    booted = subprocess.run(["sh", "-s", "--", f"{BASE}/install-local.sh", "0", "--python", "--no-tray"],
                             input=bootstrap.encode(), env=env, capture_output=True, timeout=10)
     assert booted.returncode == 0, booted.stderr.decode()
     calls = record.read_text()
     assert "apt:update\napt:install -y ca-certificates curl python3 python3-venv\n" in calls
-    assert "installer:--python --no-tray\nagent-server:local start\n" in calls
+    assert "installer:--python --no-tray --no-login\nagent-server:local start\n" in calls
     assert calls.endswith("agent-server:local status\nagent-machine:stop\nagent:proxy stop\nagent-server:local stop\n")
     assert subprocess.run([str(control), "unknown"], env=env, capture_output=True).returncode == 2
 
