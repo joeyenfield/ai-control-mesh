@@ -8,7 +8,7 @@ import { StateDot } from "../components/ProviderState";
 import { remember, remembered, useClipboard, useMachines, useStatus, useToast } from "../hooks";
 import { formatDate, formatRelative } from "../format";
 import { OS_LABELS, machinePath } from "./Machine";
-import { browserPlatform, installLine, serverAddress } from "./Downloads";
+import { browserPlatform, installLine, serverAddress, uninstallLine } from "./Downloads";
 
 /** The fleet: machines signed in to this server. Each one's page has its model servers, containers, load and launches. */
 export function MachinesPage() {
@@ -454,16 +454,6 @@ function JoinSteps({ server }: { server: string }) {
       )}
     </div>
   );
-}
-
-/** The one-line uninstaller (server/agent_server/install/uninstall.sh and .ps1) with its options. */
-function uninstallLine(server: string, system: "sh" | "powershell", { only, purge }: { only?: "agent-machine"; purge: boolean }): string {
-  if (system === "sh") {
-    const options = [only && `--only ${only}`, purge && "--purge"].filter(Boolean).join(" ");
-    return `curl -fsSL ${server}/uninstall.sh | sh${options ? ` -s -- ${options}` : ""}`;
-  }
-  const options = [only && `-Only ${only}`, purge && "-Purge"].filter(Boolean).join(" ");
-  return options ? `& ([scriptblock]::Create((irm ${server}/uninstall.ps1))) ${options}` : `irm ${server}/uninstall.ps1 | iex`;
 }
 
 type Step = { command: string; text: string };
