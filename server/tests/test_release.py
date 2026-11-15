@@ -292,8 +292,9 @@ def test_guest_termux_variables_do_not_reenter_bootstrap(tmp_path):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Termux uninstaller needs POSIX shell paths")
-@pytest.mark.parametrize(("purge", "remove_fails"), [(False, False), (True, False), (True, True)])
-def test_native_termux_uninstall_removes_guest_and_purges_bound_home(tmp_path, purge, remove_fails):
+@pytest.mark.parametrize(("purge", "remove_fails", "stop_fails"),
+                         [(False, False, False), (True, False, False), (True, True, False), (True, False, True)])
+def test_native_termux_uninstall_removes_guest_and_purges_bound_home(tmp_path, purge, remove_fails, stop_fails):
     out = tmp_path / "out"
     release.make(VERSION, BASE, built(tmp_path), out, checkout(tmp_path))
     prefix = tmp_path / "Termux prefix"
@@ -304,6 +305,7 @@ def test_native_termux_uninstall_removes_guest_and_purges_bound_home(tmp_path, p
     proot.write_text('''#!/bin/sh
 printf '%s\\n' "$*" >> "$RECORD"
 if [ "$1" = list ]; then printf 'ai-control-mesh\\n'; fi
+if [ "$1" = login ] && [ "$STOP_FAILS" = 1 ]; then exit 7; fi
 if [ "$1" = remove ] && [ "$REMOVE_FAILS" = 1 ]; then exit 7; fi
 ''', encoding="utf-8")
     proot.chmod(0o755)
@@ -325,7 +327,8 @@ if [ "$1" = remove ] && [ "$REMOVE_FAILS" = 1 ]; then exit 7; fi
     app.parent.mkdir()
     app.write_text("old program", encoding="utf-8")
     env = {**os.environ, "PREFIX": str(prefix), "TERMUX_VERSION": "test", "RECORD": str(record),
-           "REMOVE_FAILS": "1" if remove_fails else "0", "XDG_DATA_HOME": str(data),
+           "REMOVE_FAILS": "1" if remove_fails else "0", "STOP_FAILS": "1" if stop_fails else "0",
+           "XDG_DATA_HOME": str(data),
            "PATH": str(prefix / "bin") + os.pathsep + os.environ["PATH"]}
     args = [shutil.which("sh"), "-s", "--"] + (["--purge"] if purge else [])
     result = subprocess.run(args, input=(out / "uninstall-local.sh").read_bytes(), env=env,

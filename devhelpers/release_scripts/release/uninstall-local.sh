@@ -61,7 +61,7 @@ uninstall_termux() {
     if printf '%s\n' "$guests" | grep -qx 'ai-control-mesh'; then
         if [ -f "$state/home/.mesh-termux-stop.sh" ]; then
             proot-distro login ai-control-mesh --bind "$state/home:/root" -- /bin/sh /root/.mesh-termux-stop.sh ||
-                fail "couldn't stop the guest; its data is still in $state"
+                say "The guest stop helper could not finish; checking whether the guest can be removed."
         fi
         # The foreground mesh-termux session notices the stopped server and exits its guest.
         sleep 3
