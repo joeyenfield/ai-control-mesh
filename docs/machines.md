@@ -124,7 +124,7 @@ Only one agent-machine runs per folder. `run` refuses while another is running, 
 - **MCP**: the MCP servers it shares.
 - **Folders**: the launch folders.
 
-**On Android (Termux)**, Android stops apps' background processes when it wants the memory or battery, Termux's included, so agent-machine can go away while the phone is idle, and the machine shows offline on the console. Keep it running with:
+**On Android (Termux)**, the one-line installer selects the `android-arm64` build. Older servers that hand out `linux-arm64` instead fail at sign-in with `unexpected e_type: 2`; installing again from the same build gives the same error. Once the server has a build with `android-arm64`, rerun its `/install.sh` command. Android stops apps' background processes when it wants the memory or battery, Termux's included, so agent-machine can go away while the phone is idle, and the machine shows offline on the console. Keep it running with:
 
 - `termux-wake-lock` (or **Acquire wakelock** in Termux's notification) before `agent-machine start`;
 - Android's battery settings for Termux set to **Unrestricted**;

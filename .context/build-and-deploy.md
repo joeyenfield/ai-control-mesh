@@ -25,7 +25,7 @@ flowchart LR
   out --> e["SHA256SUMS"]
 ```
 
-- 15 targets (Windows, Linux incl. arm/riscv64/s390x/loong64, macOS, FreeBSD), built with `CGO_ENABLED=0 -trimpath` and `-X main.version`. Components: `agent` (agent and agent-proxy) and `agent-machine`.
+- 16 targets (Windows, Linux incl. arm/riscv64/s390x/loong64, Android ARM64 for Termux, macOS, FreeBSD), built with `CGO_ENABLED=0 -trimpath` and `-X main.version`. Android ARM64 uses `-buildmode=pie`, producing `ET_DYN` with `/system/bin/linker64`; the Linux ARM64 build is for Linux. Components: `agent` (agent and agent-proxy) and `agent-machine`.
 - Archives and Linux packages are written in Go (execute bits survive NTFS). A missing external tool (wix, pkgbuild, a JDK or Android SDK) skips its format with a note.
 - The wheel is written in Go from `python/pyproject.toml`, with `_version.py` stamped in. It is skipped when the version isn't PEP 440.
 - Flags: `-version`, `-root`, `-out`, `-only`, `-packages`, `-android`, `-python`, `-print-version` (used by the build scripts).
