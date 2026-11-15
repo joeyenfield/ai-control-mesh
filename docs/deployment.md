@@ -259,7 +259,7 @@ The server writes each script for the request: its address as you reached it (ch
 
 **The tray icon.** On a desktop (Windows, macOS, or Linux and BSD with a display), not as root, and with Python 3.9 or later, the installer also puts in `agent-tray`. It comes from the same wheel and environment, plus `pystray` and `Pillow` from PyPI. Only `agent-tray` is linked into the prefix, so the Go programs stay the ones you run. It starts when you sign in to the computer, and the installer starts it once. The icon shows whether this machine is in the fleet and whether agent is signed in, and starts and stops them ([The tray icon](local.md#the-tray-icon)). If it can't be installed, the installer says so and everything else works the same.
 
-`AGENT_PLATFORM` overrides the detected platform (such as `linux-arm64`). The console's **Downloads** page and **Add a machine** show the commands for your server, ready to copy.
+`AGENT_PLATFORM` overrides the detected platform (such as `linux-arm64`). Native Termux selects `android-arm64`, whose programs use Android's loader. A PRoot Linux guest still selects a Linux build. The console's **Downloads** page and **Add a machine** show the commands for your server, ready to copy.
 
 ### From an archive, and as a service
 
