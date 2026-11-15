@@ -61,7 +61,7 @@ Searches and reads made through a shell count as what they do: `rg`, `grep`, `fi
 
 Under the checks are the numbers they were made from. Three pictures: **the context, call by call** (the main chat's calls, so sub-agents don't blur it), **what the main chat's context holds**, split into the system prompt, tool definitions, tool results, tool calls, the agent's replies, its thinking, the messages typed and the notes the agent adds, and **model calls by tier**. Then tables that open:
 
-- **Models**: each model the session called, its tier, its calls, the tokens it read and wrote, and its estimated cost.
+- **Models**: each model the session called, its tier, its calls, the tokens it read and wrote, and its estimated cost. Calls with no token usage, such as requests refused before reaching a model, have no tier. Their rows show **No token usage** and stay out of the tier chart.
 
 - **The system prompt's sections**: each Markdown heading or XML-style tag starts a section; the largest twelve, with their sizes. This is where to look before trimming an instruction file.
 - **Tool definitions**: the largest ones, how many were never called, and each MCP server's tools and calls.

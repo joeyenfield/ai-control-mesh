@@ -1,7 +1,7 @@
 # AI Control Mesh for Android
 
 Watch and drive your coding agents from your phone. The app keeps a list of your
-agent-servers and opens each one's console full screen, on **Running agents**: read an
+agent-servers and opens each one's console on **Running agents**: read an
 agent's screen, answer its prompts, start agents on your machines, and see the traffic.
 
 It's a native shell around the console (`../ui`): the console is built for phones, so
@@ -12,6 +12,11 @@ Debug builds also include a private Android Auto session monitor; see below.
 - **Your servers.** Add a server by its address (`http://192.168.1.10:9999`, a Tailscale
   name, or HTTPS). The app checks it's an agent-server before saving it, and shows
   whether each is online.
+- **Switch servers.** Tap the server bar above the console, then choose a saved server.
+  Names and addresses distinguish servers, and the current one is marked. The bar stays
+  available during sign-in and when a server is offline. **Manage servers** opens the
+  list to add or remove one. Switching opens **Running agents**, keeps saved sign-ins,
+  and makes that server the one opened next time you start the app.
 - **Signing in** is mandatory OIDC. The app discovers the chosen API's HTTPS issuer and
   keeps its sign-in and API callback in the WebView, on this phone only. OAuth access
   and refresh cookies are not backed up; legacy pairing codes no longer grant access.

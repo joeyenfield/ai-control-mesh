@@ -325,7 +325,8 @@ export interface SessionReview {
     /** Estimated dollars: paid by the token, and an account agent's calls at API prices. */
     usd: number;
     subscription_usd: number;
-    models: { model: string | null; tier: ModelTier; calls: number; input_tokens: number; output_tokens: number; usd: number }[];
+    /** Calls with no token usage have no pricing tier. */
+    models: { model: string | null; tier: ModelTier | null; calls: number; input_tokens: number; output_tokens: number; usd: number }[];
     /** The model calls by tier, most expensive tier first; share is of the session's model calls. */
     tiers: { tier: ModelTier; calls: number; share: number; input_tokens: number; output_tokens: number; usd: number; models: string[] }[];
   };

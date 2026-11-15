@@ -166,6 +166,12 @@ To set it up on a server you reach over your network:
 
 Authentication cannot be disabled by removing users.
 
+In the Android app, tap **Switch server** in the bar above the console to choose
+another saved server. The picker shows each name and address and marks the current
+server. It also works during sign-in or when the server is offline. Switching opens
+**Running agents** on that server and keeps saved sign-ins. The app reopens the last
+server you chose on its next start. Choose **Manage servers** to add or remove one.
+
 Open a running agent to see its terminal:
 
 - **Send** types your message, then presses Enter as a separate keystroke, so agents don't read it as a paste. Multi-line text is sent as a bracketed paste once the agent has turned that on.

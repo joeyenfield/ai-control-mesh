@@ -20,6 +20,9 @@
     <string name="offline_detail">Check the phone is on the same network, or on Tailscale, and the server is running.</string>
     <string name="retry">Try again</string>
     <string name="servers">Servers</string>
+    <string name="switch_server">Switch server</string>
+    <string name="switch_server_description">Switch server. Current server: %1$s, %2$s</string>
+    <string name="manage_servers">Manage servers</string>
     <string name="update_available">Update available: the server is %1$s</string>
     <string name="update">Update</string>
     <string name="plain_http">Not encrypted: use Tailscale or HTTPS on networks you don\'t trust.</string>
