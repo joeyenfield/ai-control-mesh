@@ -205,12 +205,13 @@ if [ "$1" = install ] && [ "${FAIL_GUEST:-0}" = 1 ]; then exit 7; fi
         return
     assert result.returncode == 0, result.stderr.decode()
     assert f"<{BASE}/install-local.sh><0><--python><--no-tray><--port><35991><--auth-port><35992><--prefix></opt/mesh bin><--no-client>" in calls
-    default = subprocess.run([shutil.which("sh"), "-s"], input=script, env=env, capture_output=True, timeout=20)
-    assert default.returncode == 0, default.stderr.decode()
-    assert f"<{BASE}/install-local.sh><1><--python><--no-tray>" in record.read_text()
     state = data / "ai-control-mesh-termux"
     assert (state.stat().st_mode & 0o777) == 0o700
     assert (state / "home/.mesh-termux-prefix").read_text().strip() == "/opt/mesh bin"
+    default = subprocess.run([shutil.which("sh"), "-s"], input=script, env=env, capture_output=True, timeout=20)
+    assert default.returncode == 0, default.stderr.decode()
+    assert f"<{BASE}/install-local.sh><1><--python><--no-tray>" in record.read_text()
+    assert (state / "home/.mesh-termux-prefix").read_text().strip() == "/usr/local/bin"
     for generated in [state / "bin/mesh-termux", *list((state / "home").glob("*.sh")), *list((state / "home").glob(".*.sh"))]:
         assert subprocess.run(["sh", "-n", str(generated)], capture_output=True).returncode == 0
     control = prefix / "bin/mesh-termux"
@@ -247,7 +248,7 @@ INSTALLER
     curl.chmod(0o755)
     guest_home = state / "home"
     bootstrap = (guest_home / ".mesh-termux-install.sh").read_text().replace(
-        "/root/.mesh-termux-prefix", str(guest_home / ".mesh-termux-prefix"),
+        "/root/.mesh-termux-prefix", f"'{guest_home / '.mesh-termux-prefix'}'",
     ).replace(
         'export PATH="$prefix:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"',
         'export PATH="$prefix:/usr/bin:/bin"',
@@ -288,6 +289,56 @@ def test_guest_termux_variables_do_not_reenter_bootstrap(tmp_path):
                             env=env, capture_output=True, timeout=10)
     assert result.returncode != 0 and b"ordinary-flow" in result.stderr
     assert b"Termux detected" not in result.stdout
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Termux uninstaller needs POSIX shell paths")
+@pytest.mark.parametrize(("purge", "remove_fails"), [(False, False), (True, False), (True, True)])
+def test_native_termux_uninstall_removes_guest_and_purges_bound_home(tmp_path, purge, remove_fails):
+    out = tmp_path / "out"
+    release.make(VERSION, BASE, built(tmp_path), out, checkout(tmp_path))
+    prefix = tmp_path / "Termux prefix"
+    (prefix / "bin").mkdir(parents=True)
+    (prefix / "bin" / "sh").symlink_to(shutil.which("sh"))
+    record = tmp_path / "commands"
+    proot = prefix / "bin" / "proot-distro"
+    proot.write_text('''#!/bin/sh
+printf '%s\\n' "$*" >> "$RECORD"
+if [ "$1" = list ]; then printf 'ai-control-mesh\\n'; fi
+if [ "$1" = remove ] && [ "$REMOVE_FAILS" = 1 ]; then exit 7; fi
+''', encoding="utf-8")
+    proot.chmod(0o755)
+    sleep = prefix / "bin" / "sleep"
+    sleep.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    sleep.chmod(0o755)
+    data = tmp_path / "private data"
+    state = data / "ai-control-mesh-termux"
+    (state / "home").mkdir(parents=True)
+    (state / "bin").mkdir()
+    (state / "home/.mesh-termux-prefix").write_text("/usr/local/bin\n", encoding="utf-8")
+    (state / "home/.mesh-termux-stop.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+    (state / "bin/mesh-termux").write_text("#!/bin/sh\n", encoding="utf-8")
+    (prefix / "bin/mesh-termux").symlink_to(state / "bin/mesh-termux")
+    issuer = state / "home/.local/share/ai-control-mesh/oidc/issuer-state.sqlite3"
+    issuer.parent.mkdir(parents=True)
+    issuer.write_text("sign-ins and signing key", encoding="utf-8")
+    app = state / "home/.local/share/ai-control-mesh/app/old"
+    app.parent.mkdir()
+    app.write_text("old program", encoding="utf-8")
+    env = {**os.environ, "PREFIX": str(prefix), "TERMUX_VERSION": "test", "RECORD": str(record),
+           "REMOVE_FAILS": "1" if remove_fails else "0", "XDG_DATA_HOME": str(data),
+           "PATH": str(prefix / "bin") + os.pathsep + os.environ["PATH"]}
+    args = [shutil.which("sh"), "-s", "--"] + (["--purge"] if purge else [])
+    result = subprocess.run(args, input=(out / "uninstall-local.sh").read_bytes(), env=env,
+                            capture_output=True, timeout=20)
+    assert "list --quiet\nlogin ai-control-mesh" in record.read_text()
+    assert "remove ai-control-mesh\n" in record.read_text()
+    if remove_fails:
+        assert result.returncode != 0 and issuer.is_file() and (prefix / "bin/mesh-termux").is_symlink()
+    elif purge:
+        assert result.returncode == 0 and not state.exists() and not (prefix / "bin/mesh-termux").exists()
+    else:
+        assert result.returncode == 0 and issuer.is_file() and not app.exists()
+        assert not (prefix / "bin/mesh-termux").exists()
 
 
 def local_install(tmp_path: Path, kind: str) -> tuple[Path, Path, Path]:
