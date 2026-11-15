@@ -142,9 +142,15 @@ cleanup() {
 }
 trap cleanup EXIT
 trap 'exit 0' INT TERM HUP
-agent-server local start
+if ! start_output=$(agent-server local start 2>&1); then
+    printf '%s\n' "$start_output" >&2
+    exit 1
+fi
 if [ -s /root/.config/agent-proxy/credentials.json ] || [ -s /root/.config/agent-machine/credentials.json ]; then
-    agent-machine start </dev/null || printf 'Start or sign in the machine from mesh-termux shell.\n'
+    if ! machine_output=$(agent-machine start </dev/null 2>&1); then
+        printf '%s\n' "$machine_output" >&2
+        printf 'Start or sign in the machine from mesh-termux shell.\n' >&2
+    fi
 fi
 printf 'Full server running. Keep this session open; Ctrl+C stops it.\n'
 while agent-server local status >/dev/null 2>&1; do sleep 2; done
