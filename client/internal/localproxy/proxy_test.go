@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"sync"
@@ -52,6 +53,41 @@ func newProxy(t *testing.T, server string) (*Proxy, *httptest.Server) {
 	front := httptest.NewServer(proxy)
 	t.Cleanup(front.Close)
 	return proxy, front
+}
+
+func TestLoginSwitchCannotSendATokenToTheNewServer(t *testing.T) {
+	old := newFakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(settings.TokenHeader) != "old-access" {
+			t.Error("wrong token at the old server")
+		}
+		_, _ = w.Write([]byte("old server"))
+	})
+	other := newFakeServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Error("the old token reached the new server")
+	})
+	proxy, front := newProxy(t, old.URL)
+	proxy.Upstream.Fixed = ""
+	t.Setenv("AI_PROXY_TOKEN", "")
+	t.Setenv("AI_PROXY_MACHINE_TOKEN", "")
+	credentials := &settings.Credentials{Default: settings.Normalize(old.URL), Servers: map[string]*settings.ServerEntry{
+		settings.Normalize(old.URL): {URL: old.URL, AccessToken: "old-access", ExpiresAt: time.Now().Unix() + 3600, Issuer: old.URL, ClientID: "mesh-cli"},
+	}}
+	if err := credentials.Save(); err != nil {
+		t.Fatal(err)
+	}
+	rewrite := proxy.agents.Rewrite
+	proxy.agents.Rewrite = func(request *httputil.ProxyRequest) {
+		credentials.Default = settings.Normalize(other.URL)
+		credentials.Servers = map[string]*settings.ServerEntry{settings.Normalize(other.URL): {URL: other.URL}}
+		if err := credentials.Save(); err != nil {
+			t.Error(err)
+		}
+		rewrite(request)
+	}
+	response, body := do(t, "GET", front.URL+"/v1/models", nil, "")
+	if response.StatusCode != 200 || body != "old server" {
+		t.Fatalf("%d %s", response.StatusCode, body)
+	}
 }
 
 func do(t *testing.T, method, url string, headers map[string]string, body string) (*http.Response, string) {

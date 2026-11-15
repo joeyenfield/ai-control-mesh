@@ -86,6 +86,10 @@ The settings routes (`/api/config` and `/api/config/export|import|agents|models|
 
 ## Core flows
 
+Server stats (`stats.ServerStats`, `GET /api/server/stats`) treat OS probes as optional, including process construction and CPU priming during route registration. Restricted `/proc` access never prevents startup or fails a sample: unreadable CPU, memory, swap, boot time and process fields are null, CPU count defaults to 0, network is null and disks are empty when unavailable. Each process field is probed separately. Prometheus omits unavailable host/process metrics while keeping the server's own counters. Folder size checks also tolerate denied access.
+
+`local.py` still requires a verified process identity before signalling a recorded process. If the identity cannot be read just after spawning, it reaps that child through its own subprocess handle and reports a startup error instead of leaving an untracked process. When other processes cannot be enumerated, stop still attempts the verified parent. Raw `OSError` is handled alongside psutil's errors.
+
 **Agent request** (`routes/compat.py`)
 
 ```mermaid

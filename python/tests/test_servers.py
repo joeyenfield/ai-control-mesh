@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from agent_py import common
 from agent_py.machine import servers, settings
 import agent_py.machine as command_line
 
@@ -448,5 +449,6 @@ def test_the_data_folder_holds_the_models_and_builds_when_set(home, tmp_path, mo
     config = servers.default_config()
     config["models_dir"] = "/models"
     assert servers.environment({}, config)["OLLAMA_MODELS"] == "/models"
-    # The sign-in stays in agent-machine's own folder.
-    assert settings.credentials_path().parent == settings.home() != data
+    # Machine state and model data cannot split the shared sign-in.
+    assert settings.credentials_path() == common.credentials_path()
+    assert settings.credentials_path().parent not in (settings.home(), data)

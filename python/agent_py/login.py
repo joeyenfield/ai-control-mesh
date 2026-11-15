@@ -30,7 +30,7 @@ class Setup:
 
 def login(args: List[str], *, program: str, credentials_path: Callable[[], Path], default_server: str, label: str, done: str, signed_in: str = "",
           setup: Optional[Setup] = None) -> int:
-    token_env = "AI_PROXY_MACHINE_TOKEN" if program == "agent-machine" else "AI_PROXY_TOKEN"
+    token_env = "AI_PROXY_TOKEN"
     # agent and agent-machine each take a setup code from their own variable (Go's SetupCodeEnvironment).
     code_env = oauth.SETUP_CODE_ENV if program == "agent-machine" else oauth.AGENT_SETUP_CODE_ENV
     for arg in args:
@@ -76,10 +76,28 @@ def server_url(server: str) -> str:
 def sign_in(server: str, setup_code: str, *, program: str, credentials_path: Callable[[], Path]) -> common.ServerEntry:
     """Signs in to server (approved by setup_code, or in a browser when it's empty) and saves the
     credentials as the default server's."""
+    upstream = common.Upstream(credentials_path)
+    entry = upstream.credentials().default_entry()
+    if entry is not None and common.normalize(entry.url) == common.normalize(server):
+        try:
+            upstream.token(server)
+        except oauth.OAuthError as error:
+            if error.code != "login_required":
+                raise
+            entry = None
+        else:
+            credentials = upstream.credentials()
+            credentials.check_server(server)
+            entry = credentials.servers.get(common.normalize(server))
+    else:
+        entry = None
+    if entry is not None:
+        print(f"Signed in to {server} as {entry.user} (shared by agent and agent-machine).")
+        return entry
     entry = oauth.device_login(server, sys.stdout, program, setup_code)
     with oauth.credential_lock(credentials_path()):
         credentials = common.Credentials.load(credentials_path())
-        credentials.servers[common.normalize(server)] = entry
+        credentials.servers = {common.normalize(server): entry}
         credentials.default = common.normalize(server)
         credentials.save()
     print(f"Signed in to {server} as {entry.user}.")
@@ -104,7 +122,8 @@ def logout(args: List[str], *, program: str, credentials_path: Callable[[], Path
             except (httpx.HTTPError, ValueError, OSError, RuntimeError) as error:
                 revoke_error = error
             if credentials.default == key:
-                credentials.default = next(iter(credentials.servers), "")
+                credentials.default = ""
+                credentials.servers.clear()
             credentials.save()
     except (OSError, RuntimeError) as error:
         print(f"{program} logout: {error}", file=sys.stderr)

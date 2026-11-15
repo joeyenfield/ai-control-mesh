@@ -33,10 +33,7 @@ def proxy_url() -> str:
 
 
 def credentials_path() -> Path:
-    """credentials.json in the user's config folder, or AI_PROXY_CREDENTIALS: shared with the Go client."""
-    if os.environ.get("AI_PROXY_CREDENTIALS"):
-        return common.expand_home(os.environ["AI_PROXY_CREDENTIALS"])
-    return common.config_dir() / "agent-proxy" / "credentials.json"
+    return common.credentials_path()
 
 
 def upstream(fixed: str = "") -> common.Upstream:

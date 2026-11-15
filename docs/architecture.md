@@ -29,7 +29,7 @@ The server is the hub. It owns all configuration, accounts and recordings. Every
 
 - **The server owns the logic.** Agent definitions (stored in its database), backend choice and template rendering all live in Python. The client gets agents, backends and launch environments from the API. A new agent added on **Server settings** reaches every computer at once, with no client update.
 - **The client knows the server only by URL.** It doesn't read the server's settings or join the fleet. It can run on a laptop that never opens a port.
-- **Machines are separate from clients.** `agent-machine` has its own sign-in (`agent-machine login`, apart from `agent login`) and shares no code with `client/`. A computer that only supplies models needs nothing but `agent-machine`. When it starts an agent, it runs the `agent` program like a user would.
+- **Machines are separate from clients.** `agent-machine` shares no code with `client/`. They share the OS user's credentials file and refresh lock, so one login selects the same account and server for both. A computer that only supplies models needs nothing but `agent-machine`. When it starts an agent, it runs the `agent` program like a user would.
 - **The server never manages a model server.** It only forwards agents' traffic to one. Listing models, pulling, loading, logs, the machine's load, Ollama's settings, starting and stopping: all of that is a request to the machine that runs the model server, which does it against `127.0.0.1` on its side. So the server needs no route to the model server and no knowledge of how it's installed.
 
 How they fit together:

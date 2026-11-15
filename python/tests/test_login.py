@@ -131,6 +131,10 @@ def test_automatic_sign_in(issuer, monkeypatch, capsys):
     assert agent_machine.sign_in_first(SERVER) == 0 and len(issuer.setups) == 1
     # A refused code fails start and run, with the message.
     monkeypatch.setenv("AI_PROXY_MACHINE_HOME", str(settings.home().parent / "other"))
+    # Moving machine settings keeps the same shared sign-in; an explicit auth profile is separate.
+    monkeypatch.setenv(oauth.SETUP_CODE_ENV, "msc_auto")
+    assert agent_machine.sign_in_first(SERVER) == 0 and len(issuer.setups) == 1
+    monkeypatch.setenv("AI_PROXY_CREDENTIALS", str(settings.home() / "other-credentials.json"))
     monkeypatch.setenv(oauth.SETUP_CODE_ENV, "msc_auto")
     issuer.setup = lambda: (400, {"error": "invalid_setup_code"})
     assert agent_machine.sign_in_first(SERVER) == 1

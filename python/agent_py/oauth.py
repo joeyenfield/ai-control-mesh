@@ -151,6 +151,7 @@ def credential_lock(path: Path):
                 raise
             time.sleep(0.05)
     try:
+        common.migrate_credentials(path)
         yield
     finally:
         # A failed unlock (an antivirus holding the directory for a moment) mustn't fail
@@ -161,9 +162,9 @@ def credential_lock(path: Path):
 
 def access_token(upstream: common.Upstream, server: str) -> str:
     secure_url(server)
-    name = "AI_PROXY_TOKEN" if upstream.use_env else "AI_PROXY_MACHINE_TOKEN"
-    if os.environ.get(name):
-        return os.environ[name]
+    upstream.credentials().check_server(server)
+    if common.environment_token():
+        return common.environment_token()
     key = common.normalize(server)
     lock = credential_lock(upstream.credentials_path())
     try:
@@ -171,7 +172,9 @@ def access_token(upstream: common.Upstream, server: str) -> str:
     except (OAuthError, OSError):
         # Another process holds the lock (a slow refresh): the stored token while it's still good. The
         # file is replaced whole, so reading it unlocked is safe.
-        token = _valid_token(upstream.credentials().servers.get(key))
+        credentials = upstream.credentials()
+        credentials.check_server(server)
+        token = _valid_token(credentials.servers.get(key))
         if token:
             return token
         raise
@@ -183,6 +186,7 @@ def access_token(upstream: common.Upstream, server: str) -> str:
 
 def _locked_access_token(upstream: common.Upstream, key: str) -> str:
     credentials = upstream.credentials()
+    credentials.check_server(key)
     entry = credentials.servers.get(key)
     if not entry or not entry.access_token or not entry.issuer or not entry.client_id:
         raise OAuthError("OAuth sign-in required: run login (legacy passwords and access keys are no longer supported)", "login_required")
@@ -236,8 +240,7 @@ def reject_access_token(upstream: common.Upstream, server: str, token: str = "")
     token (the one a socket was opened with), only while it's still the stored one: several sockets
     opened with one token are closed together when it expires; the first refreshes, and the others
     mustn't throw that new token away and refresh again each. Go's RejectAccessTokenIf."""
-    name = "AI_PROXY_TOKEN" if upstream.use_env else "AI_PROXY_MACHINE_TOKEN"
-    if os.environ.get(name):
+    if common.environment_token():
         return
     with credential_lock(upstream.credentials_path()):
         credentials = upstream.credentials()

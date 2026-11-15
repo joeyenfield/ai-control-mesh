@@ -135,7 +135,7 @@ def automatic(server: str) -> None:
     credentials for it yet: a container's first start (agent-machine run or start). Later starts find
     the credentials and leave the code alone, so a restarted container doesn't spend another use."""
     code = os.environ.pop(oauth.SETUP_CODE_ENV, "").strip()  # Agents and terminals started here inherit this environment: keep the secret out of it.
-    if not code or os.environ.get("AI_PROXY_MACHINE_TOKEN"):
+    if not code or common.environment_token():
         return
     server = login.server_url(server)
     entry = common.Credentials.load(settings.credentials_path()).servers.get(common.normalize(server))
@@ -154,6 +154,7 @@ def sign_in_first(server: str) -> int:
     """automatic, as an exit status: 0 to carry on."""
     try:
         automatic(server)
+        common.Credentials.load(settings.credentials_path()).check_server(server)
     except (httpx.HTTPError, ValueError, OSError, RuntimeError) as error:
         print(f"agent-machine: couldn't sign in with the setup code: {error}", file=sys.stderr)
         return 1
@@ -334,7 +335,7 @@ def open_log() -> None:
 def run(args: List[str]) -> int:
     """Stays in the fleet until interrupted, reconnecting whenever the connection drops."""
     parser = argparse.ArgumentParser(prog="agent-machine run")
-    parser.add_argument("--server", default="", help=f"The agent-server to join (default: the one from agent-machine login, then {common.DEFAULT_SERVER})")
+    parser.add_argument("--server", default="", help=f"The shared login's server (before login: AI_PROXY_URL, then {common.DEFAULT_SERVER}); use login to switch both programs")
     options = parser.parse_args(args)
     other = settings.running()
     if other:
@@ -350,11 +351,19 @@ def run(args: List[str]) -> int:
     log = logging.getLogger("agent-machine")
     log.info("agent-machine %s joining %s", common.VERSION, status.server)
 
+    def selected_server() -> None:
+        server = upstream.server()
+        if common.normalize(status.server) != common.normalize(server):
+            status.server_version = ""
+        status.server = server
+
     def on_status(state: str) -> None:
+        selected_server()
         status.state = state
         status.save()
 
     def on_server_version(version: str) -> None:
+        selected_server()
         status.server_version = version
         status.save()
 
@@ -512,7 +521,7 @@ def status_json(machine: settings.Machine) -> Dict[str, Any]:
     upstream = settings.upstream()
     server = upstream.server()
     entry = upstream.credentials().servers.get(common.normalize(server))
-    signed_in = bool(entry and entry.access_token) or bool(os.environ.get("AI_PROXY_MACHINE_TOKEN"))
+    signed_in = bool(entry and entry.access_token) or bool(common.environment_token())
     running = settings.running()
     return {
         "id": machine.id, "name": machine.display_name(), "version": common.VERSION, "server": server,
@@ -535,7 +544,7 @@ def show(machine: settings.Machine) -> None:
         signed_in = "with OAuth"
     else:
         signed_in = f"OAuth sign-in required (agent-machine login {server})"
-    if os.environ.get("AI_PROXY_MACHINE_TOKEN"):
+    if common.environment_token():
         signed_in = "with an injected OAuth access token"
     print(f"Machine   : {machine.display_name()} ({machine.id})\nServer    : {server}, {signed_in}")
     status = settings.running()

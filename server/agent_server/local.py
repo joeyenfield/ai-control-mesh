@@ -219,7 +219,18 @@ def spawn(program: str, instance: Instance, environment: dict[str, str]) -> Proc
     with open(log, "ab") as output:
         child = subprocess.Popen(command, env=environment, cwd=str(instance.home), stdin=subprocess.DEVNULL,
                                  stdout=output, stderr=subprocess.STDOUT, **options)
-    return Process(child.pid, psutil.Process(child.pid).create_time())
+    try:
+        return Process(child.pid, psutil.Process(child.pid).create_time())
+    except (psutil.Error, OSError) as exc:
+        # This handle is our child; don't leave it untracked when /proc hides its identity.
+        child.terminate()
+        try:
+            child.wait(timeout=STOP_SECONDS)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
+        raise RuntimeError("Cannot read the local process identity. This system may restrict /proc. "
+                           "Run agent-server and agent-auth in the foreground instead.") from exc
 
 
 def _get(url: str) -> dict[str, Any] | None:
@@ -260,19 +271,26 @@ def stop_process(process: Process) -> None:
         return
     try:
         parent = psutil.Process(process.pid)
-        family = [parent, *parent.children(recursive=True)]
-    except psutil.Error:
+    except (psutil.Error, OSError):
         return
+    try:
+        family = [parent, *parent.children(recursive=True)]
+    except (psutil.Error, OSError):
+        # Other processes may be hidden even when our verified parent remains accessible.
+        family = [parent]
     for item in family:
         try:
             item.terminate()
-        except psutil.Error:
+        except (psutil.Error, OSError):
             pass
-    _, alive = psutil.wait_procs(family, timeout=STOP_SECONDS)
+    try:
+        _, alive = psutil.wait_procs(family, timeout=STOP_SECONDS)
+    except (psutil.Error, OSError):
+        return
     for item in alive:
         try:
             item.kill()
-        except psutil.Error:
+        except (psutil.Error, OSError):
             pass
 
 
@@ -296,7 +314,12 @@ def start(instance: Instance, out: Any = sys.stdout, overrides: dict[str, str] |
     # The API first: it creates the database and the first account, which the issuer reads.
     for program, ready, label in (("server", server_ready, "agent-server"), ("auth", auth_ready, "agent-auth")):
         print(f"Starting {label}...", file=out, flush=True)
-        instance.processes[program] = spawn(program, instance, environment)
+        try:
+            instance.processes[program] = spawn(program, instance, environment)
+        except (RuntimeError, OSError) as exc:
+            print(f"{label} didn't start: {exc}", file=sys.stderr)
+            stop(instance, quiet=True)
+            return 1
         instance.save()
         if not wait_for(lambda: ready(instance), instance.processes[program]):
             print(f"{label} didn't start. See {instance.log(program)}", file=sys.stderr)

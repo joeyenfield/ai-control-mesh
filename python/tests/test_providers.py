@@ -6,9 +6,11 @@ from __future__ import annotations
 import json
 import os
 import socket
+import sys
 import threading
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional
 
 import pytest
@@ -503,6 +505,43 @@ def test_disks_list_each_filesystem_once(tmp_path):
     [disk] = providers.disks([("Settings", str(first)), ("Data", str(first)), ("Launch folder", str(second)), ("Launch folder", str(second / "a" / "b"))])
     assert disk["holds"] == ["Settings", "Data", "Launch folder"] and disk["mountpoint"], disk
     assert 0 < disk["total"] >= disk["used"] and disk["free"] <= disk["total"] and 0 <= disk["percent"] <= 100, disk
+
+
+def test_metrics_when_android_denies_proc_reads(tmp_path, monkeypatch):
+    opened = set()
+
+    def denied(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    def proc_open(path, *args, **kwargs):
+        assert str(path).startswith("/proc/")
+        opened.add(str(path))
+        return denied()
+
+    class DeniedPsutil:
+        def __getattr__(self, name):
+            return denied
+
+    monkeypatch.setattr(providers, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(providers, "open", proc_open, raising=False)
+    monkeypatch.setitem(sys.modules, "psutil", DeniedPsutil())
+    monkeypatch.setattr(providers.os, "getloadavg", denied, raising=False)
+    monkeypatch.setattr(providers, "nvidia_gpus", lambda: ([], ""))
+    monkeypatch.setenv("AI_PROXY_MACHINE_HOME", str(tmp_path))
+    monkeypatch.setenv("AI_PROXY_MACHINE_DATA", str(tmp_path))
+    monkeypatch.setitem(providers._last, "value", None)
+    monkeypatch.setitem(providers._last, "cpu_at", 0)
+    answer = handle(providers.Manager(off), op="metrics")
+    assert answer["ok"]
+    sample = answer["metrics"]
+    assert sample["cpu"]["percent"] is None
+    assert all(value is None for value in sample["memory"].values())
+    assert sample["uptime_seconds"] is None and sample["load_average"] is None
+    assert sample["network"] is None and sample["swap"] == {"used": None, "total": None}
+    assert sample["process"]["rss"] is None and sample["process"]["pid"] == os.getpid()
+    assert {"/proc/stat", "/proc/meminfo", "/proc/uptime", "/proc/loadavg", "/proc/net/dev", "/proc/self/statm"} <= opened
+    assert "agent" in sample and sample["disks"]
+    json.dumps(answer)
     assert providers.disks([]) == []
     [gpu] = providers.parse_nvidia("0, NVIDIA RTX 4090, 37, 1024, 24564, 51, [N/A]\nbad line\n")
     assert gpu["memory_used"] == 1024 ** 3 and gpu["power_watts"] is None and gpu["utilization"] == 37.0, gpu

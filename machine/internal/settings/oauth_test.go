@@ -12,6 +12,7 @@ import (
 
 func TestConcurrentRefreshRotatesOnceAndFailuresAreVisible(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	t.Setenv("AI_PROXY_CREDENTIALS", t.TempDir()+"/credentials.json")
 	t.Setenv(TokenEnvironment, "")
 	var exchanges atomic.Int32
 	var rejected atomic.Bool

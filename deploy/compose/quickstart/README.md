@@ -48,8 +48,8 @@ The stack has:
 | `machine-2` | Another independent fleet machine with its own workspace and sign-ins. |
 | `ollama` | Ollama, relayed to machine-1's loopback; models persist in a volume. |
 
-Both machines sign in automatically as admin using separate OAuth device approvals for
-`agent` and `agent-machine`. Later starts reuse rotating credentials. Launches and shells
+Both machines sign in automatically as admin, with one shared login for `agent` and
+`agent-machine` in each container. Later starts reuse rotating credentials. Launches and shells
 are enabled in `/workspace`; host folders and the Docker socket are not mounted.
 Ollama runs on CPU by default and starts with no models downloaded. To give it an NVIDIA
 GPU, see [Use a GPU](#use-a-gpu).

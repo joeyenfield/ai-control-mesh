@@ -176,8 +176,8 @@ def test_it_reads_the_real_programs_status(tmp_path, monkeypatch, agent_binary, 
     monkeypatch.setattr(tray, "program", lambda name: paths.get(name))
     shot = tray.snapshot()
     assert shot.server["url"] == "http://localhost:19999" and shot.server["installed"] is False and shot.server["running"] is False
-    # agent-machine takes its server from its own sign-in, never AI_PROXY_URL: here, none yet.
-    assert shot.machine["server"].startswith("http") and shot.machine["signed_in"] is False and shot.machine["running"] is False
+    # Before the shared sign-in exists, both programs take the same configured URL.
+    assert shot.machine["server"] == "http://localhost:19999" and shot.machine["signed_in"] is False and shot.machine["running"] is False
     assert set(shot.machine["features"]) == {name for name, _ in tray.FEATURES}
     assert shot.agent == {"server": "http://localhost:19999", "signed_in": False, "user": "", "running": False, "port": 28197, "version": ""}
     assert tray.state(shot) == "stopped"

@@ -26,7 +26,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import httpx
 import websockets
 
-from .. import common
+from .. import common, oauth
 from . import containers, files, mcp, providers, servers, settings
 
 UPDATE_EVERY = 60
@@ -520,6 +520,10 @@ class Presence:
                         token, sent = latest, loop.time()
                     except asyncio.CancelledError:
                         raise
+                    except (common.ServerChangedError, oauth.OAuthError) as error:
+                        if isinstance(error, common.ServerChangedError) or error.code == "login_required":
+                            await conn.close()
+                            return
                     except Exception as error:  # noqa: BLE001 - try again; the server closes it with 4410 if it never comes
                         log.info("fleet: couldn't renew the access token: %s", error)
 
@@ -540,6 +544,7 @@ class Presence:
             tasks = {asyncio.ensure_future(keep_up()), asyncio.ensure_future(send_updates()), asyncio.ensure_future(renew()), asyncio.ensure_future(report_accounts())}
             try:
                 async for raw in conn:
+                    self.upstream.credentials().check_server(server)
                     try:
                         message = json.loads(raw)
                     except ValueError:
@@ -714,6 +719,10 @@ class Presence:
                         token, sent = latest, loop.time()
                     except asyncio.CancelledError:
                         raise
+                    except (common.ServerChangedError, oauth.OAuthError) as error:
+                        if isinstance(error, common.ServerChangedError) or error.code == "login_required":
+                            await conn.close()
+                            return
                     except Exception:  # noqa: BLE001 - try again; the server closes the tunnel if it never comes
                         continue
 

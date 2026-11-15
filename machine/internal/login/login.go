@@ -77,7 +77,14 @@ func serverURL(server string) string {
 // SignIn signs in to server (approved by setupCode, or in a browser when it's empty), saves the
 // credentials as the default server's, then switches on the toggles named in enable.
 func SignIn(server, setupCode string, enable []string) error {
-	entry, err := settings.DeviceLogin(server, setupCode, os.Stdout)
+	entry, err := settings.ExistingLogin(server)
+	if err == nil && entry != nil {
+		fmt.Printf("Signed in to %s as %s (shared with agent).\n", server, entry.User)
+		return Enable(enable)
+	}
+	if err == nil && entry == nil {
+		entry, err = settings.DeviceLogin(server, setupCode, os.Stdout)
+	}
 	if err != nil {
 		return err
 	}
@@ -86,7 +93,7 @@ func SignIn(server, setupCode string, enable []string) error {
 		return err
 	}
 	credentials := settings.LoadCredentials()
-	credentials.Servers[settings.Normalize(server)] = entry
+	credentials.Servers = map[string]*settings.ServerEntry{settings.Normalize(server): entry}
 	credentials.Default = settings.Normalize(server)
 	err = credentials.Save()
 	unlock()
@@ -128,7 +135,7 @@ func Automatic(server string) error {
 	code := strings.TrimSpace(os.Getenv(settings.SetupCodeEnvironment))
 	// Agents and terminals started from here inherit this environment: keep the secret out of it.
 	_ = os.Unsetenv(settings.SetupCodeEnvironment)
-	if code == "" || os.Getenv(settings.TokenEnvironment) != "" {
+	if code == "" || settings.EnvironmentToken() != "" {
 		return nil
 	}
 	server = serverURL(server)
@@ -172,10 +179,7 @@ func Logout(args []string) int {
 	delete(credentials.Servers, key)
 	if credentials.Default == key {
 		credentials.Default = ""
-		for other := range credentials.Servers {
-			credentials.Default = other
-			break
-		}
+		credentials.Servers = map[string]*settings.ServerEntry{}
 	}
 	if err := credentials.Save(); err != nil {
 		fmt.Fprintln(os.Stderr, "logout:", err)

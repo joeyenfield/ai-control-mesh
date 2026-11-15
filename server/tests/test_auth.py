@@ -6,8 +6,10 @@ import socket
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
+import psutil
 import pytest
 import uvicorn
 from fastapi.testclient import TestClient
@@ -187,6 +189,57 @@ def test_only_admins_see_the_server_computers_stats(tmp_path):
             stats = dave.get("/api/server/stats").json()
         builds = next(folder for folder in stats["folders"] if folder["path"] == str(settings.dist_dir))
         assert builds["bytes"] == 1000
+
+
+@pytest.mark.parametrize("denied", [PermissionError(13, "Permission denied", "/proc/filesystems"), psutil.AccessDenied()])
+def test_server_stats_when_disk_discovery_is_denied(tmp_path, monkeypatch, denied):
+    def partitions(all=False):
+        raise denied
+
+    monkeypatch.setattr("agent_server.stats.psutil.disk_partitions", partitions)
+    app = create_app(org_settings(tmp_path))
+    with signed_in(app, "sally") as client:
+        assert client.get("/api/status").status_code == 200
+        response = client.get("/api/server/stats")
+        assert response.status_code == 200
+        sample = response.json()
+        assert sample["disks"] == []
+        assert sample["memory"]["total"] > 0 and sample["process"]["rss"] > 0
+        assert len(sample["folders"]) == 2 and "live" in sample
+
+
+@pytest.mark.parametrize("process_denied", [False, True])
+@pytest.mark.parametrize("error", [PermissionError, psutil.AccessDenied])
+def test_server_starts_and_reports_stats_without_system_probes(tmp_path, monkeypatch, process_denied, error):
+    def denied(*args, **kwargs):
+        raise error()
+
+    for name in ("cpu_percent", "cpu_count", "virtual_memory", "swap_memory", "boot_time", "disk_partitions", "net_io_counters"):
+        monkeypatch.setattr(psutil, name, denied)
+    process = SimpleNamespace(**{name: denied for name in
+                              ("cpu_percent", "memory_info", "num_threads", "create_time", "num_handles", "net_connections")})
+    monkeypatch.setattr(psutil, "Process", denied if process_denied else lambda: process)
+    monkeypatch.setattr("agent_server.stats.os.getloadavg", denied, raising=False)
+    app = create_app(org_settings(tmp_path))
+    with signed_in(app, "sally") as client:
+        assert client.get("/api/status").status_code == 200
+        response = client.get("/api/server/stats")
+        assert response.status_code == 200
+        sample = response.json()
+        assert sample["boot_time"] is None
+        assert sample["cpu"] == {"percent": None, "count": 0, "load_average": None}
+        assert all(value is None for value in sample["memory"].values())
+        assert all(value is None for value in sample["swap"].values())
+        assert sample["process"]["pid"] > 0
+        assert all(value is None for key, value in sample["process"].items() if key != "pid")
+        assert sample["network"] is None and sample["disks"] == []
+        assert len(sample["folders"]) == 2 and "live" in sample
+        scraped = client.get("/api/server/metrics")
+        assert scraped.status_code == 200
+        assert "agent_server_up{" in scraped.text
+        assert "agent_server_requests_total{" in scraped.text
+        assert "agent_server_host_memory_" not in scraped.text
+        assert "agent_server_process_resident_memory_bytes" not in scraped.text
 
 
 def test_only_admins_change_the_server_organizations_and_users(tmp_path):

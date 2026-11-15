@@ -158,7 +158,7 @@ What the client reads:
 
 | Variable | What it does |
 |---|---|
-| `AI_PROXY_URL` | The server the `agent-proxy` uses, over the one from `agent login`. |
+| `AI_PROXY_URL` | The server to use before signing in. A saved shared login takes precedence. |
 | `AI_PROXY_TOKEN` | A pre-issued OAuth access token, overriding stored credentials. Obtain a replacement before it expires. |
 | `AI_PROXY_CREDENTIALS` | Where `credentials.json` is. Use a Windows path when you set it from Git Bash. |
 | `AI_PROXY_LOCAL_PORT` | The `agent-proxy`'s HTTP port (default 8184). |
@@ -194,11 +194,15 @@ agent logout http://server:9999
 
 `agent login [url]` signs this computer's `agent-proxy` in through OIDC device authorization. Open the printed verification URL, sign in and approve the displayed code. The CLI never collects your password. `agent login [url] --code <setup code>` (or `AI_PROXY_SETUP_CODE` in the environment) signs in with a setup code from the console's **Machines** page instead, with nothing to approve: you become whoever made the code. Codes expire and allow a limited number of sign-ins; see [Machines](machines.md). Access tokens refresh automatically; see [OIDC authentication](oidc.md). Authentication is mandatory: the old `--user`, `--key` and password-input flow no longer grant access.
 
-The sign-in is kept in `credentials.json`: `%APPDATA%\agent-proxy\` on Windows, `$XDG_CONFIG_HOME/agent-proxy/` (or `~/.config/agent-proxy/`) elsewhere, readable only by you. `AI_PROXY_CREDENTIALS` names another file. The last server signed in to is the default. The `agent-proxy` reads the file on every request, so signing in or out applies at once, with no restart.
+The sign-in is kept in `credentials.json`: `%APPDATA%\agent-proxy\` on Windows, `$XDG_CONFIG_HOME/agent-proxy/` (or `~/.config/agent-proxy/`) elsewhere, readable only by you. `AI_PROXY_CREDENTIALS` names another file. This file and its refresh lock are shared with `agent-machine` for the same OS user. Signing in to another server selects it for both programs. The saved selection takes precedence over `AI_PROXY_URL`; an old `--server` setting cannot select a different authenticated server. The proxy reads the file on every request, and the machine reconnects when its next token check notices a change (normally within 10 seconds).
 
 `agent logout [url]` forgets a sign-in (default: the server signed in to last) and revokes its token on the server when it can reach it.
 
-`agent-machine` has its own sign-in (`agent-machine login`), separate from this one. A computer that both runs agents and is in the fleet signs in with both.
+When injecting an access token, `AI_PROXY_URL` must match its destination and the shared selection. A conflicting token/URL pair is refused rather than sent to another server.
+
+One login is enough: `agent login` and `agent-machine login` share the account and selected server. Running the other login command for that server reuses the sign-in, with no second approval or setup-code use. `agent-machine login --enable LIST` still applies the requested machine permissions. Either logout command signs both programs out. To change account on the same server, log out first.
+
+On upgrade, an existing agent login wins if both programs previously had separate logins. If only the old machine login exists, it moves to the shared file under the refresh lock. Upgrade and restart both programs together. `AI_PROXY_MACHINE_HOME` only moves machine settings; it does not create another login. Explicit `AI_PROXY_CREDENTIALS` profiles remain isolated and are never filled from another profile.
 
 ## The agent-proxy
 
@@ -218,7 +222,7 @@ agent proxy stop                     # stop the one running here; the next agent
 agent proxy status                   # its server, who's signed in, and whether it runs (--json: server, signed_in, user, running, port, version)
 ```
 
-`--server` fixes the server for this run. Without it, the server is `AI_PROXY_URL`, then the one from `agent login`, then `http://127.0.0.1:9999`. The `agent-proxy` binary (`cmd/agent-proxy`) takes the same options. Its log is `agent-proxy.log` beside `credentials.json`. If the ports are taken, it says whether by another `agent-proxy` or another program.
+`--server` can name the selected shared server, or choose the server before sign-in. A conflicting saved selection is refused: use `agent login <url>` to switch both programs. Without it, the server is the shared login, then `AI_PROXY_URL` before login, then `http://127.0.0.1:9999`. The `agent-proxy` binary (`cmd/agent-proxy`) takes the same options. Its log is `agent-proxy.log` beside `credentials.json`. If the ports are taken, it says whether by another `agent-proxy` or another program.
 
 `GET /health` answers with its role, server, signed-in user, HTTPS proxy port, version and protocol. The launcher warns when the running `agent-proxy` or the server is another version than itself: `agent proxy stop` lets the next launch start the current one.
 

@@ -1,9 +1,5 @@
-"""agent-machine's own state, in its own folder (home()): the server it signed in to
-(credentials.json), the machine's settings (machine.json), its log and how its connection is
-doing (status.json). The same files as the Go agent-machine's, so either can run on a machine.
-
-It's separate from the agent command's sign-in on purpose: a machine can supply models to
-one server, or as one account, while its agents use another.
+"""agent-machine's settings, logs and connection state in home(). Authentication and the
+selected server are shared with agent. The files match the Go programs.
 """
 
 from __future__ import annotations
@@ -31,8 +27,8 @@ def home() -> Path:
 
 
 # Moves the large files agent-machine installs or downloads (llama.cpp's builds, its GGUF models,
-# and the models of an Ollama it starts) out of its folder, which holds the sign-in and has to
-# persist: a pod whose only writable space is /tmp or a scratch volume points it there.
+# and the models of an Ollama it starts) out of its settings folder. Settings and the user's
+# shared auth profile must persist; a pod can put large files on a scratch volume.
 DATA_ENV = "AI_PROXY_MACHINE_DATA"
 
 
@@ -49,7 +45,7 @@ def data() -> Path:
 
 
 def credentials_path() -> Path:
-    return home() / "credentials.json"
+    return common.credentials_path()
 
 
 def log_path() -> Path:
@@ -65,8 +61,7 @@ def machine_path() -> Path:
 
 
 def upstream(fixed: str = "") -> common.Upstream:
-    # Only its own sign-in (or AI_PROXY_MACHINE_TOKEN); AI_PROXY_TOKEN belongs to agent.
-    return common.Upstream(credentials_path, fixed=fixed, use_env=False)
+    return common.Upstream(credentials_path, fixed=fixed)
 
 
 # machine.json's on/off switches, by the names `agent-machine <name> on|off` takes.

@@ -199,7 +199,7 @@ foreach ($component in $components) {
     } else {
         if ($NoLogin) { Write-Output "Next: agent-machine login $Server, then agent-machine start"; continue }
         Write-Output ""
-        Write-Output "Signing agent-machine in to $Server"
+        Write-Output "Using the shared agent sign-in for agent-machine on $Server (signing in only if needed)"
         & $exe login $Server
         if ($LASTEXITCODE -ne 0) {
             Write-Output "Sign in later with: agent-machine login $Server, then agent-machine start"

@@ -62,16 +62,19 @@ with pip, `sudo agent-machine servers service` may need the full path:
 `sudo "$(which agent-machine)" servers service`.
 
 The two programs live in one package and share `common.py` (the protocol, headers, sign-in
-files, HTTP clients) and `login.py`. Each still keeps its own credentials, in the same place as
-its Go version: `agent-proxy/credentials.json` (or `AI_PROXY_CREDENTIALS`) for agent, the
-`agent-machine` folder (or `AI_PROXY_MACHINE_HOME`) for agent-machine.
+files, HTTP clients) and `login.py`. Both use the same
+`agent-proxy/credentials.json` (or `AI_PROXY_CREDENTIALS`) and refresh lock as their Go
+versions. Either login command selects the account and server for both. The other reuses
+the sign-in; either logout command signs both out. `AI_PROXY_MACHINE_HOME` only moves
+machine settings. A machine-only old login migrates to the shared file when needed;
+existing agent credentials win when both old profiles exist.
 
 Sign-in is required even on loopback; password and access-key sign-ins are removed.
 HTTPS is required except loopback development. Rotating refresh is serialized across
 Go and Python processes. Logout revokes the refresh credential, forgets the local login,
 and reports revocation failures. Service-account automation can obtain an access token
-directly from the issuer and inject `AI_PROXY_TOKEN` for agent or the separate
-`AI_PROXY_MACHINE_TOKEN` for agent-machine.
+directly from the issuer and inject `AI_PROXY_TOKEN` for both programs.
+`AI_PROXY_MACHINE_TOKEN` is a legacy alias accepted by both.
 
 A launch from the console runs `AI_PROXY_AGENT` if it's set, otherwise the Python agent with
 the same Python as agent-machine.

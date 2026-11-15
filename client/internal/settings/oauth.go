@@ -184,7 +184,12 @@ func LockCredentials() (func(), error) {
 	for {
 		err := os.Mkdir(path, 0o700)
 		if err == nil {
-			return func() { _ = os.Remove(path) }, nil
+			unlock := func() { _ = os.Remove(path) }
+			if err := migrateCredentials(); err != nil {
+				unlock()
+				return nil, err
+			}
+			return unlock, nil
 		}
 		if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) > StaleLock {
 			// Left by a process that died holding it: take it over. Rename it aside first,
@@ -223,7 +228,10 @@ func (u Upstream) AccessToken(server string) (string, error) {
 	if err := SecureURL(server); err != nil {
 		return "", err
 	}
-	if token := os.Getenv(TokenEnvironment); token != "" {
+	if err := LoadCredentials().CheckServer(server); err != nil {
+		return "", err
+	}
+	if token := EnvironmentToken(); token != "" {
 		return token, nil
 	}
 	key := Normalize(server)
@@ -231,13 +239,20 @@ func (u Upstream) AccessToken(server string) (string, error) {
 	if err != nil {
 		// Another process holds the lock (a slow refresh): the stored token, while it's still good,
 		// rather than failing the request. The file is replaced whole, so reading it unlocked is safe.
-		if token := validToken(LoadCredentials().Servers[key]); token != "" {
+		credentials := LoadCredentials()
+		if changed := credentials.CheckServer(server); changed != nil {
+			return "", changed
+		}
+		if token := validToken(credentials.Servers[key]); token != "" {
 			return token, nil
 		}
 		return "", err
 	}
 	defer unlock()
 	credentials := LoadCredentials()
+	if err := credentials.CheckServer(server); err != nil {
+		return "", err
+	}
 	entry := credentials.Servers[key]
 	if entry == nil || entry.AccessToken == "" || entry.Issuer == "" || entry.ClientID == "" {
 		return "", ErrLoginRequired
@@ -302,7 +317,7 @@ func (u Upstream) RejectAccessToken(server string) error {
 // still the stored one. Several sockets opened with one token are closed together when it expires;
 // the first refreshes, and the others mustn't throw that new token away and refresh again each.
 func (u Upstream) RejectAccessTokenIf(server, token string) error {
-	if os.Getenv(TokenEnvironment) != "" {
+	if EnvironmentToken() != "" {
 		return nil
 	}
 	unlock, err := LockCredentials()

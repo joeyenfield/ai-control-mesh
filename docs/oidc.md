@@ -69,17 +69,19 @@ The Android WebView keeps the explicitly discovered HTTPS issuer and API sign-in
 
 ```bash
 agent login https://api.example.com
-agent-machine login https://api.example.com
+# Or use agent-machine login: both programs share this sign-in.
 ```
 
-The command prints the issuer's verification address and a short user code, then polls the token endpoint until approved, denied or expired. No password is read by the CLI or sent to the API.
+Both commands use one credentials file and refresh lock per OS user. A valid existing sign-in is reused, and logout from either command revokes it for both. Sign in to a different server to switch both; logout first to change account on the same server.
+
+When a new sign-in is needed, the command prints the issuer's verification address and a short user code, then polls the token endpoint until approved, denied or expired. No password is read by the CLI or sent to the API.
 
 - Open the address in your browser, sign in, check the code and approve **only a sign-in you started**. To reject a code, choose **Deny device sign-in**: denial is final for that code, the CLI receives `access_denied`, and a new sign-in starts over.
 - Already signed in to the console? Enter the code on **Machines › Approve a device** instead: the console shows what asked and when, and you approve or deny without your password. The API passes your console access token to the issuer (`POST /device/console`, authenticated as `mesh-api`), which accepts only console sign-ins, so a CLI or service token can't approve devices.
 
 [Security](security.md#device-approval) walks through the whole flow, what protects a code, and how to approve safely.
 
-Each program keeps its own credentials file, including its access token, rotating refresh token and expiry. Refreshes are serialized across processes before atomically saving new credentials. `agent logout` and `agent-machine logout` revoke their credentials. Expired or revoked credentials fail closed.
+Both programs share one credentials file for the OS user, including the selected server, access token, rotating refresh token and expiry. Refreshes are serialized across processes before atomically saving new credentials. Either logout command revokes the shared sign-in. Expired or revoked credentials fail closed.
 
 The agent-proxy signs every server-bound call, including model and MCP traffic, with an access token in `X-AI-Proxy-Token`. That alternate header preserves the coding agent's own vendor `Authorization`. The server strips platform credentials before forwarding to providers. Existing session and MCP permissions still apply.
 
@@ -115,7 +117,7 @@ Content-Type: application/x-www-form-urlencoded
 grant_type=client_credentials&scope=mesh-api
 ```
 
-Send the resulting token to the API as `Authorization: Bearer <access_token>`. `AI_PROXY_TOKEN` can supply a pre-issued access token to the launcher. Automation must obtain another token before expiry; a client-credentials grant does not turn a token into a permanent key. A service account receives its associated account's existing role and grants, not implicit admin rights.
+Send the resulting token to the API as `Authorization: Bearer <access_token>`. `AI_PROXY_TOKEN` can supply one pre-issued access token to both the launcher and agent-machine. `AI_PROXY_MACHINE_TOKEN` remains an alias for both when `AI_PROXY_TOKEN` is absent. Automation must obtain another token before expiry; a client-credentials grant does not turn a token into a permanent key. A service account receives its associated account's existing role and grants, not implicit admin rights.
 
 ## Endpoints
 

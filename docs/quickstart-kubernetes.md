@@ -71,13 +71,13 @@ On Windows PowerShell, run the two `port-forward` commands in two windows instea
    ```
 
    Open **http://localhost:19999** (type `localhost` exactly), choose **Sign in** and sign in as **admin** with that password.
-2. **Let the machine in.** The machine signs in the way any computer does, with two device codes (one for `agent-machine`, then one for `agent`). Its log shows one at a time, the second once the first is approved, and a new one when a code runs out after ten minutes:
+2. **Let the machine in.** The machine signs in once for both `agent-machine` and `agent`. Its log shows one device code, and a new one when a code runs out after ten minutes:
 
    ```bash
    kubectl -n mesh logs deploy/quickstart-machine -c machine -f
    ```
 
-   For each code, open **Machines › Approve a device** in the console, type the newest code and approve it. Within a minute **k8s-machine** shows as **Online** on **Machines**.
+   Open **Machines › Approve a device** in the console, type the newest code and approve it. Within a minute **k8s-machine** shows as **Online** on **Machines**.
 3. **Check the console can manage its Ollama.** `machine.yaml` sets `AGENT_SERVERS=on`, so the machine lets the console pull models. A sandbox image pulled before that setting existed ignores it: `kubectl -n mesh rollout restart deploy/quickstart-machine` pulls the newest, or turn it on there once by hand:
 
    ```bash
