@@ -138,5 +138,14 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/add_server" />
+
+        <Button
+            android:id="@+id/crash_log"
+            style="@style/Button.Plain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/save_crash_log"
+            android:visibility="gone" />
     </LinearLayout>
 </ScrollView>

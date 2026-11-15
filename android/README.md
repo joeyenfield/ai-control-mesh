@@ -30,6 +30,9 @@ Debug builds also include a private Android Auto session monitor; see below.
   same server stays in the app.
 - **If Android stops the console's WebView**, the app keeps its server switcher and shows
   Try again. Tapping it starts a fresh WebView; it does not reload repeatedly by itself.
+- **App log.** After the app closes unexpectedly, reopen it and tap **Save app log**
+  on **Your servers**. Choose a folder such as Downloads, then share the saved text file.
+  The app keeps recent steps and crash details private until you export the log.
 - **Separate console hosting.** An initial server redirect to its HTTPS console stays
   inside the app, even on a different host. Later links to other sites still open in
   the browser. For Android Auto, save the API server's address, where sign-in cookies

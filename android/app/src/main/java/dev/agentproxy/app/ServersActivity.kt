@@ -14,6 +14,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import java.io.IOException
 import java.util.concurrent.Executors
 
 /** The servers this phone knows. Opening one shows its console; the last one opens by itself. */
@@ -30,6 +32,7 @@ class ServersActivity : Activity() {
         findViewById<Button>(R.id.add).setOnClickListener { showForm(true) }
         findViewById<Button>(R.id.cancel).setOnClickListener { showForm(false) }
         findViewById<Button>(R.id.save).setOnClickListener { addServer() }
+        findViewById<Button>(R.id.crash_log).setOnClickListener { saveCrashLog() }
         // Straight back to the server used last, unless the user came back here on purpose.
         val last = store.last
         if (savedInstanceState == null && !intent.getBooleanExtra(EXTRA_STAY, false) && last != null && store.all().any { it.url == last }) {
@@ -50,6 +53,7 @@ class ServersActivity : Activity() {
     private fun render() {
         val list = findViewById<LinearLayout>(R.id.server_list)
         list.removeAllViews()
+        findViewById<View>(R.id.crash_log).visibility = if (CrashLog.latest(this) == null) View.GONE else View.VISIBLE
         val servers = store.all()
         findViewById<View>(R.id.empty).visibility = if (servers.isEmpty()) View.VISIBLE else View.GONE
         if (servers.isEmpty()) showForm(true)
@@ -89,10 +93,40 @@ class ServersActivity : Activity() {
         if (visible) findViewById<EditText>(R.id.address).requestFocus()
     }
 
+    @Suppress("DEPRECATION")
+    private fun saveCrashLog() {
+        if (CrashLog.latest(this) == null) return
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TITLE, "ai-control-mesh-app-log.txt")
+        }
+        startActivityForResult(intent, REQUEST_CRASH_LOG)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_CRASH_LOG || resultCode != RESULT_OK) return
+        val source = CrashLog.latest(this) ?: return
+        val destination = data?.data ?: return
+        val saved = try {
+            source.inputStream().use { input ->
+                val output = contentResolver.openOutputStream(destination, "wt") ?: throw IOException("No output stream")
+                output.use { input.copyTo(it) }
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+        Toast.makeText(this, if (saved) R.string.crash_log_saved else R.string.crash_log_failed, Toast.LENGTH_SHORT).show()
+    }
+
     private fun addServer() {
         val address = findViewById<EditText>(R.id.address).text.toString()
         if (address.isBlank()) return
         val url = ServerStore.normalize(address)
+        CrashLog.note(this, "Add server started (localhost=${isLocalHttpAddress(url)})")
         val message = findViewById<TextView>(R.id.form_message)
         val save = findViewById<Button>(R.id.save)
         message.visibility = View.GONE
@@ -100,18 +134,22 @@ class ServersActivity : Activity() {
         save.text = getString(R.string.checking)
         background.execute {
             val result = check(url)
+            CrashLog.note(this, "Add server check returned ${result.javaClass.simpleName}")
             main.post {
+                CrashLog.note(this, "Add server result on main thread")
                 save.isEnabled = true
                 save.text = getString(R.string.add)
                 val host = android.net.Uri.parse(url).host ?: url
                 when (result) {
                     is Check.Online -> {
+                        CrashLog.note(this, "Saving server")
                         val name = findViewById<EditText>(R.id.name).text.toString().trim().ifEmpty { host }
                         store.add(Server(name, url))
                         findViewById<EditText>(R.id.address).text.clear()
                         findViewById<EditText>(R.id.name).text.clear()
                         showForm(false)
                         render()
+                        CrashLog.note(this, "Server saved and list rendered")
                     }
                     is Check.NotAServer -> {
                         message.text = getString(R.string.not_a_server, host)
@@ -159,6 +197,7 @@ class ServersActivity : Activity() {
     }
 
     companion object {
+        private const val REQUEST_CRASH_LOG = 1
         const val EXTRA_STAY = "stay"
         /** The console's Downloads page, with the app built for that server (/downloads itself is the files). */
         const val DOWNLOADS_PAGE = "/get"

@@ -8,6 +8,7 @@
 
     <!-- Servers are often plain HTTP on a LAN or Tailscale; see network_security_config. -->
     <application
+        android:name=".AgentProxyApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
