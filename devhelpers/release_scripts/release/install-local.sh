@@ -95,16 +95,37 @@ install_termux() {
     cat > "$state/home/.mesh-termux-install.sh" <<'TERMUX_INSTALL'
 #!/bin/sh
 set -eu
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+prefix=$(cat /root/.mesh-termux-prefix)
+export PATH="$prefix:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y ca-certificates curl python3 python3-venv
 installer=$(mktemp)
 trap 'rm -f "$installer"' EXIT
 curl -fsSL "$1" -o "$installer"
-shift
-sh "$installer" "$@"
+quickstart=$2
+shift 2
+printf 'Installing AI Control Mesh in Ubuntu...\n'
+if [ "$quickstart" = 1 ]; then
+    log=$(mktemp)
+    if ! sh "$installer" "$@" --no-login > "$log" 2>&1; then
+        cat "$log"
+        rm -f "$log"
+        exit 1
+    fi
+    rm -f "$log"
+else
+    sh "$installer" "$@" --no-login
+fi
 rm -f "$installer"
+if [ "$quickstart" = 1 ]; then
+    local_home=${AI_PROXY_LOCAL_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/ai-control-mesh}
+    python3 "$local_home"/app/*/devhelpers/release_scripts/release/termux_quickstart.py
+    password_file="$local_home/private/first-user-password"
+    if [ -f "$password_file" ]; then
+        printf 'Console sign-in: admin; password: %s\n' "$(cat "$password_file")"
+    fi
+fi
 printf '\nFull server installed. Keep this Termux session open.\n'
 printf 'From another Termux session: mesh-termux status, stop, start or shell.\n'
 exec /bin/sh /root/.mesh-termux-session.sh
@@ -153,11 +174,12 @@ TERMUX_CONTROL
     chmod 700 "$state/bin/mesh-termux" "$state/home/.mesh-termux-install.sh" "$state/home/.mesh-termux-session.sh" "$state/home/.mesh-termux-stop.sh"
     ln -sf "$state/bin/mesh-termux" "$PREFIX/bin/mesh-termux"
     # These programs run inside Ubuntu. Use the portable clients and omit an Android tray.
+    quickstart=1
     set -- --python --no-tray $ports
     if [ -n "$prefix" ]; then set -- "$@" --prefix "$prefix"; fi
-    if [ "$client" -eq 0 ]; then set -- "$@" --no-client; fi
-    if [ "$login" -eq 0 ]; then set -- "$@" --no-login; fi
-    exec proot-distro login ai-control-mesh --bind "$state/home:/root" -- /bin/sh /root/.mesh-termux-install.sh "$BASE/install-local.sh" "$@"
+    if [ "$client" -eq 0 ]; then set -- "$@" --no-client; quickstart=0; fi
+    if [ "$login" -eq 0 ]; then quickstart=0; fi
+    exec proot-distro login ai-control-mesh --bind "$state/home:/root" -- /bin/sh /root/.mesh-termux-install.sh "$BASE/install-local.sh" "$quickstart" "$@"
 }
 
 # Guest shells use /bin/sh even when Termux variables remain in their environment.
