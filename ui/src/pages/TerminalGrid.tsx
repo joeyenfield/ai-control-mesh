@@ -140,7 +140,11 @@ function TerminalGrid({ selectionKey }: { selectionKey: string }) {
     if (slim) { setChoosing(false); setLayoutOpen(false); }
   };
   // The empty grid's buttons and empty tiles are outside the dropdown: open it on the next click, after its own dismissal.
-  const openPicker = () => { setLayoutOpen(false); setChoosing(true); };
+  const openPicker = () => {
+    setLayout((previous) => previous.slim ? { ...previous, slim: false } : previous);
+    setLayoutOpen(false);
+    setChoosing(true);
+  };
   const sendMessage = (event: FormEvent) => {
     event.preventDefault();
     if (target && message.trim() && senders.current.get(target)?.text(message)) setMessage("");
