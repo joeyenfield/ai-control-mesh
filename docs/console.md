@@ -124,7 +124,7 @@ A terminal that isn't connected (launcher closed, or agent exited) has **Remove*
 
 - **Agents** (with the number in the grid) drops down a searchable list of shared sessions, each with its state, folder and machine. Tick up to 16. It opens by itself while the grid is empty; **Done**, Esc or a click elsewhere closes it.
 - The layout dropdown (**2 × 2**) sets **Rows** and **Columns** (1–4 each) and **Text size**. With more agents than fit, the arrows beside the page number (such as **1 / 2**) switch grid pages; only the visible page connects its terminals.
-- The button at the left of the bar hides the dropdowns, leaving one line of chrome: the grid grows into the room until you show them again.
+- The button at the left of the bar hides the dropdowns, leaving one line of chrome: the grid grows into the room until you show them again. **Choose agents** in an empty grid or **Add an agent** in an empty tile shows the bar and opens the agent list.
 
 ![Four terminals in the Live agent view](screenshots/terminal-grid.png)
 
