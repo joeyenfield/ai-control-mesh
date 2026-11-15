@@ -37,14 +37,15 @@ USAGE
 }
 
 prefix=""
+prefix_explicit=0
 only=""
 purge=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --only) [ $# -ge 2 ] || { echo "--only needs agent or agent-machine" >&2; exit 2; }; only=$2; shift ;;
         --only=*) only=${1#--only=} ;;
-        --prefix) [ $# -ge 2 ] || { echo "--prefix needs a folder" >&2; exit 2; }; prefix=$2; shift ;;
-        --prefix=*) prefix=${1#--prefix=} ;;
+        --prefix) [ $# -ge 2 ] || { echo "--prefix needs a folder" >&2; exit 2; }; prefix=$2; prefix_explicit=1; shift ;;
+        --prefix=*) prefix=${1#--prefix=}; prefix_explicit=1 ;;
         --purge) purge=1 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "uninstall: unknown option $1 (see --help)" >&2; exit 2 ;;
@@ -80,6 +81,25 @@ fi
 
 as_user() {
     if [ "$user" = "$(id -un)" ]; then "$@"; else sudo -u "$user" -H "$@"; fi
+}
+
+# A direct pip install (not the one-line installer's venv links) may live outside
+# the default prefix, as it does in Termux. Only use it when pip owns all commands.
+python_commands=""
+if [ -z "$only" ] && [ "$prefix_explicit" -eq 0 ] && [ ! -e "$prefix/agent" ] && [ ! -e "$prefix/agent-machine" ] \
+    && command -v python >/dev/null 2>&1 && python -m pip show ai-proxy-agent-py >/dev/null 2>&1; then
+    python_commands=$(command -v agent 2>/dev/null || true)
+    for program in agent-proxy agent-machine; do
+        found=$(command -v "$program" 2>/dev/null || true)
+        if [ -z "$found" ] || ! head -n 1 "$found" 2>/dev/null | grep -q python; then python_commands=""; break; fi
+    done
+    if [ -n "$python_commands" ] && ! head -n 1 "$python_commands" 2>/dev/null | grep -q python; then python_commands=""; fi
+fi
+
+program_path() {
+    if [ -x "$prefix/$1" ]; then printf '%s\n' "$prefix/$1"
+    elif [ -n "$python_commands" ]; then command -v "$1"
+    fi
 }
 
 remove_service() {
@@ -120,8 +140,9 @@ remove_service() {
 
 # stop_machine stops an agent-machine started by hand (agent-machine start, or a run in a terminal).
 stop_machine() {
-    [ -x "$prefix/agent-machine" ] || return 0
-    stopped=$(as_user "$prefix/agent-machine" stop 2>&1) || true
+    machine=$(program_path agent-machine)
+    [ -n "$machine" ] || return 0
+    stopped=$(as_user "$machine" stop 2>&1) || true
     case "$stopped" in
         *"isn't running"*|"") ;;
         *) echo "$stopped" ;;
@@ -134,8 +155,9 @@ stop_machine() {
 # by its path (the launcher starts it as `<prefix>/agent proxy`).
 stop_proxy() {
     stopped=0
-    if [ -x "$prefix/agent" ]; then
-        case "$(as_user "$prefix/agent" proxy stop 2>&1 || true)" in
+    agent_path=$(program_path agent)
+    if [ -n "$agent_path" ]; then
+        case "$(as_user "$agent_path" proxy stop 2>&1 || true)" in
             *"agent-proxy stopped"*) stopped=1 ;;
         esac
     fi
@@ -150,10 +172,11 @@ stop_proxy() {
 
 # sign_out signs one program out of every server it's signed in to; logout takes one at a time.
 sign_out() {
-    [ -x "$prefix/$1" ] || return 0
+    path=$(program_path "$1")
+    [ -n "$path" ] || return 0
     tries=0
     while [ $tries -lt 20 ]; do
-        out=$(as_user "$prefix/$1" logout 2>&1) || true
+        out=$(as_user "$path" logout 2>&1) || true
         case "$out" in
             *"Signed out"*) printf '%s\n' "$out" ;;
             *"Not signed in"*) return 0 ;;
@@ -230,7 +253,12 @@ for program in $programs; do
         removed=1
     fi
 done
-if [ $removed -eq 0 ]; then echo "Nothing to remove in $prefix."; fi
+if [ $removed -eq 0 ] && [ -z "$python_commands" ]; then echo "Nothing to remove in $prefix."; fi
+
+if [ -n "$python_commands" ]; then
+    as_user python -m pip uninstall -y ai-proxy-agent-py
+    echo "Removed the Python agent package."
+fi
 
 if [ $purge -eq 1 ]; then
     if has agent; then
