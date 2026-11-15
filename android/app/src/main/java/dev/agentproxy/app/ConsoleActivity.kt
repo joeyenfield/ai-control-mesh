@@ -48,6 +48,7 @@ class ConsoleActivity : Activity() {
         setContentView(R.layout.activity_console)
         findViewById<View>(android.R.id.content).padForSystemBars()
         url = intent.getStringExtra(EXTRA_URL) ?: return finish()
+        CrashLog.note(this, "Console opened (localhost=${isLocalHttpAddress(url)})")
         base = Uri.parse(savedInstanceState?.getString("console_base") ?: url)
         issuer = savedInstanceState?.getString("oidc_issuer")
         apis = savedInstanceState?.getStringArrayList("oidc_apis") ?: listOf(url)
@@ -134,6 +135,11 @@ class ConsoleActivity : Activity() {
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
                 // Android will close the app unless this dead WebView is removed and handled.
                 Log.e("AgentProxyAndroid", "WebView renderer exited (crashed=${detail.didCrash()})")
+                try {
+                    CrashLog.record(this@ConsoleActivity, "WebView renderer exited (crashed=${detail.didCrash()})")
+                } catch (_: Exception) {
+                    // The offline panel must still appear when storage is unavailable.
+                }
                 (view.parent as? ViewGroup)?.removeView(view)
                 if (web === view) web = null
                 view.destroy()
@@ -242,11 +248,14 @@ class ConsoleActivity : Activity() {
     private fun openConsole(url: String) {
         Thread {
             try {
+                CrashLog.note(this, "Discovering console sign-in")
                 val discovered = authIssuer(url) ?: throw java.io.IOException(getString(R.string.signin_unavailable))
+                CrashLog.note(this, "Console sign-in discovered")
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
                         issuer = discovered.issuer
                         apis = discovered.apis
+                        CrashLog.note(this, "Loading console WebView")
                         web?.loadUrl(url + (intent.getStringExtra(EXTRA_PATH) ?: "/terminals"))
                     }
                 }

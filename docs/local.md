@@ -61,6 +61,8 @@ Start with a current Termux installation and package repositories. Run `pkg upda
 
 Keep the installation session open. Once installation and sign-in finish, open **http://localhost:19999** in the phone's browser or add that address to the Android app. Sign-in uses localhost port 20000. Other ports can be passed with `--port` and `--auth-port` as usual. Both ports must be free. `--prefix`, if supplied, names a folder inside Ubuntu.
 
+If the Android app closes while adding the local server, reopen it and use **Save app log** on **Your servers** to export its recent steps and crash details to Downloads. The app keeps that log private until you export it.
+
 The installer adds a Termux command for managing the dedicated environment:
 
 ```sh
