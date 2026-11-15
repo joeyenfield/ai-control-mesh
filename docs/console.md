@@ -412,7 +412,7 @@ Members see their organization and its people, read-only; its admins manage them
 - **Get them**: every archive and package of this server's build, by platform, with sizes and SHA-256. **The programs on their own** lists the bare binaries.
 - **Python client and agent-machine**: the wheel, for computers without a Go build.
 - **Android app**: the APK.
-- **Uninstall**: the one-line uninstallers (`/uninstall.sh`, `/uninstall.ps1`), shown even when nothing is built. They remove the programs and agent-machine's service; `--purge` (`-Purge`) also signs them out and deletes their settings.
+- **Uninstall**: the one-line uninstallers (`/uninstall.sh`, `/uninstall.ps1`), shown even when nothing is built. They remove the programs and agent-machine's service. A checkbox adds `--purge` (`-Purge`) to the copied commands to sign out and delete settings and sign-ins.
 
 If nothing has been built (`devhelpers/scripts/build-dist`), it says **Nothing built yet**. See [Deployment](deployment.md#what-the-server-hands-out).
 

@@ -388,7 +388,16 @@ export function OneLineInstall({ server, only, service }: { server: string } & I
 
 /** The uninstallers: the same file for every server, so they work whichever one installed the programs. */
 function OneLineUninstall({ server }: { server: string }) {
-  return <OneLines sh={`curl -fsSL ${server}/uninstall.sh | sh`} powershell={`irm ${server}/uninstall.ps1 | iex`} />;
+  const [purge, setPurge] = useState(false);
+  return (
+    <>
+      <label className="check"><input type="checkbox" checked={purge} onChange={(event) => setPurge(event.target.checked)} /> Also sign out and delete settings and sign-ins</label>
+      <OneLines
+        sh={`curl -fsSL ${server}/uninstall.sh | sh${purge ? " -s -- --purge" : ""}`}
+        powershell={purge ? `& ([scriptblock]::Create((irm ${server}/uninstall.ps1))) -Purge` : `irm ${server}/uninstall.ps1 | iex`}
+      />
+    </>
+  );
 }
 
 function OneLines({ sh, powershell }: { sh: string; powershell: string }) {
