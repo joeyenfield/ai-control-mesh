@@ -340,7 +340,7 @@ Every archive has the same script (`uninstall.sh` or `uninstall.ps1`), which `in
 4. As root on Linux, removes what `sudo agent-machine servers service` set up: the sudoers rule, the `ollama.service` drop-in and `/etc/agent-machine/ollama.env`. Ollama's service stays.
 5. Deletes the programs, and on Windows the PATH entry and the empty folder.
 6. With `--purge`, deletes their settings, sign-ins, logs and caches: `agent-proxy` and `agent-machine` in your config folder (`~/.config`, or `%APPDATA%`) and `~/.cache/agent-proxy`. A folder named by `AI_PROXY_MACHINE_HOME` is left for you to delete. First it stops the Ollama agent-machine started itself (the one in its `servers.json`, which on Windows keeps `ollama.log` there open), with its model runners; an Ollama you started yourself, or `ollama.service`, keeps running.
-7. Says how to remove copies installed some other way: a package (`apt remove agent-proxy agent-machine` and the like), an `.msi` (Settings › Apps), the Python version (`pip uninstall ai-proxy-agent-py`), or another folder (`--prefix`).
+7. On Linux, macOS and FreeBSD, if the default prefix has no programs and all three commands come from a direct Python pip installation, removes that package with `python -m pip uninstall` (after stopping and, with `--purge`, signing out). An explicit `--prefix` only removes that prefix. For other copies, says how to remove a package (`apt remove agent-proxy agent-machine` and the like), an `.msi` (Settings › Apps), or another folder (`--prefix`).
 
 | `uninstall.sh` | `uninstall.ps1` | What it does |
 |---|---|---|
