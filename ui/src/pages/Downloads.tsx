@@ -42,6 +42,8 @@ export function DownloadsPage({ standalone = false }: { standalone?: boolean }) 
   const [picked, setPicked] = useState<string | null>(null);
   // What the one-line installer installs: both programs, or one of them.
   const [only, setOnly] = useState<InstallOptions["only"]>(undefined);
+  // Whether the uninstallers take the programs' data with them. Off, since removing it can't be undone.
+  const [purge, setPurge] = useState(false);
   const platform = picked && platforms.includes(picked) ? picked : platforms[0];
   const android = files.filter((file) => file.component === "android");
   const python = files.filter((file) => file.component === "python");
@@ -225,12 +227,20 @@ export function DownloadsPage({ standalone = false }: { standalone?: boolean }) 
           <div className="panel-head">
             <h2 id="downloads-uninstall">Uninstall</h2>
             <p className="subtle">
-              Removes agent, agent-proxy and agent-machine from the computer, with agent-machine's service and the PATH entry. Sign-ins
-              and settings stay unless you add <code>--purge</code> (<code>-Purge</code> in PowerShell), which signs them out and
-              deletes them too. <code>--only agent</code> or <code>--only agent-machine</code> removes one of them.
+              Removes agent, agent-proxy and agent-machine from the computer, with agent-machine's service and the PATH entry.
+              Pick whether their data goes too; the command below carries the option itself. <code>--only agent</code> or{" "}
+              <code>--only agent-machine</code> removes one of them.
             </p>
           </div>
-          <OneLineUninstall server={server} />
+          <div className="chip-bar" role="group" aria-label="Whether to delete their data">
+            {UNINSTALL_CHOICES.map((choice) => (
+              <button key={choice.label} type="button" aria-pressed={purge === choice.purge} onClick={() => setPurge(choice.purge)}>
+                {choice.label}
+              </button>
+            ))}
+          </div>
+          <p className="subtle">{UNINSTALL_CHOICES.find((choice) => choice.purge === purge)?.summary}</p>
+          <OneLineUninstall server={server} purge={purge} />
         </section>
       )}
 
@@ -386,9 +396,36 @@ export function OneLineInstall({ server, only, service }: { server: string } & I
   return <OneLines sh={installLine(server, "sh", { only, service })} powershell={installLine(server, "powershell", { only, service })} />;
 }
 
+/** The uninstallers' data option, as the Downloads page offers it. */
+type UninstallOptions = { only?: "agent" | "agent-machine"; purge?: boolean };
+
+const UNINSTALL_CHOICES: { purge: boolean; label: string; summary: string }[] = [
+  {
+    purge: false,
+    label: "Keep their data",
+    summary: "Their sign-ins, settings, logs and caches stay, so installing again picks up where it left off.",
+  },
+  {
+    purge: true,
+    label: "Purge their data",
+    summary:
+      "Signs agent and agent-machine out of every server they're signed in to, which revokes their tokens, then deletes their settings, sign-ins, logs and caches. This can't be undone.",
+  },
+];
+
+/** The one-line uninstallers (server/agent_server/install/uninstall.sh and .ps1) with their options. */
+export function uninstallLine(server: string, system: "sh" | "powershell", { only, purge }: UninstallOptions = {}): string {
+  if (system === "sh") {
+    const options = [only && `--only ${only}`, purge && "--purge"].filter(Boolean).join(" ");
+    return `curl -fsSL ${server}/uninstall.sh | sh${options ? ` -s -- ${options}` : ""}`;
+  }
+  const options = [only && `-Only ${only}`, purge && "-Purge"].filter(Boolean).join(" ");
+  return options ? `& ([scriptblock]::Create((irm ${server}/uninstall.ps1))) ${options}` : `irm ${server}/uninstall.ps1 | iex`;
+}
+
 /** The uninstallers: the same file for every server, so they work whichever one installed the programs. */
-function OneLineUninstall({ server }: { server: string }) {
-  return <OneLines sh={`curl -fsSL ${server}/uninstall.sh | sh`} powershell={`irm ${server}/uninstall.ps1 | iex`} />;
+function OneLineUninstall({ server, purge }: { server: string } & UninstallOptions) {
+  return <OneLines sh={uninstallLine(server, "sh", { purge })} powershell={uninstallLine(server, "powershell", { purge })} />;
 }
 
 function OneLines({ sh, powershell }: { sh: string; powershell: string }) {

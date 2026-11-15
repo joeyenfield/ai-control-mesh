@@ -319,7 +319,7 @@ The **Downloads** page has its exact address. Its `update` pip-installs the serv
 
 ### Uninstalling
 
-The server serves an uninstaller beside each installer. It needs no build, and it removes what the installers put on the computer whichever server they came from:
+The server serves an uninstaller beside each installer. It needs no build, and it removes what the installers put on the computer whichever server they came from. The console's Downloads page builds these commands for you, with a switch that adds the purge option ([Console](console.md#downloads)):
 
 ```bash
 curl -fsSL http://server:9999/uninstall.sh | sh                  # Linux, macOS, FreeBSD
