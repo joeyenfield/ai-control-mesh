@@ -545,11 +545,11 @@ function Evidence({ review }: { review: Review }) {
           head={["Model", "Tier", "Calls", "Tokens read", "Tokens written", "Estimated cost"]}
           rows={traffic.models.map((item) => [
             item.model ?? "unknown",
-            TIER[item.tier].label,
+            item.tier == null ? "No token usage" : TIER[item.tier].label,
             formatNumber(item.calls),
             formatNumber(item.input_tokens),
             formatNumber(item.output_tokens),
-            item.tier === "local" ? "none" : item.tier === "unpriced" ? "no price" : formatUsd(item.usd),
+            item.tier == null || item.tier === "local" ? "none" : item.tier === "unpriced" ? "no price" : formatUsd(item.usd),
           ])}
           note="A tier comes from the model's list price for input in the server's price table: frontier is the most expensive, then mid-range and small. Local is a machine's own model."
         />

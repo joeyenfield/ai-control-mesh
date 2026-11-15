@@ -2,6 +2,7 @@ package dev.agentproxy.app
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
@@ -10,6 +11,7 @@ import android.net.Network
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -22,7 +24,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 
 /**
- * One server's console, full screen. It opens on Running agents; the console itself is
+ * One server's console with a native server picker. It opens on Running agents; the console itself is
  * built for phones (its menu, terminal keys and input box). Sign-in is the console's own,
  * kept in the WebView's cookies. Links to other sites open in the browser.
  */
@@ -51,6 +53,13 @@ class ConsoleActivity : Activity() {
         web = findViewById(R.id.web)
         val progress = findViewById<ProgressBar>(R.id.progress)
         offline = findViewById(R.id.offline)
+        val serverName = intent.getStringExtra(EXTRA_NAME) ?: Uri.parse(url).host ?: url
+        findViewById<TextView>(R.id.current_server_name).text = serverName
+        findViewById<TextView>(R.id.current_server_url).text = url
+        findViewById<View>(R.id.server_switcher).apply {
+            contentDescription = getString(R.string.switch_server_description, serverName, url)
+            setOnClickListener { showServerPicker() }
+        }
         findViewById<Button>(R.id.retry).setOnClickListener { retry() }
         findViewById<Button>(R.id.servers).setOnClickListener { showServers() }
         resetOfflineTitle()
@@ -153,6 +162,10 @@ class ConsoleActivity : Activity() {
     override fun onDestroy() {
         network?.let { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(it) }
         network = null
+        if (::web.isInitialized) {
+            (web.parent as? ViewGroup)?.removeView(web)
+            web.destroy()
+        }
         super.onDestroy()
     }
 
@@ -220,6 +233,29 @@ class ConsoleActivity : Activity() {
                 }
             }
         }.start()
+    }
+
+    private fun showServerPicker() {
+        val store = ServerStore(this)
+        val servers = store.all()
+        val labels = servers.map { "${it.name}\n${it.url}" }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.switch_server)
+            .setSingleChoiceItems(labels, servers.indexOfFirst { it.url == url }) { dialog, index ->
+                dialog.dismiss()
+                val selected = servers[index]
+                if (selected.url != url) {
+                    store.last = selected.url
+                    // A fresh WebView keeps history and sign-in discovery scoped to the chosen server.
+                    startActivity(Intent(this, ConsoleActivity::class.java)
+                        .putExtra(EXTRA_URL, selected.url)
+                        .putExtra(EXTRA_NAME, selected.name))
+                    finish()
+                }
+            }
+            .setNeutralButton(R.string.manage_servers) { _, _ -> showServers() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun showServers() {

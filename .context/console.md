@@ -41,6 +41,10 @@ flowchart TB
 
 ## Data layer
 
+`Costs.tsx` exposes `?tab=missing` (Missing prices), filtering the existing `org-costs` report's model rows by `unpriced > 0`, sorted by unpriced calls. It includes unnamed models, supports name search, and follows the same organization/date scope and server permissions as Summary. It does not match price patterns or infer missing prices from zero cost; recompute refreshes the report after prices change.
+
+Session review model rows can have a null `tier` when none of their calls used tokens. `SessionReview` shows these as No token usage without indexing the tier labels; they are distinct from paid models with no price. The server's aggregated `traffic.tiers` contains only classified calls.
+
 Machine setup codes grant one use per computer even when both programs are installed: their login is shared. The Machines page accepts 1-100 machines, sends that count as uses, and asks for one device approval in the native and sandbox instructions. Both setup-code environment variables remain in native commands because either program can sign in first.
 
 `ServerStats` OS measurements can be null on restricted systems such as Termux. `ServerStatsPage` preserves null chart samples, omits meters without usable measurements and labels missing memory and uptime data as unavailable; it never converts a denied probe into zero usage. A CPU count of 0 is unavailable, so the process CPU chart cannot be normalized then.

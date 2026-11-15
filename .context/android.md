@@ -1,6 +1,6 @@
 # Android app (`android/`)
 
-A thin native shell, package `dev.agentproxy.app`: a list of agent-servers, and each one's console full screen in a WebView. Release features are the console's. Debug builds also have a private Android Auto session monitor. There is no JS bridge, and the console has no Android-specific code.
+A thin native shell, package `dev.agentproxy.app`: a list of agent-servers, and each one's console in a WebView below a native server switcher. Release features are the console's. Debug builds also have a private Android Auto session monitor. There is no JS bridge, and the console has no Android-specific code.
 
 ## Design rules
 
@@ -21,6 +21,7 @@ A thin native shell, package `dev.agentproxy.app`: a list of agent-servers, and 
 
 ## WebView behaviour (`ConsoleActivity.kt`)
 
+- A persistent server bar shows the saved name and URL and opens a single-choice picker with the current server checked. It stays outside the WebView and offline panel, including during sign-in. Picking another server updates `ServerStore.last`, opens a fresh `ConsoleActivity` on Running agents and finishes the previous activity; its WebView is destroyed so histories, discovery and live connections do not accumulate across switches. Cookies remain intact. Selecting the current server or cancelling leaves the page alone. Manage servers returns to `ServersActivity` with `EXTRA_STAY`.
 - JavaScript and DOM storage on (the console keeps its theme and terminal settings in localStorage), `textZoom=100`, user agent with `AgentProxyAndroid/<version>` appended.
 - Cookies are accepted and flushed in `onPageFinished` and `onPause`, so the sign-in survives restarts.
 - Before loading, `authIssuer()` (in `Servers.kt`) fetches the selected API's public auth status without redirects. It returns `SignIn(issuer, apis)`: `apis` is the chosen address plus the plain-HTTPS hosts of the status's `redirect_uris` (split hosting: the app is given `aicontrolmesh.com`, the console calls `api.aicontrolmesh.com`; older servers don't send them). `isOidcNavigation` keeps only that HTTPS issuer and those APIs' login/callback paths in the WebView; both survive rotation. An issuer that isn't plain HTTPS (no user info, query or fragment) counts as a failure, so the HTTP issuer of `deploy/compose/` can't be used from the app. Discovery failure shows an explicit sign-in error; Retry repeats discovery. Removing a server (`ServersActivity.forgetSignIn`) expires `ai_proxy_session`, `ai_proxy_remote`, `mesh_oidc_state`, `mesh_accounts` (every account the console holds) and `mesh_refresh` (an older console's one sign-in).

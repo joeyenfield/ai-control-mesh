@@ -10,7 +10,7 @@ import { TabBar, TabPanel, useTabParam } from "../components/Tabs";
 import { formatCompact, formatNumber, formatUsd } from "../format";
 import { useAuth, useToast } from "../hooks";
 
-const TABS = ["summary", "prices", "recompute"] as const;
+const TABS = ["summary", "missing", "prices", "recompute"] as const;
 
 /** The figure to lead with: money spent, or what subscriptions' calls would cost when nothing was. */
 const spentText = (cost: CostTotals) => (cost.usd > 0 || cost.subscription_usd === 0 ? formatUsd(cost.usd) : `≈ ${formatUsd(cost.subscription_usd)}`);
@@ -35,6 +35,7 @@ function Costs({ identity }: { identity: Identity }) {
   const costs = useQuery({ queryKey: ["org-costs", org, since, until], queryFn: () => api.orgCosts(org, since, until), enabled: valid, retry: false });
   const data = costs.data;
   const manage = data?.manage ?? (identity.site_admin || (identity.role === "admin" && identity.tenant === org));
+  const missing = (data?.models ?? []).filter((item) => item.unpriced > 0);
   const unpriced = (data?.models ?? []).filter((item) => item.unpriced > 0 && item.model).map((item) => item.model);
 
   return (
@@ -55,6 +56,7 @@ function Costs({ identity }: { identity: Identity }) {
         onSelect={setTab}
         tabs={[
           { id: "summary", label: "Summary" },
+          { id: "missing", label: "Missing prices", badge: missing.length ? <span className="tab-badge live">{missing.length}</span> : undefined },
           { id: "prices", label: "Model prices", badge: unpriced.length ? <span className="tab-badge live">{unpriced.length}</span> : undefined },
           { id: "recompute", label: "Recompute" },
         ]}
@@ -68,8 +70,15 @@ function Costs({ identity }: { identity: Identity }) {
         ) : !data ? (
           <p className="empty">Adding up the costs…</p>
         ) : (
-          <Summary data={data} onPrices={() => setTab("prices")} />
+          <Summary data={data} onMissing={() => setTab("missing")} />
         )}
+      </TabPanel>
+
+      <TabPanel idPrefix="costs-" id="missing" active={tab === "missing"} className="cost-panel">
+        {!valid ? <p className="empty">Choose a first and a last day.</p>
+          : costs.isError ? <p className="bad">{costs.error.message}</p>
+          : !data ? <p className="empty">Looking for missing prices…</p>
+          : <MissingPrices data={data} editable={identity.site_admin} onPrices={() => setTab("prices")} onRecompute={() => setTab("recompute")} />}
       </TabPanel>
 
       <TabPanel idPrefix="costs-" id="prices" active={tab === "prices"} keepMounted className="cost-panel">
@@ -87,7 +96,7 @@ function Costs({ identity }: { identity: Identity }) {
   );
 }
 
-function Summary({ data, onPrices }: { data: OrgCosts; onPrices: () => void }) {
+function Summary({ data, onMissing }: { data: OrgCosts; onMissing: () => void }) {
   if (data.requests === 0) return <p className="empty">No model calls were recorded in these days.</p>;
   const tokens = (item: CostTotals) => `${formatCompact(item.input_tokens)} tokens in, ${formatCompact(item.output_tokens)} out`;
   return (
@@ -121,8 +130,8 @@ function Summary({ data, onPrices }: { data: OrgCosts; onPrices: () => void }) {
           <span>
             <strong>{formatNumber(data.unpriced)} model calls had no price</strong>, so the totals leave them out. Give their models a price, then recompute these days.
           </span>
-          <button type="button" onClick={onPrices}>
-            Model prices
+          <button type="button" onClick={onMissing}>
+            View missing prices
           </button>
         </div>
       )}
@@ -147,6 +156,47 @@ function Summary({ data, onPrices }: { data: OrgCosts; onPrices: () => void }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function MissingPrices({ data, editable, onPrices, onRecompute }: {
+  data: OrgCosts; editable: boolean; onPrices: () => void; onRecompute: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const missing = data.models.filter((item) => item.unpriced > 0)
+    .sort((a, b) => b.unpriced - a.unpriced || a.model.localeCompare(b.model));
+  const rows = missing.filter((item) => (item.model || "Unknown model").toLowerCase().includes(search.trim().toLowerCase()));
+  return (
+    <section className="section stack">
+      <h2>Models with missing prices</h2>
+      <p className="subtle">
+        {data.manage ? "For this organization" : "For your own sessions"} in the selected days. These calls used tokens but had no recorded price,
+        so cost totals leave them out. Local models and calls with no token usage are not missing prices.
+        A price added since the call was recorded takes effect here after recomputing these days.
+      </p>
+      <div className="row wrap">
+        <button type="button" onClick={onPrices}>{editable ? "Edit model prices" : "View model prices"}</button>
+        {data.manage && <button type="button" onClick={onRecompute}>Recompute these days</button>}
+      </div>
+      {!editable && <p className="subtle">Ask a site admin to add missing model prices. An organization admin can then recompute its costs.</p>}
+      {!missing.length ? <p className="empty">No missing prices in the selected days.</p> : <>
+        <label className="filters">
+          <span>Find a model</span>
+          <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Model name" />
+        </label>
+        <p className="subtle">{formatNumber(rows.length)} of {formatNumber(missing.length)} model entries · {formatNumber(data.unpriced)} calls without a price in total.</p>
+        {!rows.length ? <p className="empty">No models match your search.</p> : <div className="table-scroll">
+          <table className="table">
+            <thead><tr><th scope="col">Model</th><th scope="col" className="num">Calls without a price</th><th scope="col" className="num">All calls</th></tr></thead>
+            <tbody>{rows.map((item) => <tr key={item.model}>
+              <td>{item.model ? <span className="mono">{item.model}</span> : <>Unknown model <span className="subtle">— no model name was recorded</span></>}</td>
+              <td className="num">{formatNumber(item.unpriced)}</td>
+              <td className="num">{formatNumber(item.requests)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
+      </>}
+    </section>
   );
 }
 

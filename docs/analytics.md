@@ -15,7 +15,7 @@ This page covers the console's **Analytics** section, the token and cost columns
 | Which model costs the most? | **Cost by day**, split by **Model** |
 | What did one provider cost us? | **Costs and prices** › **Summary** › **By provider** |
 | Which sessions did the money go to? | **Sessions**, sorted by **Cost**; or **Sessions that cost the most** under any chart |
-| A model shows no cost. Why? | **Costs and prices** › **Model prices** lists models used with no price |
+| A model shows no cost. Why? | **Costs and prices** › **Missing prices** lists models used with no recorded price |
 | We changed a price. How do old calls get it? | **Costs and prices** › **Recompute** |
 
 ## Who sees what
@@ -67,6 +67,7 @@ A session or person counts once in each model, provider or agent they used. Spli
 ![Costs and prices](screenshots/costs.png)
 
 - **Summary**: what the organization's model calls cost in the chosen days, by day, model, person and provider, and how many calls had no price.
+- **Missing prices**: a searchable list of models with unpriced calls in the selected organization and days, ordered by the number of unpriced calls. It shows calls without a price beside all calls for each model, including an **Unknown model** row when no name was recorded. Members see only their own sessions. Local models and calls with no token usage are excluded. Follow **Edit model prices** (site admins) or **View model prices**, then **Recompute these days** (organization admins) after prices have been added. A recorded call stays in this list until it is recomputed with a matching price.
 - **Model prices**: the server's price table. Site admins edit it here; everyone else can read it. Models that were used with no price are listed above the table, each with a button that adds its row.
 - **Recompute**: prices recorded calls again at today's prices. An organization's admins do it for their organization.
 
