@@ -25,7 +25,7 @@
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=642f72ee4a">
+  <link rel="stylesheet" href="/styles.css?v=9ddbbd2364">
   <script src="/site.js?v=35d7912c1a" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Quickstart","url":"https://aicontrolmesh.com/quickstart.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
@@ -159,11 +159,20 @@ podman logs mesh</code></pre>
           <pre class="qs-cmd when-local when-unix" tabindex="0" aria-label="The install command for Linux, macOS and FreeBSD"><code id="b-local-unix">curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/install-local.sh | sh</code></pre>
           <pre class="qs-cmd when-local when-windows" tabindex="0" aria-label="The install command for Windows PowerShell"><code id="b-local-windows">irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/install-local.ps1 | iex</code></pre>
           <p class="qs-note when-one">The last command prints the console's address and the <code>admin</code> password, which the container makes on its first start. Run it again if it printed nothing yet. To choose the password yourself, add <code>-e MESH_ADMIN_PASSWORD=...</code> after <code>--name mesh</code>.</p>
-          <p class="qs-note when-one when-docker" id="b-clear-docker">To clear down the demo, run <code>docker rm -f mesh</code>, then <code>docker volume rm mesh-data mesh-home mesh-workspace</code>. The second command deletes your settings, sign-ins, models and workspace.</p>
-          <p class="qs-note when-one when-podman" id="b-clear-podman">To clear down the demo, run <code>podman rm -f mesh</code>, then <code>podman volume rm mesh-data mesh-home mesh-workspace</code>. The second command deletes your settings, sign-ins, models and workspace.</p>
           <p class="qs-note when-one when-podman" id="b-podman-setup">On Windows and macOS, run <code>podman machine init</code> once, then <code>podman machine start</code>.</p>
           <p class="qs-note when-one when-gpu">The GPU image is the same system with the CUDA libraries for its model server, about 4 GB. Docker needs the NVIDIA Container Toolkit. With Podman, check it sees the GPU first: <code>podman run --rm --device nvidia.com/gpu=all docker.io/library/ubuntu:24.04 nvidia-smi</code>. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/gpu.md">GPU setup →</a></p>
-          <p class="qs-note when-local">The installer prints the address and the <code>admin</code> password it made. <code>uninstall-local</code> from the same address removes it again.<span class="when-unix"> The same command works on FreeBSD.</span></p>
+          <p class="qs-note when-local">The installer prints the address and the <code>admin</code> password it made.<span class="when-unix"> The same command works on FreeBSD.</span></p>
+        </div>
+        <div class="code-window qs-box qs-remove-box">
+          <div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div>
+          <pre class="qs-remove-cmd when-one when-docker" id="b-clear-docker" tabindex="0" aria-label="Remove the Docker demo and its volumes"><code>docker rm -f mesh
+docker volume rm mesh-data mesh-home mesh-workspace</code></pre>
+          <pre class="qs-remove-cmd when-one when-podman" id="b-clear-podman" tabindex="0" aria-label="Remove the Podman demo and its volumes"><code>podman rm -f mesh
+podman volume rm mesh-data mesh-home mesh-workspace</code></pre>
+          <pre class="qs-remove-cmd when-local when-unix" id="b-remove-local-unix" tabindex="0" aria-label="Uninstall the local setup on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh</code></pre>
+          <pre class="qs-remove-cmd when-local when-windows" id="b-remove-local-windows" tabindex="0" aria-label="Uninstall the local setup on Windows PowerShell"><code>irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1 | iex</code></pre>
+          <p class="qs-note when-one">The volume command deletes your settings, sign-ins, models and workspace. Run only the first command to keep them.</p>
+          <p class="qs-note when-local">The uninstaller keeps your data for a later install. See <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/local.md#remove-it">Remove it</a> to delete the data too.</p>
         </div>
         <p class="copy-status" role="status" aria-live="polite"></p>
         <p class="demo-notice"><strong>Local demo only.</strong> Its ports are bound to 127.0.0.1. Keep it on your computer: for a real deployment you need your own secrets, HTTPS host names and sign-in. <a href="#professional">The Professional level →</a></p>
