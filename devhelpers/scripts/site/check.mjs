@@ -169,7 +169,8 @@ try {
     if (pagePath === '/quickstart.html') {
     assert.equal(await page.locator('#agent-only-title').evaluate(element => getComputedStyle(element).display), 'block');
     const pick = async (...ids) => { for (const id of ids) await page.locator(`label[for="${id}"]`).click(); };
-    const copy = page.locator('[data-copy-shown]:visible');
+    const copy = page.locator('[data-copy-shown="qs-cmd"]:visible');
+    const removeCopy = page.locator('[data-copy-shown="qs-remove-cmd"]:visible');
     const status = page.locator('.qs-guide:visible .copy-status');
     // The page opens on Basic, one container, Docker, Linux or macOS.
     // Verify both clipboard outcomes without depending on the OS clipboard.
@@ -184,6 +185,8 @@ try {
     assert.ok(copied.startsWith('docker run -d --name mesh --pull=always \\') && copied.endsWith('docker logs mesh'), copied);
     assert.equal(copied.split('\n').length, 6);
     assert.match(await status.textContent(), /Commands copied/);
+    await removeCopy.click();
+    assert.equal(await page.evaluate(() => window.copiedCommand), 'docker rm -f mesh\ndocker volume rm mesh-data mesh-home mesh-workspace');
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw Error('Denied'); } } }));
     await copy.click();
     assert.equal(await page.evaluate(() => getSelection().toString().trim()), copied);
@@ -212,6 +215,7 @@ try {
       assert.equal(await page.locator('.qs-guide:visible').count(), 1, `${name} shows one guide`);
       assert.equal(await page.locator(`.guide-${level}`).isVisible(), true, `${name} shows its own guide`);
       assert.equal(await page.locator('.qs-cmd:visible').count(), 1, `${name} shows one block`);
+      assert.equal(await page.locator('.qs-remove-cmd:visible').count(), level === 'basic' ? 1 : 0, `${name} shows the matching removal block`);
       assert.equal(await page.locator('.qs-guide:visible .quickstart-copy .text-link:visible').count(), 1, `${name} links one guide`);
       if (level === 'advanced') assert.equal(await page.locator('.qs-forward:visible').count(), 1, `${name} shows one pair of port-forwards`);
       // One numbered sequence: the list at the top names every step, in order, and links to it.
@@ -222,6 +226,15 @@ try {
       assert.equal(await page.locator('#b-podman-setup').isVisible(), level === 'basic' && choices.includes('b-podman'));
       assert.equal(await page.locator('#b-clear-docker').isVisible(), level === 'basic' && choices.includes('b-one') && choices.includes('b-docker'));
       assert.equal(await page.locator('#b-clear-podman').isVisible(), level === 'basic' && choices.includes('b-one') && choices.includes('b-podman'));
+      if (level === 'basic') {
+        const removal = await page.locator('.qs-remove-cmd:visible code').textContent();
+        const prefix = choices.includes('b-local')
+          ? (choices.includes('b-windows') ? 'irm https://' : 'curl -fsSL https://')
+          : (choices.includes('b-podman') ? 'podman rm -f mesh' : 'docker rm -f mesh');
+        assert.ok(removal.startsWith(prefix), `${name}: ${removal}`);
+        await removeCopy.click();
+        assert.equal(await page.evaluate(() => getSelection().toString().trim()), removal.trim(), `${name} selects the removal commands`);
+      }
       assert.equal(await page.locator('.guide-intermediate .when-gpu.qs-note').isVisible(), choices.includes('i-gpu'));
       assert.equal(await page.locator('.guide-advanced .when-gpu.qs-note').isVisible(), choices.includes('a-gpu'));
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${name}: no horizontal overflow at ${width}`);
@@ -280,6 +293,7 @@ try {
   await page.locator('#main-nav a[href="/quickstart.html"]', { hasText: /^Quickstart$/ }).click();
   // Without JavaScript the levels, the commands and the switches still work; only copying needs it.
   assert.equal(await page.locator('#b-one-docker').isVisible(), true);
+  assert.equal(await page.locator('#b-clear-docker').isVisible(), true);
   assert.equal(await page.locator('.copy-button:visible').count(), 0);
   await page.locator('label[for="lvl-intermediate"]').click();
   assert.equal(await page.locator('#quickstart-command').isVisible(), true);
@@ -288,6 +302,7 @@ try {
   await page.locator('label[for="lvl-basic"]').click();
   await page.locator('label[for="b-local"]').click();
   assert.equal(await page.locator('#b-local-unix').isVisible(), true);
+  assert.equal(await page.locator('#b-remove-local-unix').isVisible(), true);
   assert.equal(await page.locator('.qs-cmd:visible').count(), 1);
   assert.equal(await page.locator('.qs-guide:visible').count(), 1);
   await noJS.close();
