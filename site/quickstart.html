@@ -25,7 +25,7 @@
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=9ddbbd2364">
+  <link rel="stylesheet" href="/styles.css?v=5a1c3da347">
   <script src="/site.js?v=35d7912c1a" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Quickstart","url":"https://aicontrolmesh.com/quickstart.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
@@ -164,15 +164,21 @@ podman logs mesh</code></pre>
           <p class="qs-note when-local">The installer prints the address and the <code>admin</code> password it made.<span class="when-unix"> The same command works on FreeBSD.</span></p>
         </div>
         <div class="code-window qs-box qs-remove-box">
+          <div class="qs-purge-toggle"><input type="checkbox" id="b-purge"><label for="b-purge">Purge saved data</label></div>
           <div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div>
-          <pre class="qs-remove-cmd when-one when-docker" id="b-clear-docker" tabindex="0" aria-label="Remove the Docker demo and its volumes"><code>docker rm -f mesh
+          <pre class="qs-remove-cmd when-one when-docker when-keep-data" id="b-clear-docker" tabindex="0" aria-label="Remove the Docker demo and keep its data"><code>docker rm -f mesh</code></pre>
+          <pre class="qs-remove-cmd when-one when-docker when-purge-data" id="b-clear-docker-purge" tabindex="0" aria-label="Remove the Docker demo and its data"><code>docker rm -f mesh
 docker volume rm mesh-data mesh-home mesh-workspace</code></pre>
-          <pre class="qs-remove-cmd when-one when-podman" id="b-clear-podman" tabindex="0" aria-label="Remove the Podman demo and its volumes"><code>podman rm -f mesh
+          <pre class="qs-remove-cmd when-one when-podman when-keep-data" id="b-clear-podman" tabindex="0" aria-label="Remove the Podman demo and keep its data"><code>podman rm -f mesh</code></pre>
+          <pre class="qs-remove-cmd when-one when-podman when-purge-data" id="b-clear-podman-purge" tabindex="0" aria-label="Remove the Podman demo and its data"><code>podman rm -f mesh
 podman volume rm mesh-data mesh-home mesh-workspace</code></pre>
-          <pre class="qs-remove-cmd when-local when-unix" id="b-remove-local-unix" tabindex="0" aria-label="Uninstall the local setup on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh</code></pre>
-          <pre class="qs-remove-cmd when-local when-windows" id="b-remove-local-windows" tabindex="0" aria-label="Uninstall the local setup on Windows PowerShell"><code>irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1 | iex</code></pre>
-          <p class="qs-note when-one">The volume command deletes your settings, sign-ins, models and workspace. Run only the first command to keep them.</p>
-          <p class="qs-note when-local">The uninstaller keeps your data for a later install. See <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/local.md#remove-it">Remove it</a> to delete the data too.</p>
+          <pre class="qs-remove-cmd when-local when-unix when-keep-data" id="b-remove-local-unix" tabindex="0" aria-label="Uninstall the local setup and keep its data on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh</code></pre>
+          <pre class="qs-remove-cmd when-local when-unix when-purge-data" id="b-remove-local-unix-purge" tabindex="0" aria-label="Uninstall the local setup and purge its data on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh -s -- --purge</code></pre>
+          <pre class="qs-remove-cmd when-local when-windows when-keep-data" id="b-remove-local-windows" tabindex="0" aria-label="Uninstall the local setup and keep its data on Windows PowerShell"><code>irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1 | iex</code></pre>
+          <pre class="qs-remove-cmd when-local when-windows when-purge-data" id="b-remove-local-windows-purge" tabindex="0" aria-label="Uninstall the local setup and purge its data on Windows PowerShell"><code>&amp; ([scriptblock]::Create((irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1))) -Purge</code></pre>
+          <p class="qs-note when-keep-data">Saved data stays for a later run or install.</p>
+          <p class="qs-note when-one when-purge-data">The volume command deletes your settings, sign-ins, models and workspace.</p>
+          <p class="qs-note when-local when-purge-data">The purge option deletes the server's database, recordings, keys and local sign-ins. See <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/local.md#remove-it">Remove it</a>.</p>
         </div>
         <p class="copy-status" role="status" aria-live="polite"></p>
         <p class="demo-notice"><strong>Local demo only.</strong> Its ports are bound to 127.0.0.1. Keep it on your computer: for a real deployment you need your own secrets, HTTPS host names and sign-in. <a href="#professional">The Professional level →</a></p>
