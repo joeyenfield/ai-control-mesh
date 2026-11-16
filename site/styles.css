@@ -128,7 +128,7 @@ pre code { font-size: inherit; }
 .qs-toc a { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 16px 0 8px; border: 1px solid #45506b; border-radius: 999px; color: var(--text); font-size: 13px; text-decoration: none; }
 .qs-toc a::before { counter-increment: qs-step; content: counter(qs-step); flex: none; width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--mint); color: #111d1b; font: 700 12px var(--mono); }
 .qs-toc a:hover { border-color: var(--mint); }
-.quickstart-copy h2 { display: flex; align-items: center; gap: 14px; }
+.qs-guide .quickstart-copy h2 { display: flex; align-items: center; gap: 14px; }
 /* A guide's command box: tabs across the top where a level has more than one way, then the
    chosen way's options, each a labelled group, then the terminal with its command. */
 .qs-box { overflow: hidden; }
