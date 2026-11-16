@@ -22,7 +22,7 @@ func names(answer map[string]any) []string {
 func TestFoldersListsOnlyFoldersInsideTheRoots(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
-	for _, dir := range []string{"web", "Api", ".git", "api/src"} {
+	for _, dir := range []string{"web", "Api", ".git", "Api/src"} {
 		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(dir)), 0o755); err != nil {
 			t.Fatal(err)
 		}
