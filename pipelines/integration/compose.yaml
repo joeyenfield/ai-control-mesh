@@ -1,0 +1,58 @@
+# Disposable deployment of the exact archived distribution. No production mounts or ports.
+services:
+  postgres:
+    image: docker.io/library/postgres:17
+    environment:
+      POSTGRES_DB: mesh
+      POSTGRES_PASSWORD: ci-postgres
+      AI_PROXY_DB_API_PASSWORD: ciapi
+      AI_PROXY_DB_AUTH_PASSWORD: ciauth
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ${TEST_INIT_SCRIPT}:/docker-entrypoint-initdb.d/10-mesh.sh:ro
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -d, mesh]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+  auth:
+    image: ${TEST_IMAGE}
+    entrypoint: [agent-auth]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AI_PROXY_AUTH_DATABASE_URL: postgresql+psycopg://mesh_auth:ciauth@postgres:5432/mesh
+      AI_PROXY_AUTH_HOST: 0.0.0.0
+      AI_PROXY_AUTH_PORT: '10000'
+      AI_PROXY_USERNAME: ci-admin
+      AI_PROXY_PASSWORD: ${CI_ADMIN_PASSWORD:?Set a disposable CI password}
+      AI_PROXY_OIDC_ISSUER: http://localhost:20000
+      AI_PROXY_OIDC_AUDIENCE: http://localhost:9999
+      AI_PROXY_OIDC_REDIRECT_URIS: http://localhost:9999/api/auth/callback
+      AI_PROXY_OIDC_BROWSER_ORIGINS: http://localhost:9999
+      AI_PROXY_OIDC_INTROSPECTION_SECRET: ci-disposable-introspection-secret
+  server:
+    image: ${TEST_IMAGE}
+    entrypoint: [python, /ci/start.py, server]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AI_PROXY_DATABASE_URL: postgresql+psycopg://mesh_api:ciapi@postgres:5432/mesh
+      AI_PROXY_USERNAME: ci-admin
+      AI_PROXY_PASSWORD: ${CI_ADMIN_PASSWORD:?Set a disposable CI password}
+      AI_PROXY_OIDC_ISSUER: http://localhost:20000
+      AI_PROXY_OIDC_AUDIENCE: http://localhost:9999
+      AI_PROXY_OIDC_REDIRECT_URIS: http://localhost:9999/api/auth/callback
+      AI_PROXY_OIDC_BROWSER_ORIGINS: http://localhost:9999
+      AI_PROXY_OIDC_INTROSPECTION_SECRET: ci-disposable-introspection-secret
+    volumes:
+      - ${TEST_START_SCRIPT}:/ci/start.py:ro
+      - ${TEST_DOWNLOAD_ROOT}:/app/dist:ro
+      - server-logs:/app/logs
+      - server-certs:/app/certs
+volumes:
+  postgres-data:
+  server-logs:
+  server-certs:

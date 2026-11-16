@@ -75,7 +75,7 @@ pipeline {
                 script {
                     def version = sh(returnStdout: true,
                         script: 'python3 -c \'import json; print(json.load(open(".ci-build.json"))["version"])\'').trim()
-                    build job: 'ai-control-mesh-test', wait: false,
+                    build job: '/ai-control-mesh-test', wait: false,
                         parameters: [string(name: 'VERSION', value: version)]
                 }
             }
