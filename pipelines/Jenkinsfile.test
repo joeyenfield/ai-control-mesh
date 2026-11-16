@@ -1,0 +1,25 @@
+pipeline {
+    agent { label 'lan-builder' }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 15, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+    parameters {
+        string(name: 'VERSION', defaultValue: '', description: 'Exact version in the shared dist directory.')
+    }
+    stages {
+        stage('Deploy distribution and test') {
+            steps {
+                sh 'python3 -u "$MESH_CI_HOME/test_distribution.py" "$VERSION"'
+            }
+        }
+    }
+    post {
+        always {
+            sh 'python3 "$MESH_CI_HOME/jenkins/collect-results.py" test "$VERSION" .'
+            archiveArtifacts artifacts: 'results/**', allowEmptyArchive: true
+        }
+    }
+}

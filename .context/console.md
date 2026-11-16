@@ -142,6 +142,9 @@ Server settings' **Links** tab (site admins) is `LinksSettings`: the mesh id, co
 
 ## Documentation pages (`docs/`)
 
+The Contribute section includes `pipelines.md`, the Jenkins setup, branch/PR
+verification, distribution testing and explicit release guide.
+
 The Docs page (`/help`) renders `docs/*.md`. A new page goes into `DOC_SECTIONS` in `pages/Docs.tsx` (`test_help.py` checks every page is listed), the same section of `docs/index.md` (Start here, Use it, People and data, Run a server, Technical overview, Contribute). The guides (Start here to Run a server) are plain steps for users and operators; design, flows, protocols and internals go in Technical overview pages, so a guide links to them rather than carrying the detail and `README.md`'s table. Diagrams are Mermaid (`sequenceDiagram` for flows, `flowchart` for structure), never ASCII art. Headings: one H1, a handful of H2s, H3s only for genuinely separate parts, no H4s, no Contents lists; small topics are a paragraph with a bold lead-in, a list item or a table row. Plain short sentences, sentence case, saying what something does for the user.
 
 ## Gotchas

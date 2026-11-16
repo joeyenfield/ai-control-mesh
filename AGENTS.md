@@ -66,6 +66,7 @@ python/agent_py/       the Python agent, agent-proxy and agent-machine; python/t
 ui/src/                the console: api.ts, navigation.ts, pages/, components/, styles.css
 android/               the Android app
 tools/dist/            builds every platform's archives, packages, the wheel and the APK (Go module)
+pipelines/             Jenkins definitions: multibranch build/verification, versioned deployment test/release, controller bootstrap
 deploy/                runs the PUBLISHED images only (deploy/README.md):
   compose/             quickstart/ (server, issuer, two machines, Ollama; its start.py and machine.py are shared), allinone/ (the
                        ai-control-mesh image: the whole system in one container), peer/ (two linked servers), server/ (for real use)

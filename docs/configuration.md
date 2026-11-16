@@ -91,7 +91,7 @@ backends:
   laptop:    {type: ollama, url: http://127.0.0.1:11434, machine: 3f2a9c1e7b6d4a10}
   strata-iq3:
     type: strata
-    url: http://192.168.1.133:18500
+    url: http://192.0.2.10:18500
     machine: 9b1c0d2e3f4a5b6c
     container: {engine: strata, image: ..., port: 18500, gpus: all, env: {...}, volume: ...}
   anthropic: {type: anthropic, url: https://api.anthropic.com}

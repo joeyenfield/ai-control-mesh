@@ -1,0 +1,84 @@
+pipeline {
+    agent { label 'lan-builder' }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 180, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
+    }
+    parameters {
+        booleanParam(name: 'RUN_DEPLOYMENT_TESTS', defaultValue: true,
+            description: 'Queue the isolated distribution test after building.')
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                // Use the exact revision selected by multibranch indexing.
+                checkout scm
+            }
+        }
+        stage('Prepare snapshot') {
+            steps {
+                sh 'python3 "$MESH_CI_HOME/build.py" . --stage prepare'
+            }
+        }
+        stage('Prepare test container') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage checks-image' }
+        }
+        stage('Tools checks') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage check-tools' }
+        }
+        stage('Client checks') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage check-client' }
+        }
+        stage('Machine checks') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage check-machine' }
+        }
+        stage('UI build') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage ui' }
+        }
+        stage('Platform packages and Python wheel') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage packages' }
+        }
+        stage('Android APK') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage android' }
+        }
+        stage('Server bundle and installers') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage installers' }
+        }
+        stage('AMD64 server image') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage image-amd64' }
+        }
+        stage('ARM64 server image') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage image-arm64' }
+        }
+        stage('Verify artifacts') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage finalize' }
+        }
+        stage('Publish') {
+            steps {
+                script {
+                    def version = sh(returnStdout: true,
+                        script: 'python3 -c \'import json; print(json.load(open(".ci-build.json"))["version"])\'').trim()
+                    currentBuild.description = version
+                    def downloads = "${env.MESH_DOWNLOADS_URL.replaceAll('/+$', '')}/${version}/"
+                    writeFile file: 'downloads.url', text: downloads + '\n'
+                    sh 'cp .ci-build.json build-receipt.json'
+                    archiveArtifacts artifacts: 'build-receipt.json,downloads.url', fingerprint: true
+                    echo "Download all packages and images: ${downloads}"
+                }
+            }
+        }
+        stage('Queue distribution test') {
+            when { expression { params.RUN_DEPLOYMENT_TESTS } }
+            steps {
+                script {
+                    def version = sh(returnStdout: true,
+                        script: 'python3 -c \'import json; print(json.load(open(".ci-build.json"))["version"])\'').trim()
+                    build job: 'ai-control-mesh-test', wait: false,
+                        parameters: [string(name: 'VERSION', value: version)]
+                }
+            }
+        }
+    }
+}
