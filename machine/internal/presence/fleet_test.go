@@ -319,6 +319,10 @@ func TestPresenceAnswersProviderRequestsAndSendsStrataKeys(t *testing.T) {
 	var progress []any
 	for {
 		message := next()
+		// Account discovery can report its status while the provider request runs.
+		if message["type"] == "update" {
+			continue
+		}
 		if message["type"] == "provider_progress" {
 			if message["request"] != "p1" {
 				t.Fatalf("%v", message)
