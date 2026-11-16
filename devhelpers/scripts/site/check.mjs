@@ -167,6 +167,7 @@ try {
       }
     }
     if (pagePath === '/quickstart.html') {
+    assert.equal(await page.locator('#agent-only-title').evaluate(element => getComputedStyle(element).display), 'block');
     const pick = async (...ids) => { for (const id of ids) await page.locator(`label[for="${id}"]`).click(); };
     const copy = page.locator('[data-copy-shown]:visible');
     const status = page.locator('.qs-guide:visible .copy-status');
@@ -218,7 +219,9 @@ try {
       const numbers = await page.locator('.qs-guide:visible .step-number').allTextContents();
       assert.deepEqual(numbers, listed.map((hash, index) => String(index + 1)), `${name} numbers its steps from 1`);
       for (const hash of listed) assert.equal(await page.locator(hash).isVisible(), true, `${name} lists ${hash}`);
-      assert.equal(await page.locator('.guide-basic .when-podman.qs-note').isVisible(), level === 'basic' && choices.includes('b-podman'));
+      assert.equal(await page.locator('#b-podman-setup').isVisible(), level === 'basic' && choices.includes('b-podman'));
+      assert.equal(await page.locator('#b-clear-docker').isVisible(), level === 'basic' && choices.includes('b-one') && choices.includes('b-docker'));
+      assert.equal(await page.locator('#b-clear-podman').isVisible(), level === 'basic' && choices.includes('b-one') && choices.includes('b-podman'));
       assert.equal(await page.locator('.guide-intermediate .when-gpu.qs-note').isVisible(), choices.includes('i-gpu'));
       assert.equal(await page.locator('.guide-advanced .when-gpu.qs-note').isVisible(), choices.includes('a-gpu'));
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${name}: no horizontal overflow at ${width}`);
