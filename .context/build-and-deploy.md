@@ -6,6 +6,20 @@ How the components are versioned, built for every platform, handed out by the se
 
 There is one hand-written version (`VERSION`) and one compatibility number (`PROTOCOL`). `tools/dist` builds every Go program for every platform, plus packages, the Python wheel and the Android APK, into `dist/<version>/` with a `SHA256SUMS`. The server hands out exactly those files (`/downloads/`), and every installer and self-update checks them against that list. So a computer only ever installs what its server built.
 
+## Jenkins pipelines
+
+`pipelines/Jenkinsfile.build` and `Jenkinsfile.verify` are read from Git by
+multibranch Jenkins jobs. They use `checkout scm` for the indexed revision.
+Verification discovers branches and PR heads, including forks with target-branch
+pipeline trust. Distribution builds discover origin branches; only `master`
+builds automatically. Both folders are indexed every five minutes.
+`Jenkinsfile.test` and `Jenkinsfile.distribute` remain parameterized SCM pipelines
+for exact built versions. Release requires the matching deployment-test result.
+`pipelines/configure.groovy` migrates the controller while preserving legacy job
+history. The definitions call installed host runners through `MESH_CI_HOME`;
+credentials and artifacts stay outside Git. See `docs/pipelines.md` for setup and
+the intentionally stubbed control mesh integration coverage.
+
 ## Versions
 
 - `VERSION` = `X.Y.Z`. The build version is `X.Y.Z` on its tag, else `X.Y.Z+<commit>[.dirty]`. `.dirty` means uncommitted changes to any tracked file (no exclusions: the server's settings used to be saved in `config/`, which was exempt, but they live in its database now); there's no `.git` → `+unknown`. `AI_PROXY_VERSION` overrides it.

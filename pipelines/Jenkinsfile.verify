@@ -1,0 +1,48 @@
+pipeline {
+    agent { label 'lan-builder' }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 40, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+    }
+    stages {
+        stage('Checkout branch or PR') {
+            steps {
+                script {
+                    deleteDir()
+                    checkout scm
+                    sh 'python3 "$MESH_CI_HOME/jenkins/github-status.py" pending'
+                }
+            }
+        }
+        stage('Prepare verification container') {
+            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage prepare' }
+        }
+        stage('Tools unit tests') {
+            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage tools' }
+        }
+        stage('Client unit tests') {
+            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage client' }
+        }
+        stage('Machine unit tests') {
+            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage machine' }
+        }
+        stage('Server unit tests') {
+            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage server' }
+        }
+        stage('UI verification') {
+            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage ui' }
+        }
+    }
+    post {
+        success { sh 'python3 "$MESH_CI_HOME/jenkins/github-status.py" success' }
+        unsuccessful {
+            script {
+                if (fileExists('.git')) {
+                    sh 'python3 "$MESH_CI_HOME/jenkins/github-status.py" failure'
+                }
+            }
+        }
+    }
+}

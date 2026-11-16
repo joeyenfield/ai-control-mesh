@@ -71,6 +71,7 @@ export const DOC_SECTIONS: { title: string; pages: { id: string; label: string }
     title: "Contribute",
     pages: [
       { id: "development", label: "Development" },
+      { id: "pipelines", label: "Jenkins pipelines" },
       { id: "releases", label: "Releases and snapshots" },
       { id: "website", label: "Marketing website" },
     ],

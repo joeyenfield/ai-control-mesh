@@ -18,6 +18,7 @@ machine/         agent-machine, in Go, its own module: the fleet connection, pro
 python/          agent_py: the same agent, agent-proxy and agent-machine in Python
 android/         The Android app (Kotlin): a list of servers, each one's console in a WebView
 tools/dist/      Build tooling, in Go: every platform's binaries, archives, packages and the Python wheel
+pipelines/       Jenkins multibranch build/verification and versioned deployment test/release definitions
 devhelpers/      For development: the deploy/ stacks built from this checkout, the all-in-one image's Dockerfile
   scripts/       Build, dev, launcher, screenshot and site scripts (.ps1 and .sh pairs), HTTPS setup
   release_scripts/   Release, ARM64 emulation and deploy scripts (.ps1 and .sh pairs)
@@ -90,7 +91,7 @@ Vite on 5173 proxies `/api` (WebSockets included), `/health`, the OpenAPI pages,
 | `cd ui && npm run build` | Writes `ui/dist`. |
 | `helm lint --strict deploy/helm/agent-mesh -f deploy/helm/agent-mesh/ci/<file>.yaml` | The chart with each CI values file; then `helm template ... \| kubeconform -strict`. |
 
-Builds and releases run locally; there are no GitHub Actions workflows. Pushes and tags do not publish anything. Run the checks before publishing. Use `devhelpers/release_scripts/release.ps1` or `.sh` with `website`, `services` or `installers` for independent snapshots. Add `--publish` to upload directly, and `--plan` to preview commands. See [Local releases and snapshots](releases.md) for prerequisites, offline archives, ARM64, stable releases and old queue cleanup.
+Builds and releases run locally; there are no GitHub Actions workflows. The configured [Jenkins pipelines](pipelines.md) discover branches and PRs for verification and build `master` snapshots on the LAN agent. Other branches can be built manually. Publishing stays explicit. Use `devhelpers/release_scripts/release.ps1` or `.sh` with `website`, `services` or `installers` for independent snapshots. Add `--publish` to upload directly, and `--plan` to preview commands. See [Local releases and snapshots](releases.md) for prerequisites, offline archives, ARM64, stable releases and old queue cleanup.
 
 The one pytest warning, Starlette's httpx deprecation in `TestClient`, is expected.
 

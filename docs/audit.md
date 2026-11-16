@@ -23,7 +23,7 @@ Each event is a [CloudEvent](https://cloudevents.io) with an OCSF-like body:
 ```json
 {"specversion": "1.0", "id": "6f6c…", "source": "agent-server/api-7d9…", "type": "mesh.audit.data.update",
  "time": "2026-11-01T12:00:00.000Z", "tenant": "acme", "actor": "dave", "outcome": "success",
- "data": {"tenant": "acme", "actor": {"user": "dave", "via": "cookie", "ip": "10.1.2.3", "user_agent": "…"},
+ "data": {"tenant": "acme", "actor": {"user": "dave", "via": "cookie", "ip": "192.0.2.30", "user_agent": "…"},
           "action": "PUT /api/orgs/{id}/retention", "target": {"kind": "orgs", "id": "acme", "part": "retention"},
           "outcome": "success", "reason": null, "status": 200, "request_id": null, "session_id": null, "machine_id": null,
           "changes": {"fields": ["days"], "days": {"traces": 7}}},

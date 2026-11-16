@@ -571,7 +571,7 @@ A container is stored in the server's settings as a backend with `machine` and `
 backends:
   strata-iq3:
     type: strata
-    url: http://192.168.1.40:8080   # the machine's address, and the container's port
+    url: http://192.0.2.20:8080   # the machine's address, and the container's port
     machine: 3f2a9c1e7b6d4a10       # the machine's id
     container:
       engine: strata                # or ollama, llamacpp
