@@ -24,7 +24,7 @@ func main() {
 	if dir, err := update.Location(); err == nil {
 		update.Cleanup(dir, update.Programs)
 	}
-	args := os.Args[1:]
+	args := settings.CommandArgs()
 	if len(args) > 0 {
 		switch args[0] {
 		case "login":

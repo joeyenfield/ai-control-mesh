@@ -151,7 +151,7 @@ It doesn't start again when you sign in to your computer. Run `agent-server loca
 
 ## The tray icon
 
-On a desktop the installers put in `agent-tray`, an icon in the system tray. It's green when everything here runs, amber when some of it does, and grey when nothing does. Its menu shows, for whatever is on this computer:
+On a desktop the installers put in `agent-tray`, the purple AI Control Mesh icon in the system tray. Its status dot is green when everything here runs, amber when some of it does, and grey when nothing does. Click it on Ubuntu, or right-click it on Windows, to open its menu. The menu shows, for whatever is on this computer:
 
 | Part | What it shows | What it does |
 | --- | --- | --- |
@@ -162,7 +162,7 @@ On a desktop the installers put in `agent-tray`, an icon in the system tray. It'
 **Start at sign-in** is ticked by the installers. On Windows it's an entry in your sign-in programs; on macOS a LaunchAgent; on Linux an XDG autostart file.
 
 - **Windows:** new icons go behind **^** in the taskbar. Drag it out to keep it in view.
-- **Linux:** the icon needs a system tray. KDE, XFCE and most desktops have one. GNOME needs the AppIndicator extension, which Ubuntu has by default.
+- **Linux:** the icon needs a system tray. KDE, XFCE and most desktops have one. On Ubuntu and Debian, the installers install missing GTK and AppIndicator libraries with apt, using sudo when needed. On GNOME they also install and enable the AppIndicator extension and check that the desktop exposes a tray host. A new extension can require signing out and back in; the installer tells you when that is needed. `--no-tray` skips this setup. The installers prefer the system Python for desktop installs so its GTK bindings match. If `PYSTRAY_BACKEND` is set to `xorg`, unset it: that backend has no menus. For a manual installation, run `agent-tray --setup` once. Normal tray startup does not install packages or change extensions.
 - **What it runs:** the commands you'd type (`agent-server local`, `agent-machine`, `agent proxy`). It reads their `status --json` every few seconds, so it works with the Go programs and the Python ones alike. When one of them is too old to answer, the menu says so: update it.
 
 | Command | What it does |
@@ -170,7 +170,8 @@ On a desktop the installers put in `agent-tray`, an icon in the system tray. It'
 | `agent-tray` | Shows the icon. One runs at a time. |
 | `agent-tray --autostart on\|off` | Starts it when you sign in, or not |
 | `agent-tray --status` | Prints what the icon would show, as JSON |
-| `agent-tray --check` | Exits 0 when an icon can be shown here |
+| `agent-tray --check` | Exits 0 when a tray backend with menus can be loaded; otherwise prints the problem. The desktop must also provide a tray. |
+| `agent-tray --setup` | Installs missing Ubuntu/Debian desktop libraries (may ask for sudo), enables GNOME tray support and checks readiness. Run by the installers. |
 
 On another computer with Python 3.9 or later, the server's own installer adds it ([Deployment](deployment.md#the-one-line-installers)). Elsewhere, `pip install "ai-proxy-agent-py[tray]"` from the wheel on the server's **Downloads** page gives you `agent-tray`.
 

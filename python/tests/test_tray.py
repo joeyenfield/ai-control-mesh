@@ -10,6 +10,7 @@ import os
 import plistlib
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -154,6 +155,57 @@ def test_an_icon_needs_a_desktop():
     assert tray.desktop_available({}, "win32") and tray.desktop_available({}, "darwin")
     assert not tray.desktop_available({}, "linux")
     assert tray.desktop_available({"WAYLAND_DISPLAY": "wayland-0"}, "linux")
+
+
+def test_a_backend_without_menus_is_rejected(monkeypatch, capsys):
+    monkeypatch.setitem(sys.modules, "PIL", SimpleNamespace())
+    monkeypatch.setattr(tray.sys, "platform", "win32")
+    backend = SimpleNamespace(Icon=SimpleNamespace(HAS_MENU=False))
+    monkeypatch.setattr(tray.importlib, "import_module", lambda name: backend)
+    with pytest.raises(RuntimeError, match="cannot show menus"):
+        tray.desktop_backend()
+    assert not tray.available()
+    assert tray.main(["--check"]) == 1
+    assert "sudo apt install python3-gi" in capsys.readouterr().err
+    backend.Icon.HAS_MENU = True
+    assert tray.desktop_backend() is backend
+    assert tray.main(["--check"]) == 0
+
+
+def test_ubuntu_gi_is_loaded_from_the_system_without_exposing_other_packages(tmp_path, monkeypatch):
+    monkeypatch.setitem(sys.modules, "PIL", SimpleNamespace())
+    package = tmp_path / "gi"
+    package.mkdir()
+    (package / "__init__.py").write_text("from . import bindings\n", encoding="utf-8")
+    (package / "bindings.py").write_text("available = True\n", encoding="utf-8")
+    spec = tray.importlib.machinery.PathFinder.find_spec("gi", [str(tmp_path)])
+    # Restore sys.modules after the loader adds these modules.
+    monkeypatch.setitem(sys.modules, "gi", None)
+    monkeypatch.delitem(sys.modules, "gi")
+    monkeypatch.setitem(sys.modules, "gi.bindings", None)
+    monkeypatch.delitem(sys.modules, "gi.bindings")
+    monkeypatch.setattr(tray.sys, "platform", "linux")
+    monkeypatch.setattr(tray.importlib.util, "find_spec", lambda name: None)
+    find_spec = tray.importlib.machinery.PathFinder.find_spec
+    monkeypatch.setattr(tray.importlib.machinery.PathFinder, "find_spec",
+                        lambda name, paths=None, target=None: spec if name == "gi" else find_spec(name, paths, target))
+    backend = SimpleNamespace(Icon=SimpleNamespace(HAS_MENU=True))
+    monkeypatch.setattr(tray.importlib, "import_module", lambda name: backend)
+    paths_before = list(sys.path)
+    assert tray.desktop_backend() is backend
+    assert sys.modules["gi"].bindings.available
+    assert sys.path == paths_before
+
+
+def test_icon_keeps_the_mesh_identity_and_changes_its_status_badge():
+    pytest.importorskip("PIL")
+    pictures = [tray.image(status) for status in ("running", "partial", "stopped")]
+    for picture in pictures:
+        assert picture.size == (64, 64) and picture.mode == "RGBA"
+        assert picture.getpixel((0, 0))[3] == 0
+        assert picture.getpixel((32, 10))[:3] == (79, 70, 229)
+        assert picture.getpixel((20, 22))[:3] == (255, 255, 255)
+    assert len({picture.getpixel((52, 52)) for picture in pictures}) == 3
 
 
 def test_it_reads_the_real_programs_status(tmp_path, monkeypatch, agent_binary, machine_binary):

@@ -8,6 +8,8 @@ The client knows the server by URL and gets agent definitions, environments and 
 
 ## Boundaries
 
+`settings.CommandArgs()` is used by both command entry points. On Android it removes only an absolute first argument matching the executable's own path, which Termux's linker can insert before `login`, `proxy`, etc. The settings tests cover duplicated and ordinary argument lists; Python mirrors this in `common.command_args()`.
+
 - Never reads the server's settings or database, or imports server, machine or Python code. Never chooses backends or renders templates.
 - Never joins the fleet: `agent machine` points at agent-machine and exits.
 - Binds `127.0.0.1` only. No HTTP client or dialer uses an environment proxy (`Proxy: nil`).

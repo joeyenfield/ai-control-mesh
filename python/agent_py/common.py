@@ -45,6 +45,20 @@ PROTOCOL_HEADER = "X-AI-Proxy-Protocol"
 LOOPBACK = {"localhost", "127.0.0.1", "::1"}
 
 
+def command_args() -> List[str]:
+    """Mirror Go's Termux linker argument correction before command dispatch."""
+    argv = sys.argv
+    args = list(argv[1:])
+    android = sys.platform == "android" or hasattr(sys, "getandroidapilevel")
+    if android and argv and args and os.path.isabs(args[0]):
+        name = argv[0]
+        if os.path.basename(name) == name:
+            name = shutil.which(name) or name
+        if os.path.abspath(name) == os.path.normpath(args[0]):
+            return args[1:]
+    return args
+
+
 def _version() -> str:
     if os.environ.get("AI_PROXY_VERSION"):
         return os.environ["AI_PROXY_VERSION"]
