@@ -18,7 +18,13 @@ for exact built versions. Release requires the matching deployment-test result.
 `pipelines/configure.groovy` migrates the controller while preserving legacy job
 history. The definitions call installed host runners through `MESH_CI_HOME`;
 credentials and artifacts stay outside Git. See `docs/pipelines.md` for setup and
-the intentionally stubbed control mesh integration coverage.
+the deployment and control mesh integration coverage. The seven checks in
+`pipelines/integration/` are archived and checksummed with each distribution.
+They run the packaged Go machine against real PostgreSQL/server/issuer services,
+cover OAuth device sign-in, fleet enrollment, a folders RPC and path confinement.
+Promotion rejects failed or skipped deployment tests. Installer URLs point to
+the versioned GitHub release, where the installer files are published alongside
+the full distribution archive.
 
 ## Versions
 

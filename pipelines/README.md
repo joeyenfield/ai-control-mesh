@@ -10,3 +10,7 @@
 See [Jenkins builds and verification](../docs/pipelines.md) for setup, triggers,
 agent requirements, artifacts and promotion. `configure.groovy` installs the job
 configuration; pipeline definitions themselves are read from Git.
+
+`integration/` holds the real deployment and control mesh checks. Builds include
+these fixtures in their checksummed distributions so testing uses the framework
+from the built commit.

@@ -78,13 +78,18 @@ version includes the source commit and UTC timestamp. Each distribution contains
 image archives. The Jenkins build archives its receipt and download link.
 
 The deployment test loads the archived AMD64 image and starts an isolated
-PostgreSQL, issuer and server stack. It checks service health, the exact version
-and the downloads index. Machine enrollment, routing and session integration
-tests are explicitly stubbed. Logs and results are archived in the test job;
+PostgreSQL, issuer and server stack. The versioned framework in
+`pipelines/integration/` is copied into the distribution and covered by its
+manifest. Seven checks cover service health, the exact version and downloads,
+unauthenticated access rejection, real OAuth device sign-in, the packaged Go
+machine joining the fleet, a folders RPC reaching that machine, and rejection
+of paths outside its configured roots. These checks use disposable credentials
+and private container networking. Logs and results are archived in the test job;
 containers and volumes are removed after the run.
 
 Release requires a successful deployment-test result matching the source commit
-and distribution manifest. Pi releases reuse the existing backup and health
-checks; GitHub releases upload a distribution archive as a prerelease. Neither
+and distribution manifest, with no failed or skipped deployment checks. Pi
+releases reuse the existing backup and health checks; GitHub releases upload the
+distribution archive and standalone installer files as a prerelease. Neither
 operation rebuilds source. Builds and verification never trigger production
 deployment or GitHub publication.
