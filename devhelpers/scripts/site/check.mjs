@@ -175,6 +175,16 @@ try {
     // The page opens on Basic, one container, Docker, Linux or macOS.
     // Verify both clipboard outcomes without depending on the OS clipboard.
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.copiedCommand = text; } } }));
+    for (const state of ['keep', 'purge']) {
+      await page.locator(`label[for="agent-${state}"]`).click();
+      for (const platform of ['unix', 'windows']) {
+        await page.locator(`[data-copy-shown="agent-remove-${platform}"]`).click();
+        const removal = await page.evaluate(() => window.copiedCommand);
+        assert.ok(removal.includes(platform === 'unix' ? '--only agent' : '-Only agent'));
+        assert.equal(removal.includes(platform === 'unix' ? '--purge' : '-Purge'), state === 'purge');
+      }
+    }
+    await page.locator('label[for="agent-keep"]').click();
     for (const [id, option] of [['agent-only-unix', '--only agent --no-tray'], ['agent-only-windows', '-Only agent -NoTray']]) {
       await page.locator(`[data-copy="${id}"]`).click();
       assert.ok((await page.evaluate(() => window.copiedCommand)).includes(option));
@@ -212,11 +222,12 @@ try {
     ]) {
       const name = `${level}/${choices.join('/')}`;
       await pick(`lvl-${level}`, ...choices);
-      if (level === 'basic') await page.locator('#b-purge').setChecked(false);
+      const dataPrefix = { basic: 'b', intermediate: 'i', advanced: 'a', professional: 'p' }[level];
+      await page.locator(`label[for="${dataPrefix}-keep"]`).click();
       assert.equal(await page.locator('.qs-guide:visible').count(), 1, `${name} shows one guide`);
       assert.equal(await page.locator(`.guide-${level}`).isVisible(), true, `${name} shows its own guide`);
       assert.equal(await page.locator('.qs-cmd:visible').count(), 1, `${name} shows one block`);
-      assert.equal(await page.locator('.qs-remove-cmd:visible').count(), level === 'basic' ? 1 : 0, `${name} shows the matching removal block`);
+      assert.equal(await page.locator('.qs-remove-cmd:visible').count(), 1, `${name} shows the matching removal block`);
       assert.equal(await page.locator('.qs-guide:visible .quickstart-copy .text-link:visible').count(), 1, `${name} links one guide`);
       if (level === 'advanced') assert.equal(await page.locator('.qs-forward:visible').count(), 1, `${name} shows one pair of port-forwards`);
       // One numbered sequence: the list at the top names every step, in order, and links to it.
@@ -237,12 +248,21 @@ try {
           ? (windows ? `& ([scriptblock]::Create((irm ${url}ps1))) -Purge` : `curl -fsSL ${url}sh | sh -s -- --purge`)
           : `${keep}\n${engine} volume rm mesh-data mesh-home mesh-workspace`;
         for (const [checked, expected] of [[false, keep], [true, purge]]) {
-          await page.locator('#b-purge').setChecked(checked);
+          await page.locator(checked ? 'label[for="b-purge"]' : 'label[for="b-keep"]').click();
           assert.equal(await page.locator('.qs-remove-cmd:visible code').textContent(), expected, `${name} purge=${checked}`);
           await removeCopy.click();
           assert.equal(await page.evaluate(() => getSelection().toString().trim()), expected, `${name} copies purge=${checked}`);
         }
-        await page.locator('#b-purge').setChecked(false);
+        await page.locator('label[for="b-keep"]').click();
+      } else {
+        const keep = await page.locator('.qs-remove-cmd:visible code').textContent();
+        await page.locator(`label[for="${dataPrefix}-purge"]`).click();
+        const purge = await page.locator('.qs-remove-cmd:visible code').textContent();
+        assert.notEqual(purge, keep, `${name} has a purge command`);
+        assert.ok(purge.includes(level === 'intermediate' ? 'down -v' : 'kubectl delete namespace mesh'));
+        await removeCopy.click();
+        assert.equal(await page.evaluate(() => getSelection().toString().trim()), purge.trim());
+        await page.locator(`label[for="${dataPrefix}-keep"]`).click();
       }
       assert.equal(await page.locator('.guide-intermediate .when-gpu.qs-note').isVisible(), choices.includes('i-gpu'));
       assert.equal(await page.locator('.guide-advanced .when-gpu.qs-note').isVisible(), choices.includes('a-gpu'));
@@ -303,9 +323,9 @@ try {
   // Without JavaScript the levels, the commands and the switches still work; only copying needs it.
   assert.equal(await page.locator('#b-one-docker').isVisible(), true);
   assert.equal(await page.locator('#b-clear-docker').isVisible(), true);
-  await page.locator('#b-purge').check();
+  await page.locator('label[for="b-purge"]').click();
   assert.equal(await page.locator('#b-clear-docker-purge').isVisible(), true);
-  await page.locator('#b-purge').uncheck();
+  await page.locator('label[for="b-keep"]').click();
   assert.equal(await page.locator('.copy-button:visible').count(), 0);
   await page.locator('label[for="lvl-intermediate"]').click();
   assert.equal(await page.locator('#quickstart-command').isVisible(), true);
@@ -315,7 +335,7 @@ try {
   await page.locator('label[for="b-local"]').click();
   assert.equal(await page.locator('#b-local-unix').isVisible(), true);
   assert.equal(await page.locator('#b-remove-local-unix').isVisible(), true);
-  await page.locator('#b-purge').check();
+  await page.locator('label[for="b-purge"]').click();
   assert.equal(await page.locator('#b-remove-local-unix-purge').isVisible(), true);
   assert.equal(await page.locator('.qs-cmd:visible').count(), 1);
   assert.equal(await page.locator('.qs-guide:visible').count(), 1);
