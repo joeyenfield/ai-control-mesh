@@ -1,5 +1,7 @@
 # Machine (`machine/`)
 
+The executable dispatches through `settings.CommandArgs()`. On Android this removes an extra absolute self-path inserted by Termux's linker before the subcommand; other arguments stay intact. `settings/args_test.go` mirrors the client's cases, and Python uses `common.command_args()`.
+
 `agent-machine`: the Go module `ai-control-mesh/machine`. It keeps a computer in a server's **fleet** and supplies every local LLM provider: the model servers it runs, and containers it runs for the server.
 
 ## Design in one paragraph

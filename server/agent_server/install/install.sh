@@ -73,6 +73,20 @@ case "$only" in ""|agent|agent-machine) ;; *) echo "install: --only takes agent 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'install: %s\n' "$*" >&2; exit 1; }
 
+# A PRoot guest can inherit Termux variables; only its native shell identifies Termux.
+if [ -n "${PREFIX:-}" ] && [ "$(command -v sh)" = "$PREFIX/bin/sh" ]; then
+    case "${TERMUX_VERSION:-}:$PREFIX" in
+        ?*:*|*:*/com.termux/files/usr)
+            [ -n "$prefix" ] || prefix="$PREFIX/bin"
+            tray=0
+            if [ $service -eq 1 ]; then
+                say "Termux has no systemd; --service will start agent-machine in the background after sign-in instead."
+                service=0
+            fi
+            ;;
+    esac
+fi
+
 # This system, named the way tools/dist names its builds (AGENT_PLATFORM overrides it).
 platform=${AGENT_PLATFORM:-}
 if [ -z "$platform" ]; then
@@ -160,7 +174,12 @@ python_env() {
     line=$(lookup python python)
     if [ -z "$line" ]; then say "This server's build has no Python wheel; see $SERVER/get"; return 1; fi
     interpreter=""
-    for candidate in python3 python; do
+    candidates="python3 python"
+    # Ubuntu's GI bindings match its system Python, even if another Python is on PATH.
+    if [ $tray -eq 1 ] && [ -f /etc/debian_version ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+        candidates="/usr/bin/python3 $candidates"
+    fi
+    for candidate in $candidates; do
         if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
             interpreter=$(command -v "$candidate")
             break
@@ -242,6 +261,10 @@ if [ $tray -eq 1 ] && [ "$(id -u)" -ne 0 ] && { [ "$(uname -s)" = Darwin ] || [ 
     say "Installing the tray icon (agent-tray)"
     if python_env && "$pyhome/venv/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade "$wheel[tray]"; then
         ln -sf "$pyhome/venv/bin/agent-tray" "$bin/agent-tray"
+        if ! "$pyhome/venv/bin/python" -m agent_py.tray --setup; then
+            say "Tray setup is incomplete; see the error above. Rerun the installer after resolving it."
+            tray=0
+        fi
         "$pyhome/venv/bin/agent-tray" --autostart on >/dev/null 2>&1 || true
     else
         say "The tray icon couldn't be installed; everything else works without it."
@@ -262,12 +285,16 @@ if [ $login -eq 1 ] && [ -z "${AI_PROXY_MACHINE_SETUP_CODE:-}${AI_PROXY_SETUP_CO
     say "No terminal to sign in from; run the commands below yourself."
     login=0
 fi
+signin_incomplete=0
 for component in $components; do
     if [ "$component" = agent ]; then
         if [ $login -eq 1 ]; then
             say ""
             say "Signing agent in to $SERVER"
-            signin "$(program agent)" login "$SERVER" || say "Sign in later with: agent login $SERVER"
+            signin "$(program agent)" login "$SERVER" || {
+                signin_incomplete=1
+                say "Sign in later with: agent login $SERVER"
+            }
         else
             say "Next: agent login $SERVER"
         fi
@@ -277,8 +304,11 @@ for component in $components; do
             say "Using the shared agent sign-in for agent-machine on $SERVER (signing in only if needed)"
             if signin "$(program agent-machine)" login "$SERVER"; then
                 # A service retries by itself; otherwise join the fleet now, in the background.
-                if [ $service -eq 0 ] && [ $start -eq 1 ]; then "$(program agent-machine)" start || true; fi
+                if [ $service -eq 0 ] && [ $start -eq 1 ]; then
+                    "$(program agent-machine)" start || { signin_incomplete=1; say "agent-machine couldn't start; see the error above."; }
+                fi
             else
+                signin_incomplete=1
                 say "Sign in later with: agent-machine login $SERVER, then agent-machine start"
             fi
         else
@@ -287,7 +317,11 @@ for component in $components; do
     fi
 done
 say ""
-say "Done: $VERSION from $SERVER. Open its console at $SERVER"
+if [ $signin_incomplete -eq 1 ]; then
+    say "Installed $VERSION from $SERVER, but sign-in or startup is incomplete. See the errors above."
+else
+    say "Done: $VERSION from $SERVER. Open its console at $SERVER"
+fi
 if [ $tray -eq 1 ]; then
     # In the background, apart from this shell, so it stays when the terminal closes.
     if command -v setsid >/dev/null 2>&1; then

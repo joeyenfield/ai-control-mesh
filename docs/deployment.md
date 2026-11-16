@@ -257,7 +257,7 @@ The server writes each script for the request: its address as you reached it (ch
 
 **On any system, with Python.** With `--python`, or when the server has no Go build for the computer's system or processor, the installer installs the Python wheel instead. That works anywhere with Python 3.9 or later. It checks the wheel's SHA-256 and installs it into an environment of its own: `~/.local/share/agent-py` (`/usr/local/lib/agent-py` as root, `%LOCALAPPDATA%\agent-py` on Windows). Then it puts `agent`, `agent-proxy` and `agent-machine` in the prefix, as links on Linux, macOS and FreeBSD and as copies of pip's launchers on Windows. Signing in is the same. `--service` sets up the Go `agent-machine` only, so start the Python one with `agent-machine start`.
 
-**The tray icon.** On a desktop (Windows, macOS, or Linux and BSD with a display), not as root, and with Python 3.9 or later, the installer also puts in `agent-tray`. It comes from the same wheel and environment, plus `pystray` and `Pillow` from PyPI. Only `agent-tray` is linked into the prefix, so the Go programs stay the ones you run. It starts when you sign in to the computer, and the installer starts it once. The icon shows whether this machine is in the fleet and whether agent is signed in, and starts and stops them ([The tray icon](local.md#the-tray-icon)). If it can't be installed, the installer says so and everything else works the same.
+**The tray icon.** On a desktop (Windows, macOS, or Linux and BSD with a display), not as root, and with Python 3.9 or later, the installer also puts in `agent-tray`. It comes from the same wheel and environment, plus `pystray` and `Pillow` from PyPI. On Ubuntu and Debian it installs missing GTK and AppIndicator packages with apt (using sudo when needed), enables GNOME's tray extension and checks readiness. A new extension may require signing out and back in; the installer reports this. `--no-tray` skips tray setup. Only `agent-tray` is linked into the prefix, so the Go programs stay the ones you run. It starts when you sign in to the computer, and the installer starts it once when setup succeeds. The icon shows whether this machine is in the fleet and whether agent is signed in, and starts and stops them ([The tray icon](local.md#the-tray-icon)). If it can't be installed, the installer says so and everything else works the same.
 
 `AGENT_PLATFORM` overrides the detected platform (such as `linux-arm64`). The console's **Downloads** page and **Add a machine** show the commands for your server, ready to copy.
 
@@ -287,6 +287,10 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall # runs uninstall
 | macOS | A launchd agent, `~/Library/LaunchAgents/com.ai-control-mesh.agent-machine.plist`, run when you log in |
 | FreeBSD, as root | An rc.d service, `/usr/local/etc/rc.d/agent_machine`, enabled with `sysrc` |
 | Windows | A scheduled task, `agent-machine`, that runs `agent-machine start` when you sign in |
+
+In native Termux, the installers default to `$PREFIX/bin`, which is already on PATH. Termux has no systemd, so `--service` skips service creation. The one-line installer still completes sign-in and starts `agent-machine` in the background (unless `--no-start` is passed). An archive install prints the sign-in and start commands. This does not arrange startup after an Android reboot; open Termux and run `agent-machine start` again.
+
+Android command dispatch removes an extra leading executable path when Termux's linker duplicates it. This applies to `agent`, `agent-proxy` and `agent-machine`; ordinary arguments are preserved. If sign-in or startup fails, the one-line installer reports that setup is incomplete after copying the programs.
 
 ### Native packages and the Python wheel
 

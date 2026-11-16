@@ -200,6 +200,11 @@ try {
         if ($LASTEXITCODE -eq 0 -and (Test-Path (Join-Path $venv "Scripts\agent-tray.exe"))) {
             $tray = Join-Path $venv "Scripts\agent-tray.exe"
             Invoke-Program { & $venvPython -m agent_py.tray --autostart on } | Out-Null
+            Invoke-Program { & $venvPython -m agent_py.tray --setup }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Output "Tray setup is incomplete; see the error above. Rerun the installer after resolving it."
+                $tray = $null
+            }
         } else {
             Write-Output "The tray icon couldn't be installed (pip install $($Wheel[0])[tray] failed); everything else works without it."
         }

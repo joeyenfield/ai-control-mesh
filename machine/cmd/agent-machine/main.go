@@ -22,5 +22,5 @@ func main() {
 	if dir, err := update.Location(); err == nil {
 		update.Cleanup(dir, command.Programs)
 	}
-	os.Exit(command.Main(os.Args[1:]))
+	os.Exit(command.Main(settings.CommandArgs()))
 }

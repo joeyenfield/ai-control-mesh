@@ -18,5 +18,5 @@ func main() {
 	if dir, err := update.Location(); err == nil {
 		update.Cleanup(dir, update.Programs)
 	}
-	os.Exit(localproxy.Main("agent-proxy", os.Args[1:]))
+	os.Exit(localproxy.Main("agent-proxy", settings.CommandArgs()))
 }

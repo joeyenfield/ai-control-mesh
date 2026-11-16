@@ -12,7 +12,7 @@ from . import launcher, localproxy, settings
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    args = list(sys.argv[1:] if argv is None else argv)
+    args = list(common.command_args() if argv is None else argv)
     if args:
         if args[0] == "login":
             return login.login(args[1:], program="agent", credentials_path=settings.credentials_path, default_server=settings.upstream().server(),
@@ -84,4 +84,4 @@ def proxy_main() -> int:
     """agent-proxy on its own, for running it as a service."""
     # How it names itself to the server, in its User-Agent.
     settings.PROGRAM = "agent-proxy"
-    return localproxy.main("agent-proxy", sys.argv[1:])
+    return localproxy.main("agent-proxy", common.command_args())

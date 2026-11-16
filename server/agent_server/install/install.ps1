@@ -11,6 +11,7 @@
 #   -NoStart                    don't start agent-machine after signing it in
 #   -Python                     the Python versions (Python 3.9 or later), in their own
 #                               environment (%LOCALAPPDATA%\agent-py), copied into the prefix
+# Native Termux uses install.sh: --service starts in the background after sign-in there.
 #   -NoTray                     no tray icon (agent-tray, put in when Python 3.9 or later is here:
 #                               what runs, its start and stop, at every sign-in to Windows)
 #
@@ -182,12 +183,18 @@ try {
         } else {
             $tray = Join-Path $pyhome "venv\Scripts\agent-tray.exe"
             Invoke-Native { & $venvPython -m agent_py.tray --autostart on } | Out-Null
+            Invoke-Native { & $venvPython -m agent_py.tray --setup }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Output "Tray setup is incomplete; see the error above. Rerun the installer after resolving it."
+                $tray = $null
+            }
         }
     }
 } finally {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work
 }
 
+$signinIncomplete = $false
 foreach ($component in $components) {
     $exe = Join-Path $bin "$component.exe"
     if ($component -eq "agent") {
@@ -195,23 +202,35 @@ foreach ($component in $components) {
         Write-Output ""
         Write-Output "Signing agent in to $Server"
         & $exe login $Server
-        if ($LASTEXITCODE -ne 0) { Write-Output "Sign in later with: agent login $Server" }
+        if ($LASTEXITCODE -ne 0) {
+            $signinIncomplete = $true
+            Write-Output "Sign in later with: agent login $Server"
+        }
     } else {
         if ($NoLogin) { Write-Output "Next: agent-machine login $Server, then agent-machine start"; continue }
         Write-Output ""
         Write-Output "Using the shared agent sign-in for agent-machine on $Server (signing in only if needed)"
         & $exe login $Server
         if ($LASTEXITCODE -ne 0) {
+            $signinIncomplete = $true
             Write-Output "Sign in later with: agent-machine login $Server, then agent-machine start"
         } elseif (-not $NoStart) {
             # Started (or restarted) now, signed in; with -Service it also starts at every sign-in.
             & $exe stop | Out-Null
             & $exe start
+            if ($LASTEXITCODE -ne 0) {
+                $signinIncomplete = $true
+                Write-Output "agent-machine couldn't start; see the error above."
+            }
         }
     }
 }
 Write-Output ""
-Write-Output "Done: $Version from $Server. Open its console at $Server"
+if ($signinIncomplete) {
+    Write-Output "Installed $Version from $Server, but sign-in or startup is incomplete. See the errors above."
+} else {
+    Write-Output "Done: $Version from $Server. Open its console at $Server"
+}
 if ($tray -and (Test-Path $tray)) {
     # A windowed program: it stays when this PowerShell closes. One runs at a time; a second leaves.
     Start-Process -FilePath $tray

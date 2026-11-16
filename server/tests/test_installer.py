@@ -66,6 +66,12 @@ def fake_wheel() -> bytes:
     info = f"ai_proxy_agent_py-{VERSION}.dist-info"
     files = {
         "fake_agent_py/__init__.py": "import sys\n\ndef main():\n    print('python ' + ' '.join(sys.argv[1:]))\n",
+        "agent_py/__init__.py": "",
+        "agent_py/tray.py": (
+            "import os, sys\nfrom fake_agent_py import main\n"
+            "if '--setup' in sys.argv and os.environ.get('FAKE_TRAY_MENU') == '0':\n"
+            "    print('tray menus unavailable', file=sys.stderr)\n    sys.exit(1)\nmain()\n"
+        ),
         # The tray extra brings nothing here, so pip installs it with no index.
         f"{info}/METADATA": f"Metadata-Version: 2.1\nName: ai-proxy-agent-py\nVersion: {VERSION}\nProvides-Extra: tray\n",
         f"{info}/WHEEL": "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
@@ -208,7 +214,8 @@ def test_irm_iex_downloads_checks_and_runs_the_installer(tmp_path):
 
 
 @pytest.mark.skipif(sh_tools() is None or sys.platform == "win32", reason="needs sh, curl and tar, and a Python whose venv has bin/")
-def test_curl_pipe_sh_installs_the_python_versions_with_python_or_for_a_system_without_a_build(tmp_path):
+@pytest.mark.parametrize("tray_available", [True, False])
+def test_curl_pipe_sh_installs_the_python_versions_with_python_or_for_a_system_without_a_build(tmp_path, tray_available):
     fake_build(tmp_path / "dist")
     record = tmp_path / "ran.txt"
     with serve(app_for(tmp_path)) as server:
@@ -216,6 +223,7 @@ def test_curl_pipe_sh_installs_the_python_versions_with_python_or_for_a_system_w
             bin_dir = tmp_path / platform / "bin"
             # A display, so the tray goes in too: the fake wheel's agent-tray, which only prints.
             env = {**{key: value for key, value in os.environ.items() if key != "PYTHONPATH"}, "RECORD": str(record), "AGENT_PLATFORM": platform,
+                   "FAKE_TRAY_MENU": "1" if tray_available else "0",
                    "XDG_DATA_HOME": str(tmp_path / platform / "data"), "XDG_CONFIG_HOME": str(tmp_path / platform / "config"), "DISPLAY": ":99"}
             done = subprocess.run(
                 [sh_tools(), "-c", f"curl -fsSL {server}/install.sh | sh -s -- --no-login {options} --prefix {bin_dir}"],
@@ -232,7 +240,66 @@ def test_curl_pipe_sh_installs_the_python_versions_with_python_or_for_a_system_w
             if not options:
                 assert "installing the Python versions instead" in done.stdout
             assert "Installing the tray icon" in done.stdout and (bin_dir / "agent-tray").is_symlink()
-            assert "Its icon is in the system tray" in done.stdout
+            assert ("Its icon is in the system tray" in done.stdout) == tray_available
+            if not tray_available:
+                assert "tray menus unavailable" in done.stderr
+                assert "Tray setup is incomplete" in done.stdout
+
+
+@pytest.mark.skipif(sh_tools() is None or os.name == "nt", reason="needs POSIX shell tools")
+@pytest.mark.parametrize(("one_liner", "failure"), [(False, ""), (True, ""), (True, "login"), (True, "start")])
+def test_termux_service_request_finishes_installation_and_sign_in(tmp_path, one_liner, failure):
+    """Real installers and fake programs: no service, auth profile or fleet is touched."""
+    root = Path(__file__).resolve().parents[2]
+    installer_script = (root / "tools/dist/install/install.sh").read_bytes()
+    executable = (b'#!/bin/sh\nprintf "%s %s\\n" "${0##*/}" "$*" >> "$RECORD"\n'
+                  b'if [ "${FAIL_COMMAND:-}" = "$1" ]; then exit 1; fi\n')
+    termux = tmp_path / "termux"
+    termux_bin = termux / "bin"
+    termux_bin.mkdir(parents=True)
+    (termux_bin / "sh").symlink_to(sh_tools())
+    record = tmp_path / "calls"
+    env = {**os.environ, "PREFIX": str(termux), "TERMUX_VERSION": "test", "HOME": str(tmp_path / "home"),
+           "PATH": str(termux_bin) + os.pathsep + os.environ["PATH"], "RECORD": str(record),
+           "AGENT_PLATFORM": "linux-amd64", "AI_PROXY_SETUP_CODE": "test-setup-code",
+           "AI_PROXY_MACHINE_SETUP_CODE": "test-setup-code"}
+    env["FAIL_COMMAND"] = failure
+    env.pop("AI_PROXY_ONE_LINER", None)
+    if one_liner:
+        folder = tmp_path / "dist" / VERSION
+        folder.mkdir(parents=True)
+        sums = []
+        for component, programs in (("agent", ("agent", "agent-proxy")), ("agent-machine", ("agent-machine",))):
+            data = tar_gz("linux-amd64", {**{name: executable for name in programs}, "install.sh": installer_script})
+            name = f"linux-amd64/{component}-{VERSION}-linux-amd64.tar.gz"
+            (folder / name).parent.mkdir(exist_ok=True)
+            (folder / name).write_bytes(data)
+            sums.append(f"{hashlib.sha256(data).hexdigest()}  {name}")
+        (folder / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="utf-8")
+        with serve(app_for(tmp_path)) as server:
+            done = subprocess.run([sh_tools(), "-c", f"curl -fsSL {server}/install.sh | sh -s -- --service"],
+                                  env=env, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        assert done.returncode == 0, done.stdout + done.stderr
+        expected = [f"agent login {server}", f"agent-machine login {server}"]
+        if failure != "login":
+            expected.append("agent-machine start")
+        assert record.read_text().splitlines() == expected
+        assert ("Done:" in done.stdout) == (not failure)
+        assert ("sign-in or startup is incomplete" in done.stdout) == bool(failure)
+    else:
+        archive = tmp_path / "archive"
+        archive.mkdir()
+        (archive / "install.sh").write_bytes(installer_script)
+        for name in ("agent", "agent-proxy", "agent-machine"):
+            (archive / name).write_bytes(executable)
+        done = subprocess.run([sh_tools(), str(archive / "install.sh"), "--service"],
+                              env=env, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert not record.exists()
+        assert "Next: agent-machine login" in done.stdout
+    assert "Termux has no systemd" in done.stdout
+    assert "isn't on your PATH" not in done.stdout
+    assert all((termux_bin / name).is_file() for name in ("agent", "agent-proxy", "agent-machine"))
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows PowerShell")

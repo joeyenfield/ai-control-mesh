@@ -6,6 +6,7 @@
 #   ... install.ps1 -Service      also start agent-machine when you sign in to Windows (a scheduled task)
 #   ... install.ps1 -Uninstall    remove them again, the task and the PATH entry (settings stay;
 #                                 uninstall.ps1 beside it does it, and takes -Purge)
+# Native Termux uses install.sh, which skips systemd service setup and completes installation.
 param([string]$Prefix = "", [switch]$Service, [switch]$Uninstall)
 $ErrorActionPreference = "Stop"
 

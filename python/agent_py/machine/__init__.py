@@ -74,7 +74,7 @@ STARTED_ENV = "AI_PROXY_MACHINE_STARTED"
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    args = list(sys.argv[1:] if argv is None else argv)
+    args = list(common.command_args() if argv is None else argv)
     if args[:2] == ["status", "--json"]:
         print(json.dumps(status_json(settings.Machine.load())))
         return 0

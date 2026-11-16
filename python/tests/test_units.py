@@ -28,6 +28,42 @@ from agent_py.machine import settings as machine_settings
 Seen = List[Tuple[str, str, Dict[str, str], bytes]]
 
 
+@pytest.mark.parametrize(("platform", "arguments", "expected"), [
+    ("android", ["/tmp/agent-machine", "login", "https://mesh.example"], ["login", "https://mesh.example"]),
+    ("android", ["/tmp/agent-machine", "start"], ["start"]),
+    ("android", ["/tmp/agent-machine"], []),
+    ("android", ["login"], ["login"]),
+    ("android", ["/tmp/other", "login"], ["/tmp/other", "login"]),
+    ("linux", ["/tmp/agent-machine", "login"], ["/tmp/agent-machine", "login"]),
+])
+def test_command_arguments_handle_termuxs_duplicate_executable(tmp_path, monkeypatch, platform, arguments, expected):
+    monkeypatch.setattr(sys, "platform", platform)
+    monkeypatch.delattr(sys, "getandroidapilevel", raising=False)
+    arguments = [value.replace("/tmp", str(tmp_path)) for value in arguments]
+    expected = [value.replace("/tmp", str(tmp_path)) for value in expected]
+    monkeypatch.setattr(sys, "argv", [str(tmp_path / "agent-machine"), *arguments])
+    assert common.command_args() == expected
+
+
+@pytest.mark.parametrize("program", [client_main, machine_main])
+def test_termux_duplicate_is_removed_before_login_dispatch(tmp_path, monkeypatch, program):
+    monkeypatch.setattr(sys, "platform", "android")
+    executable = str(tmp_path / "agent")
+    monkeypatch.setattr(sys, "argv", [executable, executable, "login", "https://mesh.example"])
+    seen = []
+    monkeypatch.setattr(login, "login", lambda args, **kwargs: seen.append(args) or 0)
+    assert program.main() == 0
+    assert seen == [["https://mesh.example"]]
+
+
+def test_termux_command_arguments_resolve_a_program_on_path(tmp_path, monkeypatch):
+    executable = str(tmp_path / "agent-machine")
+    monkeypatch.setattr(sys, "platform", "android")
+    monkeypatch.setattr(sys, "argv", ["agent-machine", executable, "start"])
+    monkeypatch.setattr(common.shutil, "which", lambda name: executable)
+    assert common.command_args() == ["start"]
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX signal inheritance")
 def test_plain_agents_keep_ctrl_c_and_restore_the_launchers_handler(tmp_path):
     previous = signal.getsignal(signal.SIGINT)

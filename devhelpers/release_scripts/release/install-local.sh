@@ -192,7 +192,12 @@ if [ "$os" = darwin ] && [ "$arch" = amd64 ] && [ "$(sysctl -n hw.optional.arm64
 platform=${AGENT_PLATFORM:-$os-$arch}
 
 python=""
-for candidate in python3 python3.13 python3.12 python3.11 python; do
+candidates="python3 python3.13 python3.12 python3.11 python"
+# Ubuntu's GI bindings match its system Python, even if another Python is on PATH.
+if [ $tray -eq 1 ] && [ -f /etc/debian_version ] && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+    candidates="/usr/bin/python3 $candidates"
+fi
+for candidate in $candidates; do
     if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
         python=$(command -v "$candidate")
         break
@@ -339,6 +344,10 @@ fi
 if [ $tray -eq 1 ]; then
     ln -sf "$venv/bin/agent-tray" "$prefix/agent-tray"
     "$venv/bin/agent-tray" --autostart on >/dev/null 2>&1 || true
+    if ! "$venv/bin/python" -m agent_py.tray --setup; then
+        say "Tray setup is incomplete; see the error above. Rerun the installer after resolving it."
+        tray=0
+    fi
 fi
 
 # Sign-ins show a code to approve in the browser and wait: from the terminal, as this script's

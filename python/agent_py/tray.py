@@ -19,6 +19,9 @@ starts it at sign-in (the Run key on Windows, a LaunchAgent on macOS, XDG autost
 from __future__ import annotations
 
 import argparse
+import importlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 import plistlib
@@ -405,13 +408,42 @@ def desktop_available(environ: Optional[Dict[str, str]] = None, platform: Option
     return bool(environ.get("DISPLAY") or environ.get("WAYLAND_DISPLAY"))
 
 
+def desktop_backend() -> Any:
+    """Load a tray with menus, including Ubuntu's GTK bindings outside the installer's venv."""
+    if sys.platform.startswith("linux") and importlib.util.find_spec("gi") is None:
+        # Debian/Ubuntu ship GI as a system package, not a pip dependency. Import just
+        # that package rather than exposing every system package to this environment.
+        spec = importlib.machinery.PathFinder.find_spec("gi", ["/usr/lib/python3/dist-packages"])
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["gi"] = module
+            try:
+                spec.loader.exec_module(module)
+            except Exception:
+                sys.modules.pop("gi", None)
+                raise RuntimeError(
+                    "Ubuntu's python3-gi must match the tray's Python version. "
+                    "Install the tray using /usr/bin/python3."
+                ) from None
+    import PIL  # noqa: F401
+
+    pystray = importlib.import_module("pystray")
+    if not pystray.Icon.HAS_MENU:
+        raise RuntimeError(
+            "The selected tray backend cannot show menus. On Ubuntu install: "
+            "sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1; "
+            "Use Ubuntu's /usr/bin/python3 for the tray, enable the AppIndicator shell extension, "
+            "and unset PYSTRAY_BACKEND if it forces xorg."
+        )
+    return pystray
+
+
 def available() -> bool:
-    """A desktop, and pystray able to draw in it (on Linux, its backend loads only with a display)."""
+    """A desktop and a backend with menus; the shell must also provide a tray."""
     if not desktop_available():
         return False
     try:
-        import PIL  # noqa: F401
-        import pystray  # noqa: F401
+        desktop_backend()
     except Exception:  # pystray raises more than ImportError when no backend fits
         return False
     return True
@@ -439,25 +471,28 @@ def lock() -> Optional[Any]:
 
 
 def image(status: str) -> Any:
-    """The icon: three joined nodes, green when everything runs, amber when some does, grey when none."""
+    """The site's mesh mark, with a separate status badge, legible at tray sizes."""
     from PIL import Image, ImageDraw
 
     color = COLORS.get(status, COLORS["stopped"])
-    picture = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    # Draw large and downsample so the small tray icon has smooth edges.
+    picture = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
     draw = ImageDraw.Draw(picture)
-    nodes = [(14, 48), (50, 48), (32, 14)]
-    for start, end in ((0, 1), (1, 2), (2, 0)):
-        draw.line([nodes[start], nodes[end]], fill=color, width=6)
-    for x, y in nodes:
-        draw.ellipse([x - 11, y - 11, x + 11, y + 11], fill=color)
-    return picture
+    draw.rounded_rectangle((8, 8, 240, 240), radius=64, fill="#4f46e5")
+    points = [(64, 88), (112, 88), (144, 168), (192, 168)]
+    draw.line(points, fill="white", width=24, joint="curve")
+    for x, y in points:
+        draw.ellipse((x - 12, y - 12, x + 12, y + 12), fill="white")
+    draw.ellipse((164, 164, 252, 252), fill="#18181b")
+    draw.ellipse((176, 176, 240, 240), fill=color)
+    return picture.resize((64, 64), Image.Resampling.LANCZOS)
 
 
 class Tray:
     """The icon, its menu, and the poll that keeps them current."""
 
     def __init__(self) -> None:
-        import pystray
+        pystray = desktop_backend()
 
         self.pystray = pystray
         self.shot = Snapshot()
@@ -527,12 +562,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="agent-tray", description=(
         "An icon in the system tray: whether the local server, this machine and agent-proxy run, "
         "with their start and stop, and the console to open."))
-    parser.add_argument("--check", action="store_true", help="Exit 0 when an icon can be shown here, 1 when not")
+    parser.add_argument("--check", action="store_true", help="Exit 0 when a tray with menus can be loaded here, 1 when not")
+    parser.add_argument("--setup", action="store_true", help="Install Ubuntu/Debian tray libraries, enable GNOME tray support and check readiness")
     parser.add_argument("--status", action="store_true", help="Print what the icon would show, as JSON, and stop")
     parser.add_argument("--autostart", choices=["on", "off"], help="Start it when you sign in to this computer, or not")
     args = parser.parse_args(argv)
-    if args.check:
-        return 0 if available() else 1
+    if args.check or args.setup:
+        if not desktop_available():
+            print("agent-tray: there's no desktop here to show an icon in.", file=sys.stderr)
+            return 1
+        try:
+            if args.setup:
+                from .tray_setup import prepare
+
+                prepare()
+            desktop_backend()
+        except Exception as error:
+            print(f"agent-tray: {error}", file=sys.stderr)
+            return 1
+        return 0
     if args.status:
         shot = snapshot()
         print(json.dumps({**asdict(shot), "state": state(shot)}))
@@ -545,10 +593,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("agent-tray: there's no desktop here to show an icon in.", file=sys.stderr)
         return 1
     try:
-        import PIL  # noqa: F401
-        import pystray  # noqa: F401
+        desktop_backend()
     except Exception as error:
-        print(f"agent-tray needs pystray and Pillow (pip install 'ai-proxy-agent-py[tray]'): {error}", file=sys.stderr)
+        print(f"agent-tray: {error}. Install its Python dependencies with pip install 'ai-proxy-agent-py[tray]'.", file=sys.stderr)
         return 1
     held = lock()
     if held is None:

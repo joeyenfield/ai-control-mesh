@@ -34,6 +34,19 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$(id -u)" -eq 0 ]; then root=1; else root=0; fi
+# Native Termux has no systemd. Leave sign-in/start to the one-line installer;
+# archive installs print the normal next steps. A PRoot guest uses its own shell.
+if [ -n "${PREFIX:-}" ] && [ "$(command -v sh)" = "$PREFIX/bin/sh" ]; then
+    case "${TERMUX_VERSION:-}:$PREFIX" in
+        ?*:*|*:*/com.termux/files/usr)
+            [ -n "$prefix" ] || prefix="$PREFIX/bin"
+            if [ $service -eq 1 ]; then
+                echo "Termux has no systemd; skipping --service. Use agent-machine start after sign-in."
+                service=0
+            fi
+            ;;
+    esac
+fi
 if [ -z "$prefix" ]; then
     if [ $root -eq 1 ]; then prefix=/usr/local/bin; else prefix="$HOME/.local/bin"; fi
 fi
