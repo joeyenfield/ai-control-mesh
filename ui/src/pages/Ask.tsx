@@ -50,6 +50,7 @@ export function AskPage() {
   const [session, setSession] = useState<{ backend: string; model: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const stop = useRef<AbortController | null>(null);
+  const generation = useRef(0);
   const pane = useRef<HTMLDivElement>(null);
   const opened = useRef<string | null>(null);
   opened.current = sessionId;
@@ -63,7 +64,9 @@ export function AskPage() {
     window.addEventListener("pagehide", end);
     return () => {
       window.removeEventListener("pagehide", end);
+      generation.current++;
       stop.current?.abort();
+      stop.current = null;
       end();
     };
   }, []);
@@ -73,8 +76,12 @@ export function AskPage() {
   }, [messages]);
 
   const reset = () => {
+    generation.current++;
     stop.current?.abort();
+    stop.current = null;
+    setBusy(false);
     if (sessionId) api.endSession(sessionId).catch(() => undefined);
+    opened.current = null;
     setSessionId(null);
     setSession(null);
     setMessages([]);
@@ -91,7 +98,9 @@ export function AskPage() {
   const send = async (event?: FormEvent) => {
     event?.preventDefault();
     const text = draft.trim();
-    if (!text || busy || !choice) return;
+    if (!text || busy || stop.current || !choice) return;
+    const turn = ++generation.current;
+    const currentTurn = () => generation.current === turn;
     // Latch a fallback choice on first use, so a models poll reordering backends
     // mid-conversation doesn't silently rotate the session to another model.
     if (!picked) setPicked(choice);
@@ -105,6 +114,7 @@ export function AskPage() {
     let requestId: string | null = null;
     const append = (piece: { content?: string; reasoning?: string }) =>
       setMessages((current) => {
+        if (!currentTurn() || !current.length) return current;
         const last = current[current.length - 1];
         const next = { ...last, content: last.content + (piece.content ?? ""), reasoning: (last.reasoning ?? "") + (piece.reasoning ?? "") };
         return [...current.slice(0, -1), next];
@@ -114,6 +124,13 @@ export function AskPage() {
         if (id) api.endSession(id).catch(() => undefined);
         const created = await api.createSession({ client: CLIENT, model: choice.model, backend: choice.backend, trace: true });
         id = created.session_id;
+        // Creation cannot be aborted: close a session that arrived after leaving or resetting.
+        if (!currentTurn() || controller.signal.aborted) {
+          api.endSession(id).catch(() => undefined);
+          if (currentTurn()) setMessages((current) => currentTurn() ? current.slice(0, -1) : current);
+          return;
+        }
+        opened.current = id;
         setSessionId(id);
         setSession(choice);
         client.invalidateQueries({ queryKey: ["sessions"] });
@@ -133,6 +150,7 @@ export function AskPage() {
           requestId,
           (soFar) =>
             setMessages((current) => {
+              if (!currentTurn() || !current.length) return current;
               const last = current[current.length - 1];
               // The server keeps the last 24,000 characters: a longer reply keeps what arrived here.
               if (soFar.content.length < last.content.length) return current;
@@ -143,16 +161,20 @@ export function AskPage() {
         ).catch(() => Promise.reject(error));
       }
     } catch (error) {
+      if (!currentTurn()) return;
       const stopped = controller.signal.aborted;
       setMessages((current) => {
+        if (!currentTurn() || !current.length) return current;
         const last = current[current.length - 1];
         if (stopped) return last.content ? current : current.slice(0, -1);
         return [...current.slice(0, -1), { ...last, failed: error instanceof Error ? error.message : String(error) }];
       });
       if (!stopped) notify(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusy(false);
-      stop.current = null;
+      if (currentTurn()) {
+        setBusy(false);
+        stop.current = null;
+      }
     }
   };
 

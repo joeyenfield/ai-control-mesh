@@ -260,19 +260,25 @@ export function SessionReview({ session }: { session: Session }) {
       <section className="review-part" id="review-ai">
         <h2>AI review</h2>
         <p className="subtle">
-          A model reads what was measured and suggests what to change. Choose what it should look at: each review has its own
-          question and is sent only the data it needs, never the whole transcript. It runs as a private session of your own.
+          Get suggestions for improving future sessions. A model reads selected measurements and findings, then explains
+          what to change and why. Choose one review focus below; selecting it does not start a model call.
         </p>
-        <div className="chip-bar" role="group" aria-label="What to review">
+        <fieldset className="review-focus" disabled={busy}>
+          <legend>1. Choose a review focus</legend>
+          <p className="subtle">Compare the descriptions and choose the question you want answered.</p>
+          <div className="review-focus-list">
           {prompts.map((item) => (
-            <button key={item.id} type="button" aria-pressed={item.id === prompt?.id} disabled={busy} onClick={() => setFocus(item.id)}>
-              {item.title}
-            </button>
+            <label key={item.id} className={`review-focus-option${item.id === prompt?.id ? " selected" : ""}`}>
+              <input type="radio" name={`review-focus-${id}`} checked={item.id === prompt?.id} onChange={() => setFocus(item.id)} />
+              <span><strong>{item.title}</strong><span>{item.about}</span></span>
+            </label>
           ))}
-        </div>
+          </div>
+          {!prompts.length && <p className="empty">No review prompts are available. Ask a site admin to configure Review prompts in Server settings.</p>}
+        </fieldset>
         {prompt && (
           <details className="review-prompt">
-            <summary>{prompt.about}</summary>
+            <summary>What gets sent for “{prompt.title}”?</summary>
             <dl>
               <dt>Data sent</dt>
               <dd>{prompt.data.join(" · ")}</dd>
@@ -286,7 +292,10 @@ export function SessionReview({ session }: { session: Session }) {
           </details>
         )}
         {choices.length ? (
-          <div className="filters review-bar">
+          <div className="review-setup">
+            <h3>2. Choose a model and start</h3>
+            <p className="subtle">The selected model receives only the data listed above, never the whole transcript. The review runs as a private session of your own and counts as a model call.</p>
+            <div className="review-setup-fields">
             <label className="ask-model">
               <span>Review with</span>
               <select
@@ -310,17 +319,23 @@ export function SessionReview({ session }: { session: Session }) {
             </label>
             <label className="review-question">
               <span>Anything else to ask (optional)</span>
-              <input value={question} maxLength={500} disabled={busy} onChange={(event) => setQuestion(event.target.value)} placeholder="Would a smaller model have done?" />
+              <textarea rows={3} value={question} maxLength={500} disabled={busy} onChange={(event) => setQuestion(event.target.value)} placeholder="For example: Would a smaller model have done?" />
+              <span>Add a specific question to the selected review. Up to 500 characters.</span>
             </label>
+            </div>
+            <div className="review-start">
+            <p className="subtle">{prompt ? <>Ready to review: <strong>{prompt.title}</strong></> : "Choose a review focus to continue."}</p>
             {busy ? (
               <button type="button" onClick={() => stopReviewRun(id)}>
                 Stop
               </button>
             ) : (
-              <button type="button" className="primary" onClick={start}>
+              <button type="button" className="primary" onClick={start} disabled={!prompt}>
                 {reviews.length || phase ? "Review again" : "Review this session"}
               </button>
             )}
+            </div>
+            <p className="review-note subtle">You can leave this tab while it runs. Closing or reloading the console stops it. Saved answers appear under Earlier reviews.</p>
           </div>
         ) : (
           <p className="subtle">
