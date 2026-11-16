@@ -8,7 +8,7 @@ Use Python 3.11 or later. Image builds need Podman and a running Podman machine 
 | --- | --- | --- |
 | `website` | The brochure nginx image, `ai-control-mesh-site` | Independent of the application console and services |
 | `services` | `agent-server`, including agent-auth and the built-in React console | Select `sandbox`, `allinone` or `gpu` explicitly with `--image` |
-| `installers` | Server bundle, all 15 platforms' agent archives, Python wheel, installers and checksums | Repeat `--target` for a smaller build; no container images or Android build |
+| `installers` | Server bundle, all 16 platforms' agent archives, Python wheel, installers and checksums | Repeat `--target` for a smaller build; no container images or Android app build |
 
 ## Make a snapshot
 

@@ -179,6 +179,8 @@ An installer downloads each file and refuses it unless its SHA-256 matches the o
 6. On a desktop it installs the wheel's `tray` extra into the same `venv`, links `agent-tray`, turns on its start at sign-in, and starts it detached at the end. A failure here never fails the install.
 7. It signs `agent` and `agent-machine` in with the device flow, reading from the terminal (`/dev/tty` on Unix, since the script's own input is the download), and starts the machine. Without a terminal it prints the commands instead.
 
+The Termux branch runs the guest installer with `--no-login`, then runs the bundled `termux_quickstart.py`. It uses the existing local admin password with the issuer's normal device flow to save shared credentials, enables the PRoot-compatible machine functions on first setup, disables containers, adds `/root/projects` and starts the machine. Reinstalling keeps existing machine choices apart from the unsupported containers toggle. The console still requires the admin's browser sign-in.
+
 The options are listed in [Install from the web](local.md#install-from-the-web). The checkout installers, `devhelpers/scripts/install-local.sh` and `.ps1`, are much simpler: `pip install -e server`, the console built with npm when npm is there, `agent` and `agent-machine` built with Go when Go is there (else the Python ones), then `agent-server local start`.
 
 ## Upgrades

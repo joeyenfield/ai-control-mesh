@@ -98,6 +98,10 @@ def fake_build(dist: Path, broken: str | None = None) -> None:
         f"python/{WHEEL}": fake_wheel(),
         f"linux-amd64/agent-{VERSION}-linux-amd64.tar.gz": tar_gz("linux-amd64", {"agent": b"#!/bin/sh\n", "agent-proxy": b"#!/bin/sh\n", "install.sh": RECORD_SH.encode()}),
         f"linux-amd64/agent-machine-{VERSION}-linux-amd64.tar.gz": tar_gz("linux-amd64", {"agent-machine": b"#!/bin/sh\n", "install.sh": RECORD_SH.encode()}),
+        f"linux-arm64/agent-{VERSION}-linux-arm64.tar.gz": tar_gz("linux-arm64", {"agent": b"#!/bin/sh\n", "agent-proxy": b"#!/bin/sh\n", "install.sh": RECORD_SH.encode()}),
+        f"linux-arm64/agent-machine-{VERSION}-linux-arm64.tar.gz": tar_gz("linux-arm64", {"agent-machine": b"#!/bin/sh\n", "install.sh": RECORD_SH.encode()}),
+        f"android-arm64/agent-{VERSION}-android-arm64.tar.gz": tar_gz("android-arm64", {"agent": b"#!/bin/sh\n", "agent-proxy": b"#!/bin/sh\n", "install.sh": RECORD_SH.encode()}),
+        f"android-arm64/agent-machine-{VERSION}-android-arm64.tar.gz": tar_gz("android-arm64", {"agent-machine": b"#!/bin/sh\n", "install.sh": RECORD_SH.encode()}),
         f"windows-amd64/agent-{VERSION}-windows-amd64.zip": zip_bytes("windows-amd64", {"agent.exe": b"x", "install.ps1": RECORD_PS1.encode()}),
         f"windows-amd64/agent-machine-{VERSION}-windows-amd64.zip": zip_bytes("windows-amd64", {"agent-machine.exe": b"x", "install.ps1": RECORD_PS1.encode()}),
     }
@@ -195,6 +199,41 @@ def test_curl_pipe_sh_downloads_checks_and_runs_the_installer(tmp_path):
         refused = subprocess.run([sh_tools(), "-c", f"curl -fsSL {server}/install.sh | sh -s -- --no-login --no-tray"],
                                  env=env, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
         assert refused.returncode != 0 and "SHA-256" in refused.stderr and not record.exists()
+
+
+@pytest.mark.skipif(sh_tools() is None or os.name == "nt", reason="needs a POSIX shell")
+def test_termux_selects_android_build_and_guest_does_not(tmp_path):
+    fake_build(tmp_path / "dist")
+    prefix = tmp_path / "com.termux" / "files" / "usr"
+    bin_dir = prefix / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "sh").symlink_to(sh_tools())
+    uname = bin_dir / "uname"
+    uname.write_text("#!/bin/sh\ncase \"$1\" in -s) echo Linux ;; -m) echo aarch64 ;; esac\n")
+    uname.chmod(0o755)
+    record = tmp_path / "ran.txt"
+    with serve(app_for(tmp_path)) as server:
+        env = {**os.environ, "PREFIX": str(prefix), "TERMUX_VERSION": "test", "PATH": f"{bin_dir}:{os.environ['PATH']}", "RECORD": str(record)}
+        env.pop("AGENT_PLATFORM", None)
+        done = subprocess.run(
+            [sh_tools(), "-c", f"curl -fsSL {server}/install.sh | sh -s -- --no-login --no-tray --prefix '{tmp_path / 'installed'}'"],
+            env=env, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL,
+        )
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert "for android-arm64" in done.stdout
+        assert "agent-machine" in record.read_text()
+        guest_bin = tmp_path / "guest-bin"
+        guest_bin.mkdir()
+        guest_uname = guest_bin / "uname"
+        guest_uname.write_bytes(uname.read_bytes())
+        guest_uname.chmod(0o755)
+        guest = {**env, "PATH": f"{guest_bin}:{os.environ['PATH']}"}
+        done = subprocess.run(
+            [sh_tools(), "-c", f"curl -fsSL {server}/install.sh | sh -s -- --no-login --no-tray --prefix '{tmp_path / 'guest'}'"],
+            env=guest, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL,
+        )
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert "for linux-arm64" in done.stdout
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows PowerShell")

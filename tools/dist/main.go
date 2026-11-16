@@ -52,6 +52,7 @@ import (
 var Targets = []string{
 	"windows/amd64", "windows/arm64", "windows/386",
 	"linux/amd64", "linux/arm64", "linux/arm", "linux/386", "linux/ppc64le", "linux/riscv64", "linux/s390x", "linux/loong64",
+	"android/arm64",
 	"darwin/amd64", "darwin/arm64",
 	"freebsd/amd64", "freebsd/arm64",
 }
@@ -274,8 +275,13 @@ func build(dir, folder string, programs []string, version, goos, goarch string) 
 	var names []string
 	for _, program := range programs {
 		name := program + extension
-		cmd := exec.Command("go", "build", "-trimpath", "-ldflags", "-s -w -X main.version="+version,
-			"-o", filepath.Join(folder, name), "./cmd/"+program)
+		args := []string{"build", "-buildvcs=false", "-trimpath", "-ldflags", "-s -w -X main.version=" + version}
+		// Termux needs a PIE linked for Android's /system/bin/linker64.
+		if goos == "android" {
+			args = append(args, "-buildmode=pie")
+		}
+		args = append(args, "-o", filepath.Join(folder, name), "./cmd/"+program)
+		cmd := exec.Command("go", args...)
 		cmd.Dir = dir
 		// ARMv7 covers the Raspberry Pi 2 and later and most ARM boards.
 		cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "GOARM=7", "CGO_ENABLED=0")

@@ -476,7 +476,8 @@ export function browserPlatform(): string {
   // Browsers report Intel on Apple silicon too; most Macs now are arm64.
   if (agent.includes("mac")) return "darwin-arm64";
   if (agent.includes("freebsd")) return "freebsd-amd64";
-  if (agent.includes("linux") && !agent.includes("android")) return arm ? "linux-arm64" : "linux-amd64";
+  if (agent.includes("android")) return "android-arm64";
+  if (agent.includes("linux")) return arm ? "linux-arm64" : "linux-amd64";
   return "linux-amd64";
 }
 
