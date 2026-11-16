@@ -149,3 +149,7 @@ The Docs page (`/help`) renders `docs/*.md`. A new page goes into `DOC_SECTIONS`
 - The auth gate and public pages work from `window.location`; add a route to `PublicDocs`/`PublicDownloads` only if it must work signed out.
 - A poll whose `refetchInterval` is a function returning `false` on error stops for good after one failure (a lapsed sign-in, a dropped network); use `pollEvery` instead, which only stops on 403.
 - UI text: plain sentence case, providers named through `providerLabel()`.
+
+Ask a model scopes asynchronous session creation and reply updates to a conversation generation. Reset and unmount invalidate the previous generation; a session created after cancellation is ended immediately. Old requests cannot change the new conversation or clear its busy state.
+
+AI review setup uses a fieldset of native radio choices, each showing the server-provided title and about text. A separate setup panel groups the model, optional question, selected focus and start action. Both grids stack below 700 px; prompt definitions and routing remain server-owned.

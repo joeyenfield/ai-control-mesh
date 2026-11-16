@@ -17,8 +17,10 @@ Debug builds also include a private Android Auto session monitor; see below.
   available during sign-in and when a server is offline. **Manage servers** opens the
   list to add or remove one. Switching opens **Running agents**, keeps saved sign-ins,
   and makes that server the one opened next time you start the app.
-- **Signing in** is mandatory OIDC. The app discovers the chosen API's HTTPS issuer and
-  keeps its sign-in and API callback in the WebView, on this phone only. OAuth access
+- **Signing in** is mandatory OIDC. The app discovers the chosen API's issuer and
+  keeps its sign-in and API callback in the WebView, on this phone only. Remote
+  issuers must use HTTPS; `agent-server local` on this phone may use
+  `http://localhost:20000` with `http://localhost:19999`. OAuth access
   and refresh cookies are not backed up; legacy pairing codes no longer grant access.
 - **Plain HTTP** is allowed, because agent-servers usually run on a LAN or Tailscale; the
   app says when a connection isn't encrypted. HTTPS with a certificate you installed on
@@ -26,6 +28,11 @@ Debug builds also include a private Android Auto session monitor; see below.
 - **Back** goes through the console's own history (closing its menu first), then to your
   servers. Links to other sites open in the browser. A redirect from HTTP to HTTPS on the
   same server stays in the app.
+- **If Android stops the console's WebView**, the app keeps its server switcher and shows
+  Try again. Tapping it starts a fresh WebView; it does not reload repeatedly by itself.
+- **App log.** After the app closes unexpectedly, reopen it and tap **Save app log**
+  on **Your servers**. Choose a folder such as Downloads, then share the saved text file.
+  The app keeps recent steps and crash details private until you export the log.
 - **Separate console hosting.** An initial server redirect to its HTTPS console stays
   inside the app, even on a different host. Later links to other sites still open in
   the browser. For Android Auto, save the API server's address, where sign-in cookies

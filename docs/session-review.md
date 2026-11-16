@@ -85,7 +85,7 @@ While a review runs, its box shows where it stands and how long it has taken:
 
 A review keeps running if you leave the tab: choose **Open as a session** to watch it in the chat view, or go anywhere else in the console, and come back to find it where it has got to. Closing or reloading the console stops it, because the page is what reads the reply. A review that was stopped before the model began its answer has no saved answer, and says so.
 
-Each prompt asks its own question, is sent only the parts of the session it lists, and gets the findings of the checks in its area. The line under the buttons opens to show the data sent, the checks and the whole prompt.
+Each prompt asks its own question, is sent only the parts of the session it lists, and gets the findings of the checks in its area. **1. Choose a review focus** shows each option with its description and a radio button. Selecting one does not start a call. **What gets sent** opens to show the data sent, the checks and the whole prompt. **2. Choose a model and start** groups the model selector, optional question and start button. A summary names the selected focus before you run it.
 
 | Review | It asks |
 | --- | --- |

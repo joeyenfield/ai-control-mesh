@@ -89,16 +89,12 @@ fun authIssuer(url: String): SignIn? {
     val response = get("$url/api/auth/status")
     if (response.first != 200) return null
     val issuer = response.second.optString("issuer")
-    if (!plainHttps(issuer)) return null
+    val localServer = isLocalHttpAddress(url)
+    if (!isAllowedAuthAddress(issuer, localServer)) return null
     // Older servers don't name their callbacks: only the chosen address then.
     val callbacks = response.second.optJSONArray("redirect_uris")
-    val apis = (0 until (callbacks?.length() ?: 0)).mapNotNull { callbacks?.optString(it)?.takeIf(::plainHttps) }
+    val apis = (0 until (callbacks?.length() ?: 0)).mapNotNull { callbacks?.optString(it)?.takeIf { address -> isAllowedAuthAddress(address, localServer) } }
     return SignIn(issuer, listOf(url) + apis)
-}
-
-private fun plainHttps(address: String): Boolean {
-    val parsed = try { URL(address) } catch (_: java.net.MalformedURLException) { return false }
-    return parsed.protocol == "https" && parsed.host.isNotEmpty() && parsed.userInfo == null && parsed.query == null && parsed.ref == null
 }
 
 private fun get(url: String): Pair<Int, JSONObject> {

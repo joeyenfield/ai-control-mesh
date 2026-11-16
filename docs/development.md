@@ -169,6 +169,7 @@ Pushing a tag does not start a build. Run `devhelpers/release_scripts/release.ps
 |---|---|
 | Windows | `windows-amd64`, `windows-arm64`, `windows-386` |
 | Linux | `linux-amd64`, `linux-arm64`, `linux-armv7`, `linux-386`, `linux-ppc64le`, `linux-riscv64`, `linux-s390x`, `linux-loong64` |
+| Android (Termux) | `android-arm64` |
 | macOS | `darwin-amd64`, `darwin-arm64` |
 | FreeBSD | `freebsd-amd64`, `freebsd-arm64` |
 

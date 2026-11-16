@@ -259,7 +259,7 @@ The server writes each script for the request: its address as you reached it (ch
 
 **The tray icon.** On a desktop (Windows, macOS, or Linux and BSD with a display), not as root, and with Python 3.9 or later, the installer also puts in `agent-tray`. It comes from the same wheel and environment, plus `pystray` and `Pillow` from PyPI. On Ubuntu and Debian it installs missing GTK and AppIndicator packages with apt (using sudo when needed), enables GNOME's tray extension and checks readiness. A new extension may require signing out and back in; the installer reports this. `--no-tray` skips tray setup. Only `agent-tray` is linked into the prefix, so the Go programs stay the ones you run. It starts when you sign in to the computer, and the installer starts it once when setup succeeds. The icon shows whether this machine is in the fleet and whether agent is signed in, and starts and stops them ([The tray icon](local.md#the-tray-icon)). If it can't be installed, the installer says so and everything else works the same.
 
-`AGENT_PLATFORM` overrides the detected platform (such as `linux-arm64`). The console's **Downloads** page and **Add a machine** show the commands for your server, ready to copy.
+`AGENT_PLATFORM` overrides the detected platform (such as `linux-arm64`). Native Termux selects `android-arm64`, whose programs use Android's loader. A PRoot Linux guest still selects a Linux build. The console's **Downloads** page and **Add a machine** show the commands for your server, ready to copy.
 
 ### From an archive, and as a service
 
@@ -344,7 +344,7 @@ Every archive has the same script (`uninstall.sh` or `uninstall.ps1`), which `in
 4. As root on Linux, removes what `sudo agent-machine servers service` set up: the sudoers rule, the `ollama.service` drop-in and `/etc/agent-machine/ollama.env`. Ollama's service stays.
 5. Deletes the programs, and on Windows the PATH entry and the empty folder.
 6. With `--purge`, deletes their settings, sign-ins, logs and caches: `agent-proxy` and `agent-machine` in your config folder (`~/.config`, or `%APPDATA%`) and `~/.cache/agent-proxy`. A folder named by `AI_PROXY_MACHINE_HOME` is left for you to delete. First it stops the Ollama agent-machine started itself (the one in its `servers.json`, which on Windows keeps `ollama.log` there open), with its model runners; an Ollama you started yourself, or `ollama.service`, keeps running.
-7. Says how to remove copies installed some other way: a package (`apt remove agent-proxy agent-machine` and the like), an `.msi` (Settings › Apps), the Python version (`pip uninstall ai-proxy-agent-py`), or another folder (`--prefix`).
+7. On Linux, macOS and FreeBSD, if the default prefix has no programs and all three commands come from a direct Python pip installation, removes that package with `python -m pip uninstall` (after stopping and, with `--purge`, signing out). An explicit `--prefix` only removes that prefix. For other copies, says how to remove a package (`apt remove agent-proxy agent-machine` and the like), an `.msi` (Settings › Apps), or another folder (`--prefix`).
 
 | `uninstall.sh` | `uninstall.ps1` | What it does |
 |---|---|---|

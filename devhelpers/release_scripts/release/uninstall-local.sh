@@ -47,6 +47,47 @@ while [ $# -gt 0 ]; do
 done
 
 say() { printf '%s\n' "$*"; }
+fail() { printf 'uninstall-local: %s\n' "$*" >&2; exit 1; }
+
+uninstall_termux() {
+    state="${XDG_DATA_HOME:-$HOME/.local/share}/ai-control-mesh-termux"
+    if [ ! -f "$state/home/.mesh-termux-prefix" ]; then
+        say "There's no AI Control Mesh Termux install in $state."
+        return
+    fi
+    [ $client -eq 1 ] || fail "--keep-client isn't available for the dedicated Termux guest"
+    command -v proot-distro >/dev/null 2>&1 || fail "proot-distro is needed to remove the Ubuntu guest"
+    guests=$(proot-distro list --quiet) || fail "couldn't list Ubuntu guests; its data is still in $state"
+    if printf '%s\n' "$guests" | grep -qx 'ai-control-mesh'; then
+        if [ -f "$state/home/.mesh-termux-stop.sh" ]; then
+            proot-distro login ai-control-mesh --bind "$state/home:/root" -- /bin/sh /root/.mesh-termux-stop.sh ||
+                say "The guest stop helper could not finish; checking whether the guest can be removed."
+        fi
+        # The foreground mesh-termux session notices the stopped server and exits its guest.
+        sleep 3
+        proot-distro remove ai-control-mesh || fail "close other mesh-termux shells and retry; its data is still in $state"
+    fi
+    control="$PREFIX/bin/mesh-termux"
+    if [ -L "$control" ] && [ "$(readlink "$control")" = "$state/bin/mesh-termux" ]; then rm -f "$control"; fi
+    if [ $purge -eq 1 ]; then
+        rm -rf "$state"
+        say "Removed the Termux guest and deleted its server data, issuer state and signing key."
+    else
+        rm -rf "$state/home/.local/share/ai-control-mesh/app" "$state/home/.local/share/ai-control-mesh/venv"
+        say "Removed the Termux guest. Its data stays in $state/home."
+    fi
+}
+
+# Native Termux owns the Ubuntu guest and its separately bound home. Its uninstaller must target
+# both; the ordinary Unix path below only knows the server's home inside one Linux environment.
+if [ -n "${PREFIX:-}" ] && [ "$(command -v sh)" = "$PREFIX/bin/sh" ]; then
+    case "${TERMUX_VERSION:-}:$PREFIX" in
+        ?*:*|*:*/com.termux/files/usr) uninstall_termux; exit 0 ;;
+    esac
+fi
+if [ "${container:-}" = proot-distro ] && [ -f /root/.mesh-termux-prefix ]; then
+    fail "run this uninstaller from native Termux to remove the Ubuntu guest and its bound home"
+fi
 
 # The same folder agent-server local uses (server/agent_server/local.py, instance_home).
 if [ -n "${AI_PROXY_LOCAL_HOME:-}" ]; then

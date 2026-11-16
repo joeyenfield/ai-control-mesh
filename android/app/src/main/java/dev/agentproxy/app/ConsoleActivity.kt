@@ -10,9 +10,11 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -29,7 +31,7 @@ import android.widget.TextView
  * kept in the WebView's cookies. Links to other sites open in the browser.
  */
 class ConsoleActivity : Activity() {
-    private lateinit var web: WebView
+    private var web: WebView? = null
     private lateinit var base: Uri
     private var openingConsole = true
     private var issuer: String? = null
@@ -46,11 +48,13 @@ class ConsoleActivity : Activity() {
         setContentView(R.layout.activity_console)
         findViewById<View>(android.R.id.content).padForSystemBars()
         url = intent.getStringExtra(EXTRA_URL) ?: return finish()
+        CrashLog.note(this, "Console opened (localhost=${isLocalHttpAddress(url)})")
         base = Uri.parse(savedInstanceState?.getString("console_base") ?: url)
         issuer = savedInstanceState?.getString("oidc_issuer")
         apis = savedInstanceState?.getStringArrayList("oidc_apis") ?: listOf(url)
         openingConsole = savedInstanceState == null
-        web = findViewById(R.id.web)
+        val webView = findViewById<WebView>(R.id.web)
+        web = webView
         val progress = findViewById<ProgressBar>(R.id.progress)
         offline = findViewById(R.id.offline)
         val serverName = intent.getStringExtra(EXTRA_NAME) ?: Uri.parse(url).host ?: url
@@ -68,7 +72,7 @@ class ConsoleActivity : Activity() {
         // Debug builds can be inspected from chrome://inspect on the computer.
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
         CookieManager.getInstance().setAcceptCookie(true)
-        web.settings.apply {
+        webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             // The console's own text sizes; the terminal has its own A-/A+.
@@ -77,19 +81,19 @@ class ConsoleActivity : Activity() {
         }
         // A WebView doesn't download: hand files (the app's own APK on Downloads) to the system,
         // which saves them and offers to install. Downloads need no sign-in.
-        web.setDownloadListener { downloadUrl, _, _, _, _ ->
+        webView.setDownloadListener { downloadUrl, _, _, _, _ ->
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl)))
             } catch (_: ActivityNotFoundException) {
             }
         }
-        web.webChromeClient = object : WebChromeClient() {
+        webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 progress.progress = newProgress
                 progress.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
             }
         }
-        web.webViewClient = object : WebViewClient() {
+        webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val target = request.url
                 if (request.isForMainFrame && isOidcNavigation(apis, issuer, target.toString())) return false
@@ -127,9 +131,28 @@ class ConsoleActivity : Activity() {
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
                 if (request.isForMainFrame && errorResponse.statusCode >= 500) showOffline()
             }
+
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                // Android will close the app unless this dead WebView is removed and handled.
+                Log.e("AgentProxyAndroid", "WebView renderer exited (crashed=${detail.didCrash()})")
+                try {
+                    CrashLog.record(this@ConsoleActivity, "WebView renderer exited (crashed=${detail.didCrash()})")
+                } catch (_: Exception) {
+                    // The offline panel must still appear when storage is unavailable.
+                }
+                (view.parent as? ViewGroup)?.removeView(view)
+                if (web === view) web = null
+                view.destroy()
+                openingConsole = false
+                failed = true
+                progress.visibility = View.GONE
+                findViewById<TextView>(R.id.offline_title).text = getString(R.string.renderer_stopped)
+                offline.visibility = View.VISIBLE
+                return true
+            }
         }
         if (savedInstanceState != null) {
-            web.restoreState(savedInstanceState)
+            webView.restoreState(savedInstanceState)
         } else {
             openConsole(url)
         }
@@ -140,31 +163,33 @@ class ConsoleActivity : Activity() {
         outState.putString("console_base", base.toString())
         outState.putString("oidc_issuer", issuer)
         outState.putStringArrayList("oidc_apis", ArrayList(apis))
-        web.saveState(outState)
+        web?.saveState(outState)
     }
 
     @Deprecated("Back goes through the console's history first")
     override fun onBackPressed() {
-        if (web.canGoBack()) web.goBack() else showServers()
+        val current = web
+        if (current?.canGoBack() == true) current.goBack() else showServers()
     }
 
     override fun onPause() {
         CookieManager.getInstance().flush()
-        if (::web.isInitialized) web.onPause()
+        web?.onPause()
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
-        if (::web.isInitialized) web.onResume()
+        web?.onResume()
     }
 
     override fun onDestroy() {
         network?.let { getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(it) }
         network = null
-        if (::web.isInitialized) {
-            (web.parent as? ViewGroup)?.removeView(web)
-            web.destroy()
+        web?.let { current ->
+            (current.parent as? ViewGroup)?.removeView(current)
+            web = null
+            current.destroy()
         }
         super.onDestroy()
     }
@@ -184,11 +209,18 @@ class ConsoleActivity : Activity() {
      * user was), else open it from the start, discovering the sign-in first.
      */
     private fun retry() {
+        if (web == null) {
+            // A terminated renderer makes its WebView unusable. Recreate the activity on demand.
+            startActivity(Intent(this, ConsoleActivity::class.java).putExtras(intent))
+            finish()
+            return
+        }
         offline.visibility = View.GONE
         failed = false
         resetOfflineTitle()
-        if (issuer != null && web.url != null) {
-            web.reload()
+        val current = web
+        if (issuer != null && current?.url != null) {
+            current.reload()
         } else {
             openingConsole = true
             openConsole(url)
@@ -201,7 +233,7 @@ class ConsoleActivity : Activity() {
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 runOnUiThread {
-                    if (!isFinishing && !isDestroyed && offline.visibility == View.VISIBLE) retry()
+                    if (!isFinishing && !isDestroyed && web != null && offline.visibility == View.VISIBLE) retry()
                 }
             }
         }
@@ -216,12 +248,15 @@ class ConsoleActivity : Activity() {
     private fun openConsole(url: String) {
         Thread {
             try {
+                CrashLog.note(this, "Discovering console sign-in")
                 val discovered = authIssuer(url) ?: throw java.io.IOException(getString(R.string.signin_unavailable))
+                CrashLog.note(this, "Console sign-in discovered")
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
                         issuer = discovered.issuer
                         apis = discovered.apis
-                        web.loadUrl(url + (intent.getStringExtra(EXTRA_PATH) ?: "/terminals"))
+                        CrashLog.note(this, "Loading console WebView")
+                        web?.loadUrl(url + (intent.getStringExtra(EXTRA_PATH) ?: "/terminals"))
                     }
                 }
             } catch (error: java.io.IOException) {

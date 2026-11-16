@@ -111,6 +111,13 @@ if [ -z "$platform" ]; then
     esac
     # Apple silicon under Rosetta reports x86_64.
     if [ "$os" = darwin ] && [ "$arch" = amd64 ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = 1 ]; then arch=arm64; fi
+    # Termux needs Android's PIE binaries, not Linux's glibc-linked executables.
+    # Check the shell path too: a PRoot guest can inherit Termux's variables.
+    if [ "$os" = linux ] && [ -n "${PREFIX:-}" ] && [ "$(command -v sh)" = "$PREFIX/bin/sh" ]; then
+        case "${TERMUX_VERSION:-}:$PREFIX" in
+            ?*:*|*:*/com.termux/files/usr) os=android ;;
+        esac
+    fi
     platform=$os-$arch
 fi
 
