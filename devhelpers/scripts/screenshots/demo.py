@@ -1416,7 +1416,8 @@ def llama_server(request: dict, servers: dict, providers: FakeProviders) -> dict
         return {"llamacpp_settings": providers.llama_settings(request)}
     if op == "install_options":
         return {"llamacpp_install": {"source": "termux", "variants": [
-            {"id": "opencl", "label": "OpenCL (phone GPU)", "help": "Adreno and other phone GPUs, through the phone's own OpenCL driver. The fastest on Snapdragon phones.", "recommended": True},
+            {"id": "opencl-adreno", "label": "OpenCL (Adreno, source build)", "help": "Qualcomm vendor-driver access, tested on Samsung S24 Ultra. Builds a pinned version on this phone; the first install can take several minutes. Applies an 8K context and F16 cache. Test a model after restarting.", "recommended": True},
+            {"id": "opencl", "label": "OpenCL (ICD driver)", "help": "Requires a compatible vendor OpenCL ICD. Qualcomm phones may need the Adreno source build instead.", "recommended": False},
             {"id": "vulkan", "label": "Vulkan (phone GPU)", "help": "Through Android's Vulkan driver; often slower than OpenCL on Adreno.", "recommended": False},
             {"id": "cpu", "label": "CPU only", "recommended": False}]}}
     if op == "install":
@@ -1424,7 +1425,11 @@ def llama_server(request: dict, servers: dict, providers: FakeProviders) -> dict
 
         def finish() -> None:
             time.sleep(4)
-            llama.update(found=True, variant=request.get("variant"), source="termux")
+            adreno = request.get("variant") == "opencl-adreno"
+            llama.update(found=True, variant=request.get("variant"), source="source" if adreno else "termux", release="e358d5917837" if adreno else None)
+            if adreno:
+                providers.llama_config.update(ctx_size=8192, cache_type_k="f16", cache_type_v="f16", flash_attn="off",
+                                              cache_ram=0, parallel=1, models_max=1, threads=4, gpu_layers="all", device="GPUOpenCL")
             llama["install"] = {**llama["install"], "state": "installed", "step": None}
 
         threading.Thread(target=finish, daemon=True).start()

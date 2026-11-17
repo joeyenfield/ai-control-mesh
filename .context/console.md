@@ -8,6 +8,8 @@ Every byte the console shows comes from the server over HTTP, server-sent events
 
 ## Boundaries
 
+llama.cpp's Termux install chooser can suggest `opencl-adreno` with explicit source-build/profile help. Owned source builds report `source: source` and can be removed like GitHub builds. Installation requires saved/reverted edits and disables settings during the job; completion refreshes the form even on a fast cache hit so stale settings cannot overwrite the hardware profile. The demo provides this choice; `docs/screenshots/llamacpp-adreno.png` shows it.
+
 The standalone nginx image and server-hosted SPA send `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `nosniff`, `same-origin` referrer policy, and object/base-URL restrictions. These do not change page layout. nginx location caching must preserve the server-level security headers.
 
 - Only the server's API. No imports from other components, and no logic the server owns (backend choice, agent templates).

@@ -131,6 +131,8 @@ The release's `install-local.sh` detects native Termux by its prefix and shell p
 
 ## Rules
 
+The Jenkins verification runner's Ollama/Adreno parity stage runs Python installer units and both fleet contracts. Go's full machine suite covers the same source-install success, cache and failure behavior; the Android runtime stage separately covers native executable identity. Qualcomm device inference remains a real-device check, not an emulator claim. The source installer embeds the vendor patch/license and Python build recipe; `.gitattributes` forces LF for their hashed bytes. Python assets are modules so both pip and the Go distribution wheel writer carry them.
+
 The standalone console and brochure nginx images hide version strings and send framing, object/base-URL, sniffing and referrer protection headers. Keep nginx header inheritance intact when changing location-specific caching. Helm trusts forwarded headers from loopback by default: operators must set ingress/gateway CIDRs, or restrict `networkPolicy.publicFrom` before trusting `*`.
 
 - Keep `go.mod` at Go 1.24 and build with `GOTOOLCHAIN=local`.

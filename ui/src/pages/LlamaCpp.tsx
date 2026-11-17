@@ -349,10 +349,11 @@ function LlamaControls({ machine }: { machine: FleetMachine }) {
   // Say when an install finishes, and refresh what depends on it.
   const job = settings.data?.status?.install ?? null;
   useEffect(() => {
-    const now = job?.state ?? null;
-    if (lastState.current === "installing" && now && now !== "installing") {
+    const now = job ? `${job.at}:${job.variant}:${job.state}` : null;
+    if (lastState.current !== now && job?.state && job.state !== "installing") {
       setInstalling(false);
-      notify(now === "installed" ? `llama.cpp ${job?.release ?? ""} installed on ${machine.name}.` : `Installing llama.cpp failed: ${job?.error ?? "see the log"}`);
+      if (job.state === "installed" && settings.data) setConfig(settings.data.config);
+      if (lastState.current) notify(job.state === "installed" ? `llama.cpp ${job?.release ?? ""} installed on ${machine.name}.` : `Installing llama.cpp failed: ${job?.error ?? "see the log"}`);
       client.invalidateQueries({ queryKey: ["machines"] });
     }
     lastState.current = now;
@@ -456,6 +457,8 @@ function LlamaControls({ machine }: { machine: FleetMachine }) {
                   ? `Termux's packages (${status.variant})`
                   : status.source === "github"
                     ? `${status.release} (${status.variant}), from GitHub`
+                    : status.source === "source"
+                      ? `${status.release} · built here for Qualcomm OpenCL`
                     : "Found there"}
             </dd>
           </div>
@@ -470,7 +473,7 @@ function LlamaControls({ machine }: { machine: FleetMachine }) {
             <button type="button" className={status.found ? undefined : "primary"} disabled={!owner} onClick={() => setChoosing((open) => !open)}>
               {status.found ? (status.source === "found" ? "Install llama.cpp's own build" : "Update or change build") : "Install llama.cpp"}
             </button>
-            {status.source === "github" && (
+            {(status.source === "github" || status.source === "source") && (
               <button type="button" className="danger" disabled={!owner || status.managed} onClick={() => setConfirm("uninstall")}>
                 Remove
               </button>
@@ -478,7 +481,8 @@ function LlamaControls({ machine }: { machine: FleetMachine }) {
             {!owner && <span className="subtle">Installing and starting it needs the machine's servers permission.</span>}
           </div>
         )}
-        {choosing && !inProgress && <InstallChooser machine={machine} busy={install.isPending} onInstall={(variant) => install.mutate(variant)} />}
+        {choosing && dirty && <p className="warn">Save or revert settings edits before installing a build.</p>}
+        {choosing && !inProgress && <InstallChooser machine={machine} busy={install.isPending} blocked={dirty || save.isPending} onInstall={(variant) => install.mutate(variant)} />}
         {status.running && !status.managed && (
           <div className="callout">
             <p>
@@ -507,12 +511,14 @@ function LlamaControls({ machine }: { machine: FleetMachine }) {
             { id: "log", label: "Log" },
           ]}
         />
-        <TabPanel idPrefix={tabs} id="settings" active={tab === "settings"}>
-          {config && <SettingsTab info={info} config={config} warnings={warnings} changed={changed} onChange={update} notes={GROUP_NOTES} />}
-        </TabPanel>
-        <TabPanel idPrefix={tabs} id="environment" active={tab === "environment"}>
-          {config && <EnvironmentTab info={info} config={config} dirty={dirty} onChange={update} text={LLAMA_ENV} />}
-        </TabPanel>
+        <fieldset disabled={inProgress} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+          <TabPanel idPrefix={tabs} id="settings" active={tab === "settings"}>
+            {config && <SettingsTab info={info} config={config} warnings={warnings} changed={changed} onChange={update} notes={GROUP_NOTES} />}
+          </TabPanel>
+          <TabPanel idPrefix={tabs} id="environment" active={tab === "environment"}>
+            {config && <EnvironmentTab info={info} config={config} dirty={dirty} onChange={update} text={LLAMA_ENV} />}
+          </TabPanel>
+        </fieldset>
         <TabPanel idPrefix={tabs} id="log" active={tab === "log"}>
           <LogPanel
             queryKey={["llamacpp-log", machine.id]}
@@ -543,11 +549,11 @@ function LlamaControls({ machine }: { machine: FleetMachine }) {
                 Revert
               </button>
             )}
-            <button type="button" className={canRestart ? undefined : "primary"} disabled={!owner || !dirty || save.isPending} onClick={() => save.mutate()}>
+            <button type="button" className={canRestart ? undefined : "primary"} disabled={!owner || !dirty || save.isPending || inProgress} onClick={() => save.mutate()}>
               {save.isPending && confirm !== "save-restart" ? "Saving…" : "Save"}
             </button>
             {canRestart && (
-              <button type="button" className="primary" disabled={!dirty || busy || save.isPending} onClick={() => setConfirm("save-restart")}>
+              <button type="button" className="primary" disabled={!dirty || busy || save.isPending || inProgress} onClick={() => setConfirm("save-restart")}>
                 Save and restart
               </button>
             )}
@@ -621,7 +627,7 @@ function InstallProgress({ job }: { job: LlamaInstallJob | null }) {
 }
 
 /** The builds llama.cpp has for the machine, as the machine finds them, to pick one to install. */
-function InstallChooser({ machine, busy, onInstall }: { machine: FleetMachine; busy: boolean; onInstall: (variant: string) => void }) {
+function InstallChooser({ machine, busy, blocked, onInstall }: { machine: FleetMachine; busy: boolean; blocked: boolean; onInstall: (variant: string) => void }) {
   const options = useQuery({ queryKey: ["llamacpp-install", machine.id], queryFn: () => api.llamaInstallOptions(machine.id), staleTime: 60_000 });
   const [picked, setPicked] = useState<string | null>(null);
   if (options.isPending) return <p className="subtle">Asking {machine.name} which builds fit it…</p>;
@@ -633,7 +639,7 @@ function InstallChooser({ machine, busy, onInstall }: { machine: FleetMachine; b
     <div className="panel install-chooser">
       <p className="subtle">
         {data.source === "termux"
-          ? "From Termux's own packages, with apt. The GPU builds use the phone's own drivers."
+          ? "Choose a build for this phone. Adreno builds compile verified source and apply GPU settings; other builds use Termux packages."
           : `llama.cpp ${data.release}, published by ggml-org on GitHub. agent-machine checks the download's SHA-256 and unpacks it into its own folder; nothing else on ${machine.name} changes.`}
       </p>
       <fieldset className="choice-list">
@@ -651,7 +657,7 @@ function InstallChooser({ machine, busy, onInstall }: { machine: FleetMachine; b
         ))}
       </fieldset>
       <div className="row">
-        <button type="button" className="primary" disabled={!chosen || busy} onClick={() => chosen && onInstall(chosen)}>
+        <button type="button" className="primary" disabled={!chosen || busy || blocked} onClick={() => chosen && onInstall(chosen)}>
           {busy ? "Starting…" : "Install"}
         </button>
       </div>

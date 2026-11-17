@@ -367,6 +367,14 @@ await shot("machine-files", "/machines/build-box/files?path=/home/joey/code/api&
 await shot("machine-file-image", "/machines/build-box/files?path=/home/joey/code/api&file=/home/joey/code/api/logo.png", { fullPage: true });
 await shot("machine-model-servers", "/machines/ai-desktop/providers", { fullPage: true });
 await shot("ollama-server", "/machines/ai-desktop/providers/ollama/server", { fullPage: true });
+await shot("llamacpp-adreno", "/machines/pocket/providers/llamacpp/server", {
+  element: ".status-card",
+  prepare: async (page) => {
+    await page.getByRole("button", { name: "Update or change build", exact: true }).click();
+    await page.getByText("OpenCL (Adreno, source build)", { exact: true }).waitFor();
+    await page.addStyleTag({ content: ".save-bar { position: static !important; }" });
+  },
+});
 await shot("containers", "/machines/ai-desktop/providers/containers", { fullPage: true });
 await shot("machine-mcp", "/machines/build-box/mcp", { fullPage: true });
 await shot("machine-access", "/machines/build-box/access", { fullPage: true });
