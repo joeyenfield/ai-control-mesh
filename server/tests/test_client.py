@@ -114,6 +114,10 @@ def fleet_machine(m, machine_binary: Path, tmp_path: Path, *settings: list[str],
     for args in settings:
         command(*args)
     process = subprocess.Popen([str(machine_binary), "run"], env=machine_env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    # A remote update stops this child before replacing it. Reap it immediately:
+    # on POSIX an unreaped child still answers kill(pid, 0) and looks alive to stop.
+    reaper = threading.Thread(target=process.wait, daemon=True)
+    reaper.start()
     try:
         deadline = time.monotonic() + 20
         listed: list = []
@@ -126,6 +130,7 @@ def fleet_machine(m, machine_binary: Path, tmp_path: Path, *settings: list[str],
     finally:
         process.terminate()
         process.wait(timeout=10)
+        reaper.join(timeout=10)
 
 
 def free_port() -> int:
@@ -605,7 +610,16 @@ def test_a_fleet_machine_runs_an_account_agent_with_a_managed_token_it_gets_once
     project = tmp_path / "work" / "api"
     project.mkdir(parents=True)
     settings = (["launches", "on"], ["roots", "add", str(tmp_path / "work")])
-    with machine(tmp_path, agent_binary) as m, fleet_machine(m, machine_binary, tmp_path, *settings) as fleet:
+    # Detection must be independent of whether the developer has Copilot installed.
+    # The native test binary supplies --version; the launched agent remains FAKE_AGENT.
+    provider_bin = tmp_path / "provider-bin"
+    provider_bin.mkdir()
+    shutil.copy2(agent_binary, provider_bin / ("copilot.exe" if os.name == "nt" else "copilot"))
+
+    def installed_provider(env: dict) -> None:
+        env["PATH"] = str(provider_bin) + os.pathsep + env.get("PATH", "")
+
+    with machine(tmp_path, agent_binary, prepare=installed_provider) as m, fleet_machine(m, machine_binary, tmp_path, *settings) as fleet:
         box = fleet.box
         # It reports provider sign-ins (what `agent accounts detect --json` finds there), never a token, as soon as it's looked.
         assert box["provider_clis"] is not None
@@ -614,6 +628,7 @@ def test_a_fleet_machine_runs_an_account_agent_with_a_managed_token_it_gets_once
             time.sleep(0.2)
             box = httpx.get(f"{m.server}/api/machines/{box['id']}", headers=m.headers).json()
         assert [item["provider"] for item in box["provider_clis"]["clis"]] == ["claude", "codex", "copilot"], box["provider_clis"]
+        assert next(item for item in box["provider_clis"]["clis"] if item["provider"] == "copilot")["installed"]
         detected = run_agent(m, "accounts", "detect", "--json")
         assert detected.returncode == 0, detected.stderr
         assert [item["provider"] for item in json.loads(detected.stdout.strip().splitlines()[-1])["clis"]] == ["claude", "codex", "copilot"]
@@ -919,7 +934,7 @@ def test_agent_machine_updates_itself_from_the_servers_downloads(tmp_path, agent
         (tmp_path / "dist" / "9.9.9" / "SHA256SUMS").write_text(f"{hashlib.sha256(new).hexdigest()}  {platform}/artifact/{name}\n")
         installed = tmp_path / "bin" / name
         installed.parent.mkdir()
-        installed.write_bytes(machine_binary.read_bytes())
+        shutil.copy2(machine_binary, installed)
         with machine(tmp_path, agent_binary) as m:
             env = {**m.env, "AI_PROXY_MACHINE_HOME": str(tmp_path / "machine-home")}
             done = subprocess.run([str(installed), "update", "--server", m.server], env=env, capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -1119,7 +1134,7 @@ def test_the_console_updates_a_fleet_machine_that_takes_updates(tmp_path, agent_
         (tmp_path / "dist" / "9.9.9" / "SHA256SUMS").write_text(f"{hashlib.sha256(new).hexdigest()}  {platform}/artifact/{name}\n")
         installed = tmp_path / "bin" / name
         installed.parent.mkdir()
-        installed.write_bytes(machine_binary.read_bytes())
+        shutil.copy2(machine_binary, installed)
         home = tmp_path / "machine-home"
         with machine(tmp_path, agent_binary) as m:
             # The programs report their own version (a test build says dev), not the one the server was given.
