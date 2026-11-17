@@ -10,6 +10,8 @@ The client knows the server by URL and gets agent definitions, environments and 
 
 `settings.CommandArgs()` is used by both command entry points. On Android it removes only an absolute first argument matching the executable's own path, which Termux's linker can insert before `login`, `proxy`, etc. The settings tests cover duplicated and ordinary argument lists; Python mirrors this in `common.command_args()`.
 
+`settings.Executable()` identifies the actual native binary from argv when Android's `/proc/self/exe` points to its system linker. Proxy startup/revival and update location discovery use it. `process.NativeCommand()` invokes the Android linker explicitly for our native children, bypassing the app data exec restriction that Go's raw syscall cannot handle through Termux's libc hook. The machine mirrors both helpers; Python's interpreter and libc subprocess handling already provide the equivalent behavior.
+
 - Never reads the server's settings or database, or imports server, machine or Python code. Never chooses backends or renders templates.
 - Never joins the fleet: `agent machine` points at agent-machine and exits.
 - Binds `127.0.0.1` only. No HTTP client or dialer uses an environment proxy (`Proxy: nil`).

@@ -107,7 +107,7 @@ agent-machine login https://api.example.com --code msc_... --enable launches,com
 ### Running it
 
 - `run` stays in the foreground and reconnects whenever the connection drops. It waits 2, 5, 10, then 30 seconds between tries, and starts over after a connection that lasted more than a minute. It renews its access token over the open connection, so the token's expiry doesn't drop it. `--server` must match the shared login once signed in. Use `agent login <url>` or `agent-machine login <url>` to switch both programs to another server.
-- `start` runs `agent-machine run` detached from the terminal, and waits up to 15 seconds for it to connect or fail. It prints the log's path.
+- `start` runs `agent-machine run` detached from the terminal, and waits up to 15 seconds for it to connect or fail. It prints the log's path and captures early startup errors there. A child that exits during startup makes `start` fail. On Android, the native binaries restart through the system linker using the actual agent executable path.
 - `stop` stops the running one and waits up to 10 seconds for it to go.
 
 Only one agent-machine runs per folder. `run` refuses while another is running, and `start` says it's already running. It knows by the process id in `status.json` and only counts a process of its own user: if the one it ran has gone and its id now belongs to another user's process, it isn't running, and `start` starts a new one.

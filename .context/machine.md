@@ -1,6 +1,6 @@
 # Machine (`machine/`)
 
-The executable dispatches through `settings.CommandArgs()`. On Android this removes an extra absolute self-path inserted by Termux's linker before the subcommand; other arguments stay intact. `settings/args_test.go` mirrors the client's cases, and Python uses `common.command_args()`.
+The executable dispatches through `settings.CommandArgs()`. On Android this removes an extra absolute self-path inserted by Termux's linker before the subcommand; other arguments stay intact. `settings/args_test.go` mirrors the client's cases, and Python uses `common.command_args()`. `settings.Executable()` uses argv to identify the native binary when Android's `/proc/self/exe` identifies the system linker. Startup, remote updates and update location discovery use it. `process.NativeCommand()` starts our binaries through Android's linker explicitly because Go's raw exec syscall bypasses Termux's libc hook. The client mirrors both helpers; Python uses its interpreter and libc subprocess handling instead. Background startup redirects stdout/stderr to the private machine log before spawning and reaps the child with `Wait` so a zombie cannot look like a successful startup. Python mirrors startup logging and already uses `Popen.poll()` to detect exits.
 
 `agent-machine`: the Go module `ai-control-mesh/machine`. It keeps a computer in a server's **fleet** and supplies every local LLM provider: the model servers it runs, and containers it runs for the server.
 

@@ -11,7 +11,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -361,7 +360,7 @@ func startedBy() string {
 
 // start runs `agent-machine run` detached from this terminal, and waits until it has connected or failed to.
 func start(args []string) int {
-	self, err := os.Executable()
+	self, err := settings.Executable()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "agent-machine: %v\n", err)
 		return 1
@@ -386,26 +385,39 @@ func startWith(binary string, args []string) int {
 		fmt.Printf("agent-machine is already running (process %d): %s\n", other.PID, other.State)
 		return 0
 	}
-	cmd := exec.Command(binary, append([]string{"run"}, args...)...)
+	if err := os.MkdirAll(settings.Home(), 0o700); err != nil {
+		fmt.Fprintf(os.Stderr, "agent-machine: couldn't create log directory: %v\n", err)
+		return 1
+	}
+	output, err := os.OpenFile(settings.LogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "agent-machine: couldn't open startup log: %v\n", err)
+		return 1
+	}
+	defer output.Close()
+	cmd := process.NativeCommand(binary, append([]string{"run"}, args...)...)
 	cmd.Env = append(os.Environ(), startedEnv+"=background")
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
+	cmd.Stdout, cmd.Stderr = output, output
 	process.Detach(cmd)
 	if err := cmd.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "agent-machine: couldn't start: %v\n", err)
 		return 1
 	}
 	pid := cmd.Process.Pid
-	_ = cmd.Process.Release()
+	exited := make(chan error, 1)
+	go func() { exited <- cmd.Wait() }()
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
+		select {
+		case err := <-exited:
+			fmt.Fprintf(os.Stderr, "agent-machine exited while starting (%v). Run `agent-machine run` to see why (log: %s)\n", err, settings.LogPath())
+			return 1
+		default:
+		}
 		status := settings.LoadStatus()
 		if status.PID == pid && status.State != "connecting" {
 			fmt.Printf("agent-machine started (process %d): %s\nIts log: %s\n", pid, status.State, settings.LogPath())
 			return 0
-		}
-		if !process.Alive(pid) {
-			fmt.Fprintf(os.Stderr, "agent-machine exited while starting. Run `agent-machine run` to see why (log: %s)\n", settings.LogPath())
-			return 1
 		}
 		time.Sleep(200 * time.Millisecond)
 	}

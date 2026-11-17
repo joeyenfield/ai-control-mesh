@@ -33,6 +33,8 @@ It mirrors the Go programs behaviour for behaviour, and the Go code is the refer
 
 ## What's different
 
+Background machine startup opens the private machine log before spawning and redirects the child's stdout and stderr there, preserving early interpreter/startup failures. `Popen.poll()` detects an exited child. Go's Android executable identity and linker invocation helpers are native binary details; Python already uses its interpreter path and libc subprocess execution.
+
 `common.command_args()` mirrors Go's `settings.CommandArgs()`: on Android, strip only a duplicated absolute executable path before dispatch. The agent, standalone proxy and machine entry points use it when reading `sys.argv`; explicitly supplied argument lists are preserved. `test_units.py` covers normalization and login dispatch.
 
 The tray's `desktop_backend()` requires `Icon.HAS_MENU`, so Linux cannot silently fall back to Xorg's icon without menus. In Debian/Ubuntu venvs it loads only the system `gi` package from `/usr/lib/python3/dist-packages` when absent; it does not add all system packages to `sys.path`. GI must match the interpreter. `--check` prints failures. Both installer pairs call `--setup`, which imports `tray_setup.py` to query/install missing Debian/Ubuntu packages via dpkg/apt/sudo, enable GNOME's indicator extension and verify its D-Bus watcher before loading the backend. Normal startup and `--check` never install dependencies. `tests/test_tray_setup.py` mocks every system command, including apt and desktop changes. The icon follows `site/assets/icon.svg` with a separate status dot. `tests/test_tray.py` covers backend rejection, the system GI loader and status colours as well as the menu.

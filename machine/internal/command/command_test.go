@@ -2,10 +2,36 @@ package command
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
+	"time"
 
 	"ai-control-mesh/machine/internal/settings"
 )
+
+func TestStartReportsAnExitedChildAndKeepsItsError(t *testing.T) {
+	if runtime.GOOS == "windows" || runtime.GOOS == "android" {
+		t.Skip("uses a POSIX shell helper")
+	}
+	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
+	program := filepath.Join(t.TempDir(), "fail-start")
+	if err := os.WriteFile(program, []byte("#!/bin/sh\necho startup-failed >&2\nexit 42\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	if code := startWith(program, nil); code != 1 {
+		t.Fatalf("startWith returned %d for an exited child", code)
+	}
+	if elapsed := time.Since(started); elapsed > 5*time.Second {
+		t.Fatalf("child exit was not reaped promptly: %v", elapsed)
+	}
+	log, err := os.ReadFile(settings.LogPath())
+	if err != nil || !strings.Contains(string(log), "startup-failed") {
+		t.Fatalf("startup error missing from log: %q, %v", log, err)
+	}
+}
 
 func TestSettingsCommandsChangeMachineJSON(t *testing.T) {
 	t.Setenv("AI_PROXY_MACHINE_HOME", t.TempDir())
