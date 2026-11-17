@@ -19,6 +19,38 @@ func CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd 
 	return prepareCommand(exec.CommandContext(ctx, name, args...), runtime.GOOS, runtime.GOARCH)
 }
 
+// ExecutableEnvironment updates Termux's libc executable identity after a direct
+// linker launch. Otherwise native readlink("/proc/self/exe") returns the parent's
+// saved identity, so model routers respawn agent-machine instead of themselves.
+// Call after building a custom environment, which replaces Cmd.Env wholesale.
+func ExecutableEnvironment(cmd *exec.Cmd, base []string) []string {
+	return executableEnvironment(cmd, base, runtime.GOOS)
+}
+
+func executableEnvironment(cmd *exec.Cmd, base []string, goos string) []string {
+	if goos != "android" {
+		return base
+	}
+	if base == nil {
+		base = os.Environ()
+	}
+	binary := cmd.Path
+	if (binary == "/system/bin/linker" || binary == "/system/bin/linker64") && len(cmd.Args) > 1 {
+		binary = cmd.Args[1]
+	}
+	if binary == "" {
+		return base
+	}
+	const name = "TERMUX_EXEC__PROC_SELF_EXE="
+	env := make([]string, 0, len(base)+1)
+	for _, value := range base {
+		if !strings.HasPrefix(value, name) {
+			env = append(env, value)
+		}
+	}
+	return append(env, name+binary)
+}
+
 func prepareCommand(cmd *exec.Cmd, goos, goarch string) *exec.Cmd {
 	if goos != "android" || cmd.Err != nil {
 		return cmd

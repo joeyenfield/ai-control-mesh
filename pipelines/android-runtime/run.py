@@ -29,7 +29,7 @@ CASES = (
     ("machine-process", "machine", "process", "TestCommand|TestAndroid", PROCESS_TESTS),
     ("terminal", "client", "terminal", "TestPTYStartsShellInAppStorage", ("TestPTYStartsShellInAppStorage",)),
     ("presence", "machine", "presence", "TestShellLaunchStartsNativeAgent", ("TestShellLaunchStartsNativeAgent",)),
-    ("ollama", "machine", "servers", "TestOllamaStartsNativeBinaryAndStopsIt", ("TestOllamaStartsNativeBinaryAndStopsIt",)),
+    ("ollama", "machine", "servers", "TestOllamaStartsNativeBinaryAndStopsIt|TestLlamaStartsNativeBinaryWithCorrectExecutableIdentity", ("TestOllamaStartsNativeBinaryAndStopsIt", "TestLlamaStartsNativeBinaryWithCorrectExecutableIdentity")),
 )
 
 

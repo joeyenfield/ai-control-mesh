@@ -82,7 +82,7 @@ executes the Go regressions as an Android app user. This reproduces Android's
 app-storage execution restrictions, which an ordinary Linux Go test cannot test.
 The required checks cover native commands, scripts, literal arguments, environment
 and working directory, cancellation, PTY input/output, the machine launching the
-agent for a console shell, Ollama startup/shutdown, and ARM64 loader/DNS linkage.
+agent for a console shell, Ollama and llama.cpp startup/shutdown, correct child executable identity despite a stale Termux parent override, and ARM64 loader/DNS linkage.
 
 Branch/PR verification includes **Ollama setup Python parity**. It runs the Python install tests and the same real fleet/server install contract used by the Go server suite, in a disposable container. The machine unit stage covers CPU, Android Vulkan and Turnip package selection, environment overrides, failure preservation, concurrent changes and refusing setup while Ollama runs. No test installs host packages or requires GPU hardware; real model correctness on a GPU still needs a hardware check.
 
