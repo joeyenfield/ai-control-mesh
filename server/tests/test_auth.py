@@ -370,6 +370,103 @@ def test_missing_hierarchy_targets_do_not_change_memberships(tmp_path):
         assert admin.get("/api/users").json() == before
 
 
+@pytest.mark.parametrize("password", ["sandbox-member", "SANDBOX-MEMBER", " sandbox-member "])
+def test_password_cannot_equal_the_username_on_creation_or_reset(tmp_path, password):
+    app = create_app(org_settings(tmp_path))
+    store = app.state.runtime.auth.store
+    with TestClient(app, base_url=BASE):
+        admin = signed_in(app, "dave")
+        assert admin.post("/api/users", json={"name": "sandbox-member", "password": password}).status_code == 400
+        assert store.user("sandbox-member") is None
+        # The shared store also protects command-line creation and resets.
+        with pytest.raises(ValueError, match="different from the username"):
+            store.add_user("sandbox-member", password, tenant="acme")
+        store.add_user("sandbox-member", PASSWORD, tenant="acme", teams=["acme/core"])
+        before = store.user("sandbox-member")
+        response = admin.put("/api/users/sandbox-member", json={"role": "admin", "teams": [], "password": password})
+        assert response.status_code == 400
+        assert store.user("sandbox-member") == before
+        with pytest.raises(ValueError, match="different from the username"):
+            store.set_password("sandbox-member", password)
+        assert store.verify("sandbox-member", PASSWORD)
+
+
+def test_contact_email_is_persisted_editable_and_tenant_scoped(tmp_path):
+    app = create_app(org_settings(tmp_path))
+    store = app.state.runtime.auth.store
+    store.update_user("frank", role="admin")
+    with TestClient(app, base_url=BASE):
+        admin, member, foreign = (signed_in(app, user) for user in ("dave", "alice", "frank"))
+        made = admin.post("/api/users", json={"name": "erin", "password": PASSWORD, "email": " Erin+Contact@Example.COM "})
+        assert made.status_code == 201
+        assert store.user("erin")["email"] == "erin+contact@example.com"
+        before = store.user("erin")
+        version = store.account_version("erin")
+        assert admin.put("/api/users/erin", json={"role": "admin", "teams": [], "email": "invalid"}).status_code == 400
+        assert store.user("erin") == before
+        assert member.put("/api/users/erin", json={"email": "alice@example.com"}).status_code == 403
+        assert foreign.put("/api/users/erin", json={"email": "frank@example.com"}).status_code == 404
+        assert not any(user["name"] == "erin" for user in foreign.get("/api/users").json()["users"])
+        assert admin.put("/api/users/erin", json={"email": "New@Example.com"}).status_code == 200
+        store.update_user("alice", teams=[])
+        fresh = UserStore(store.db)
+        assert fresh.user("erin")["email"] == "new@example.com"
+        assert fresh.account_version("erin") == version
+        assert not fresh.verify("new@example.com", PASSWORD)
+        assert admin.put("/api/users/erin", json={"email": ""}).status_code == 200
+        assert UserStore(store.db).user("erin")["email"] is None
+
+
+def test_email_username_supports_plus_addressing_and_the_full_email_length(tmp_path):
+    app = create_app(org_settings(tmp_path))
+    store = app.state.runtime.auth.store
+    name = "a" * 64 + "@" + "b" * 63 + "." + "c" * 62 + "." + "d" * 62
+    assert len(name) == 254
+    with TestClient(app, base_url=BASE):
+        admin = signed_in(app, "dave")
+        for username in ("First.Last+Agent@Example.com", name.upper()):
+            made = admin.post("/api/users", json={"name": username, "password": PASSWORD})
+            assert made.status_code == 201, made.text
+            normalized = username.lower()
+            assert store.user(normalized)["email"] == normalized
+            assert admin.post("/api/users", json={"name": normalized, "password": PASSWORD}).status_code == 400
+            user = signed_in(app, normalized)
+            assert user.get("/api/auth/status").json()["identity"]["user"] == normalized
+            assert admin.put(f"/api/users/{normalized}", json={"email": "contact@example.com"}).status_code == 200
+            # Long account names also occur in audit rows, usage and legal holds.
+            app.state.runtime.usage.set_limit("acme", normalized, "backend:test", "24h", 1000, normalized)
+            hold = app.state.runtime.retention.add_hold("acme", "user", normalized, "case", normalized)
+            assert hold["target"] == normalized
+            app.state.runtime.audit.record(app.state.runtime.audit.event("accounts.update", tenant="acme", actor=normalized), now=True)
+            assert admin.delete(f"/api/users/{normalized}").status_code == 200
+            assert store.user(normalized) is None
+            assert UserStore(store.db).user(normalized) is None
+
+
+@pytest.mark.parametrize("name", ["missing@", "@example.com", "a@@example.com", "a..b@example.com", "a/b@example.com", "a@-example.com", "a@exam_ple.com", "a@" + "b" * 64 + ".com", "a" * 65 + "@example.com"])
+def test_invalid_email_usernames_are_rejected_without_changing_accounts(tmp_path, name):
+    store = UserStore(org_settings(tmp_path).open_database())
+    before = store.user_list()
+    with pytest.raises(ValueError):
+        store.add_user(name, PASSWORD, tenant="acme")
+    assert store.user_list() == before
+
+
+def test_account_commands_capture_and_change_email(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AI_PROXY_NEW_PASSWORD", PASSWORD)
+    assert account_command("user", ["add", "ops+admin@example.com", "--admin"]) == 0
+    assert account_command("user", ["add", "ordinary", "--org", "acme", "--email", "Contact@Example.com"]) == 0
+    store = UserStore(Settings.load().open_database())
+    assert store.user("ops+admin@example.com")["email"] == "ops+admin@example.com"
+    assert store.user("ordinary")["email"] == "contact@example.com"
+    assert account_command("user", ["email", "ordinary", "new@example.com"]) == 0
+    assert store.user("ordinary")["email"] == "new@example.com"
+    assert account_command("user", ["list"]) == 0
+    assert "new@example.com" in capsys.readouterr().out
+    assert account_command("user", ["email", "ordinary", ""]) == 0
+    assert store.user("ordinary")["email"] is None
+
+
 def test_combined_user_edit_is_atomic_and_password_reset_revokes_access_tokens(tmp_path):
     settings = org_settings(tmp_path)
     app = create_app(settings)
@@ -527,6 +624,23 @@ def test_sessions_are_private_until_their_owner_shares_them(tmp_path):
         assert session not in ids(dave) and bobs in ids(dave)
         # Status counts only what you can see.
         assert carol.get("/api/status").json()["total_sessions"] == 1
+
+
+@pytest.mark.parametrize("user", ["bob", "frank"])
+def test_terminal_host_does_not_reveal_private_or_foreign_sessions(tmp_path, user):
+    app = create_app(org_settings(tmp_path))
+    with TestClient(app, base_url=BASE) as client:
+        alice = signed_in(app, "alice")
+        session = alice.post("/api/sessions", json={"client": "claude", "backend": "test"}).json()["session_id"]
+        # Exercise a native Bearer principal on the WebSocket plane too.
+        headers = {**HOST, "authorization": "Bearer " + access_token(app, user)}
+        answers = []
+        for session_id in (session, "does-not-exist"):
+            with client.websocket_connect(f"/api/terminals/{session_id}/host", headers=headers) as host:
+                with pytest.raises(WebSocketDisconnect) as closed:
+                    host.receive_text()
+                answers.append((closed.value.code, closed.value.reason))
+        assert answers == [(4404, "Unknown session")] * 2
 
 
 def test_shared_terminals_follow_the_session_sharing(tmp_path):

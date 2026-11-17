@@ -142,6 +142,8 @@ Account interception's outbound HTTP goes through its own client (`runtime.inter
 
 ## State
 
+API step 11 adds `user_profiles` (`name`, optional contact `email`, with no row when unset), leaving the account identity/password rows and earlier migration steps intact. `UserStore` loads profiles alongside users and `write_directory` rewrites both in one transaction, preserving unchanged emails and deleting removed users' profiles. PostgreSQL username references are widened to 254 characters, including subscription ownership, usage, audit, request logs, holds and peer-code creators; SQLite already permits these lengths. The issuer's `ISSUER_READS` includes profiles. Contact updates never change the password-based account version.
+
 - `Fleet` receives the session store from `Runtime`. Launch replies must come from the
   requested machine; before granting `launched_by`, it checks the returned session's
   owner, machine, launch id and client. Machine history is filtered by session access.
@@ -230,6 +232,8 @@ A new route belongs to a role by the module that registers it (`roles.MODULE_ROL
 **Must never** with several processes: put a machine's keys, an MCP key or a token in Redis in the clear (seal them); serve `/internal/*` on the public port or without the token (`/metrics` is the only exception); treat an internal call as authentication (launches and shells name the user, whose permissions are checked again; forwarded viewers carry their own credentials); keep a new kind of per-process state without saying how another process finds it.
 
 ## Security model
+
+Audit middleware assigns organization-targeted events to that organization only when `auth.same_tenant` permits it (including site admins); foreign paths stay in the actor's tenant, unauthenticated requests in the root. Tenant-scoped verification checks only checkpoints that change its head, so other tenants' activity and unrelated signature failures do not appear. CSV exports guard formula-like cells; stored events and JSON exports remain unchanged. `test_governance.py` covers these boundaries.
 
 What a machine is trusted with (`docs/security.md`): its self-reported address is where a direct (untunnelled) provider is reached, but `Fleet._update` only takes a loopback address from a connection that came from loopback (else the peer's address), so a machine elsewhere can't point a provider at the server's own loopback.
 

@@ -41,6 +41,8 @@ HEADER = "x-ai-proxy-token"
 SCRYPT = {"n": 2**14, "r": 8, "p": 1}
 ROLES = ("admin", "member")
 NAME = re.compile(r"[a-z0-9][a-z0-9._-]{0,39}")
+EMAIL_LOCAL = re.compile(r"[a-z0-9_+-]+(?:\.[a-z0-9_+-]+)*")
+EMAIL_DOMAIN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")
 # The organization above every other: only site admins are in it. Every other organization is a
 # tenant under it, and everything else (users, machines, providers, sessions and their recordings)
 # belongs to exactly one tenant. Nothing is shared between tenants, and the root sees none of theirs.
@@ -73,6 +75,24 @@ def valid_name(value: str, what: str) -> str:
     return value
 
 
+def checked_email(value: str) -> str:
+    """A common unquoted email address; no network lookup or claim of verification."""
+    if not isinstance(value, str):
+        raise ValueError("Email must be an email address or empty")
+    value = value.strip().lower()
+    if not value:
+        return ""
+    local, separator, domain = value.partition("@")
+    if len(value) > 254 or len(local) > 64 or not separator or not EMAIL_LOCAL.fullmatch(local) or not EMAIL_DOMAIN.fullmatch(domain):
+        raise ValueError("Use an email address such as name@example.com (up to 254 characters)")
+    return value
+
+
+def valid_username(value: str) -> str:
+    value = value.strip().lower()
+    return checked_email(value) if "@" in value else valid_name(value, "user")
+
+
 def _digest(secret: str) -> str:
     return hashlib.sha256(secret.encode()).hexdigest()
 
@@ -92,7 +112,7 @@ def _environment_version(user: str, password: str) -> str:
 
 def account_public(name: str, role: str, tenant: str, teams: list[str], created_at: Any, **extra: Any) -> dict[str, Any]:
     """One user as the directory and the API show it, whichever kind of account it is."""
-    return {"name": name, "role": role, "tenant": tenant, "orgs": [tenant], "teams": list(teams),
+    return {"name": name, "email": None, "role": role, "tenant": tenant, "orgs": [tenant], "teams": list(teams),
             "created_at": created_at, **extra}
 
 
@@ -166,6 +186,7 @@ def tenant_of(record: dict[str, Any]) -> str:
 
 def write_directory(connection: Any, users: dict[str, Any], orgs: dict[str, Any]) -> None:
     """Replace the stored users and organizations with these (UserStore's and the legacy import's)."""
+    connection.execute(schema.user_profiles.delete())
     connection.execute(schema.users.delete())
     connection.execute(schema.orgs.delete())
     orgs = {ROOT_TENANT: {"name": "Site administration", "created_at": time.time(), "teams": {}}, **orgs}
@@ -177,6 +198,8 @@ def write_directory(connection: Any, users: dict[str, Any], orgs: dict[str, Any]
             created_at=record.get("created_at"), tenant=tenant, orgs=[tenant],
             teams=[team for team in record.get("teams", []) if team_org(team) == tenant],
         ))
+        if record.get("email"):
+            connection.execute(schema.user_profiles.insert().values(name=name, email=record["email"]))
     for org, record in orgs.items():
         connection.execute(schema.orgs.insert().values(
             id=org, name=record.get("name") or org, created_at=record.get("created_at"), teams=dict(record.get("teams") or {}),
@@ -246,9 +269,10 @@ class UserStore:
             if self._data is not None and current == self._version:
                 return
             users = {}
+            emails = dict(connection.execute(select(schema.user_profiles.c.name, schema.user_profiles.c.email)).all())
             for row in connection.execute(select(schema.users)).mappings():
                 record = {"password": row["password"], "role": row["role"], "orgs": list(row["orgs"] or []),
-                          "teams": list(row["teams"] or []), "created_at": row["created_at"], "tenant": row["tenant"]}
+                          "teams": list(row["teams"] or []), "created_at": row["created_at"], "tenant": row["tenant"], "email": emails.get(row["name"])}
                 record["tenant"] = tenant_of(record)
                 record["teams"] = [team for team in record["teams"] if team_org(team) == record["tenant"]]
                 users[row["name"]] = record
@@ -431,7 +455,7 @@ class UserStore:
     def _user_public(self, name: str) -> dict[str, Any]:
         record = self._load()["users"][name]
         return account_public(name, record.get("role", "member"), record["tenant"], record.get("teams", []),
-                              record.get("created_at"))
+                              record.get("created_at"), email=record.get("email"))
 
     # Users
 
@@ -453,14 +477,15 @@ class UserStore:
 
     def add_user(
         self, name: str, password: str, role: str | None = None, teams: list[str] | None = None, orgs: list[str] | None = None,
-        tenant: str | None = None,
+        tenant: str | None = None, email: str | None = None,
     ) -> dict[str, Any]:
         """A new user in one organization (tenant), for good. The first user is an admin of the root, so someone can run the server.
 
         orgs is the older way to name it: one organization at most. Without either it's the organization of
         their teams; without teams either, only an admin can be made, in the root.
         """
-        name = valid_name(name, "user")
+        name = valid_username(name)
+        email = checked_email(email if email is not None else name if "@" in name else "")
         named = sorted({str(item) for item in orgs or []} | ({tenant} if tenant else set()))
         if not named:
             named = sorted({team_org(str(team)) for team in teams or []})
@@ -479,13 +504,13 @@ class UserStore:
             if home == ROOT_TENANT and role != "admin":
                 raise ValueError("The root organization is for site admins only; name the organization this user belongs to")
             data["users"][name] = {
-                "password": hash_password(_checked_password(password)), "role": role, "tenant": home, "orgs": [home],
-                "teams": self._teams(home, teams or [], []), "created_at": time.time(),
+                "password": hash_password(_checked_password(password, name)), "role": role, "tenant": home, "orgs": [home],
+                "teams": self._teams(home, teams or [], []), "created_at": time.time(), "email": email or None,
             }
             self._save()
             return self._user_public(name)
 
-    def update_user(self, name: str, *, role: str | None = None, teams: list[str] | None = None, orgs: list[str] | None = None, password: str | None = None) -> dict[str, Any]:
+    def update_user(self, name: str, *, role: str | None = None, teams: list[str] | None = None, orgs: list[str] | None = None, password: str | None = None, email: str | None = None) -> dict[str, Any]:
         with self._locked():
             data = self._load()
             record = data["users"].get(name)
@@ -502,10 +527,12 @@ class UserStore:
                 if record.get("role") == "admin" and role != "admin" and self._admins(tenant) == [name]:
                     raise ValueError("That's the last admin; make someone else an admin first")
             in_teams = self._teams(tenant, teams, record.get("teams", []))
-            encoded = hash_password(_checked_password(password)) if password is not None else None
+            address = checked_email(email) if email is not None else record.get("email")
+            encoded = hash_password(_checked_password(password, name)) if password is not None else None
             if role is not None:
                 record["role"] = role
             record["teams"] = in_teams
+            record["email"] = address or None
             if encoded is not None:
                 record["password"] = encoded
                 data["sessions"] = {key: value for key, value in data["sessions"].items() if value.get("user") != name}
@@ -550,9 +577,11 @@ class UserStore:
             return _digest(json.dumps([record.get("created_at"), record.get("password")]))
 
 
-def _checked_password(password: str) -> str:
+def _checked_password(password: str, name: str) -> str:
     if len(password) < 8:
         raise ValueError("Use a password of at least 8 characters")
+    if password.strip().casefold() == name.casefold():
+        raise ValueError("Use a password different from the username")
     return password
 
 

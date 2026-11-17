@@ -50,6 +50,12 @@ agent-server user list
 
 The full list of commands is on [Configuration](configuration.md#users-organizations-and-teams). They change the accounts in the server's database, which a running server and the issuer pick up straight away. If no site admin is left, the server says so when it starts; make one with `agent-server user add <name> --admin`.
 
+New passwords and password resets for directory accounts require at least eight characters and must differ from the username, ignoring case and surrounding whitespace. Existing passwords remain valid until reset; replace any account passwords that match their usernames.
+
+Usernames can also be email addresses, including plus addresses such as `sam+work@example.com`, up to 254 characters (64 before `@`). Ordinary usernames keep their 40-character limit. Names and email addresses are trimmed and stored in lowercase. Organization and team ids keep their existing naming rules.
+
+Each account can have a separate optional contact email. Set it when creating or editing a user in the console, with `--email` on `agent-server user add`, or later with `agent-server user email sam sam@example.com` (pass an empty address to clear it). An email-form username fills this field by default. Existing accounts have no email until one is added. Contact emails are unverified, are visible in the organization's directory, and do not create an alternate sign-in or send mail. Changing the contact email keeps the username and existing sign-ins.
+
 **The first admin.** Authentication is always required. On the first start against a new database, if there is no environment account, the API creates `admin`, a site admin, with a random password, including on loopback. It prints the password and saves it in the file `first-user-password` (in `certs/` normally). Reset it with `agent-server user passwd admin`, then delete that file. Removing every user does not disable authentication.
 
 **An account from the environment.** Set `AI_PROXY_USERNAME` and `AI_PROXY_PASSWORD` on the server and on `agent-auth` (each reads its own environment) and that account is a site admin, without an account in the database. Use it for servers set up by script. Site admins see it in the console's user directory, marked **from the environment**, and it can own API credentials; the console can't edit or delete it. It can't change its password through the console.

@@ -62,6 +62,24 @@ def launch_in_thread(client, body, headers=None):
     return thread, answer
 
 
+def test_provider_accounts_keep_email_usernames_for_owners_and_grantees(tmp_path):
+    app = create_app(account_settings(tmp_path))
+    store = app.state.runtime.auth.store
+    owner = "owner+" + "x" * 45 + "@example.com"
+    grantee = "reader+" + "x" * 45 + "@example.com"
+    for name in (owner, grantee):
+        store.add_user(name, PASSWORD, tenant="acme")
+    with signed_in(app, owner) as mine, signed_in(app, grantee) as theirs:
+        made = mine.post("/api/provider-accounts", json={"provider": "claude", "display_name": "Personal Claude"})
+        assert made.status_code == 201, made.text
+        account = made.json()
+        assert account["owner"] == owner
+        shared = mine.patch(f"/api/provider-accounts/{account['id']}", json={"users": [grantee]})
+        assert shared.status_code == 200 and shared.json()["users"] == [grantee]
+        visible = theirs.get("/api/provider-accounts").json()["accounts"]
+        assert visible[0]["you"]["use"]
+
+
 def test_accounts_are_their_owners_and_stay_in_their_tenant(tmp_path):
     app = create_app(account_settings(tmp_path))
     alice, bob, dave, frank = (signed_in(app, name) for name in ("alice", "bob", "dave", "frank"))

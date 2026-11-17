@@ -606,6 +606,8 @@ export interface Org {
 
 export interface User {
   name: string;
+  /** Optional contact address; it does not grant an alternate sign-in. */
+  email: string | null;
   role: "admin" | "member";
   /** The organization the user belongs to; they can't be moved. */
   tenant: string;
@@ -2904,9 +2906,9 @@ export const api = {
     request<Directory>(`/api/orgs/${encodeURIComponent(org)}/teams/${encodeURIComponent(team)}/members/${encodeURIComponent(user)}`, { method: member ? "PUT" : "DELETE" }),
   users: () => request<{ users: User[] }>("/api/users"),
   /** tenant names the user's organization (an organization admin's own when left out; root for a site admin, admins only). */
-  addUser: (body: { name: string; password: string; role: string; tenant?: string; teams: string[] }) =>
+  addUser: (body: { name: string; email?: string; password: string; role: string; tenant?: string; teams: string[] }) =>
     request<Directory>("/api/users", { method: "POST", body: JSON.stringify(body) }),
-  updateUser: (name: string, body: { role?: string; orgs?: string[]; teams?: string[]; password?: string }) =>
+  updateUser: (name: string, body: { email?: string; role?: string; orgs?: string[]; teams?: string[]; password?: string }) =>
     request<Directory>(`/api/users/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(body) }),
   removeUser: (name: string) => request<Directory>(`/api/users/${encodeURIComponent(name)}`, { method: "DELETE" }),
   shareSession: (sessionId: string, sharing: { visibility: Visibility; team?: string | null; org?: string | null; access: Sharing["access"] }) =>

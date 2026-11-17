@@ -28,6 +28,13 @@ from ..retention import RetentionError
 from ..runtime import Runtime
 
 
+def csv_cell(value: Any) -> Any:
+    """Keep caller-controlled text from becoming a spreadsheet formula on opening."""
+    if isinstance(value, str) and (value.startswith(("\t", "\r", "\n")) or value.lstrip().startswith(("=", "+", "-", "@"))):
+        return "'" + value
+    return value
+
+
 def register(app: FastAPI, runtime: Runtime) -> None:
     retention, audit = runtime.retention, runtime.audit
 
@@ -187,8 +194,10 @@ def register(app: FastAPI, runtime: Runtime) -> None:
             writer.writerow(["time", "type", "tenant", "actor", "outcome", "action", "target", "ip", "reason", "seq", "hash"])
             for event in found:
                 data = event.get("data") or {}
-                writer.writerow([event.get("time"), event["type"], event["tenant"], event.get("actor"), event["outcome"], data.get("action"),
-                                 json.dumps(data.get("target") or {}), (data.get("actor") or {}).get("ip"), data.get("reason"), event["chain"]["seq"], event["chain"]["hash"]])
+                writer.writerow([csv_cell(value) for value in [
+                    event.get("time"), event["type"], event["tenant"], event.get("actor"), event["outcome"], data.get("action"),
+                    json.dumps(data.get("target") or {}), (data.get("actor") or {}).get("ip"), data.get("reason"), event["chain"]["seq"], event["chain"]["hash"],
+                ]])
             return PlainTextResponse(out.getvalue(), media_type="text/csv", headers={"content-disposition": "attachment; filename=audit.csv"})
         text = "".join(json.dumps(event, default=str) + "\n" for event in found)
         return PlainTextResponse(text, media_type="application/x-ndjson", headers={"content-disposition": "attachment; filename=audit.ndjson"})

@@ -121,7 +121,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
             await websocket.close(code=CLOSE_UNAUTHORIZED, reason="Not allowed to share a terminal with this proxy")
             return
         session = runtime.sessions.get(session_id)
-        if session is None:
+        if session is None or not sharing.can_view(auth.request_identity(websocket), session):
             await websocket.close(code=CLOSE_NOT_FOUND, reason="Unknown session")
             return
         if not sharing.can_control(auth.request_identity(websocket), session):
