@@ -268,6 +268,15 @@ func Folder(goos, goarch string) string {
 
 // build builds programs from the module in dir into folder, and returns the files' names.
 func build(dir, folder string, programs []string, version, goos, goarch string) ([]string, error) {
+	env := append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "GOARM=7", "CGO_ENABLED=0")
+	if goos == "android" {
+		cc, err := androidCompiler(goarch)
+		if err != nil {
+			return nil, err
+		}
+		// Android's DNS resolver is in libc; the pure Go resolver falls back to localhost.
+		env = append(env, "CGO_ENABLED=1", "CC="+cc)
+	}
 	extension := ""
 	if goos == "windows" {
 		extension = ".exe"
@@ -284,7 +293,7 @@ func build(dir, folder string, programs []string, version, goos, goarch string) 
 		cmd := exec.Command("go", args...)
 		cmd.Dir = dir
 		// ARMv7 covers the Raspberry Pi 2 and later and most ARM boards.
-		cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "GOARM=7", "CGO_ENABLED=0")
+		cmd.Env = env
 		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 		if err := cmd.Run(); err != nil {
 			return nil, err

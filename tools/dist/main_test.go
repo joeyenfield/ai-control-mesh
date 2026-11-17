@@ -6,10 +6,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
 func TestAndroidARM64BuildUsesAndroidLoader(t *testing.T) {
+	if _, err := androidCompiler("arm64"); err != nil {
+		t.Skip(err)
+	}
 	root := t.TempDir()
 	program := filepath.Join(root, "cmd", "probe")
 	if err := os.MkdirAll(program, 0o755); err != nil {
@@ -18,7 +22,7 @@ func TestAndroidARM64BuildUsesAndroidLoader(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/probe\n\ngo 1.24\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(program, "main.go"), []byte("package main\nfunc main() {}\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(program, "main.go"), []byte("package main\nimport \"net\"\nfunc main() { net.LookupHost(\"example.com\") }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	names, err := build(root, root, []string{"probe"}, "test", "android", "arm64")
@@ -45,6 +49,53 @@ func TestAndroidARM64BuildUsesAndroidLoader(t *testing.T) {
 	}
 	if !loaderFound {
 		t.Error("Android ARM64 binary has no interpreter")
+	}
+	symbols, err := binary.ImportedSymbols()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, symbol := range symbols {
+		if symbol.Name == "getaddrinfo" && symbol.Library == "libc.so" {
+			return
+		}
+	}
+	t.Fatal("Android binary does not use libc getaddrinfo; DNS would fall back to localhost")
+}
+
+func TestAndroidCompiler(t *testing.T) {
+	for _, variable := range []string{"CC", "ANDROID_NDK_HOME", "ANDROID_HOME", "ANDROID_SDK_ROOT"} {
+		t.Setenv(variable, "")
+	}
+	t.Setenv("PATH", t.TempDir())
+	if _, err := androidCompiler("arm64"); err == nil {
+		t.Fatal("missing NDK must fail rather than build with broken DNS")
+	}
+	t.Setenv("CC", "custom-android-clang")
+	if cc, err := androidCompiler("arm64"); err != nil || cc != "custom-android-clang" {
+		t.Fatalf("explicit CC = %q, %v", cc, err)
+	}
+	t.Setenv("CC", "")
+	sdk := t.TempDir()
+	t.Setenv("ANDROID_HOME", sdk)
+	ndk := filepath.Join(sdk, "ndk", "27.3")
+	// Match the host's prebuilt directory without requiring a real NDK in unit tests.
+	host := map[string]string{"linux": "linux-x86_64", "darwin": "darwin-x86_64", "windows": "windows-x86_64"}[runtime.GOOS]
+	name := "aarch64-linux-android24-clang"
+	if runtime.GOOS == "windows" {
+		name += ".cmd"
+	}
+	want := filepath.Join(ndk, "toolchains", "llvm", "prebuilt", host, "bin", name)
+	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(want, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, explicit := range []string{"", ndk} {
+		t.Setenv("ANDROID_NDK_HOME", explicit)
+		if cc, err := androidCompiler("arm64"); err != nil || cc != want {
+			t.Fatalf("NDK %q: compiler = %q, %v; want %q", explicit, cc, err, want)
+		}
 	}
 }
 
