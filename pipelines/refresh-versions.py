@@ -49,8 +49,10 @@ synchronized (job) {
     // Transfer ownership from the old static Jenkinsfile parameters. Otherwise
     // Declarative removes them on the first run after their directive is removed.
     def tracker = job.getAction(DeclarativeJobPropertyTrackerAction)
-    if (tracker?.parameters?.contains('VERSION')) {
-        job.removeAction(tracker)
+    if (tracker == null || tracker.parameters.contains('VERSION')) {
+        // Keep an empty tracker rather than removing it: Declarative otherwise
+        // falls back to the old build's parameter ownership record.
+        job.replaceAction(new DeclarativeJobPropertyTrackerAction([], [], [], []))
     }
     while (job.getProperty(ParametersDefinitionProperty) != null) {
         job.removeProperty(ParametersDefinitionProperty)
