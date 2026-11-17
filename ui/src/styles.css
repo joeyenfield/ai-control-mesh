@@ -1145,6 +1145,7 @@ h1 a:hover, h2 a:hover, h3 a:hover, .provider-card-head a:hover, .host-name a:ho
 .agent-row-line .pill { flex: none; }
 .agent-row-project { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-row-end { flex: none; margin-left: auto; padding-left: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.agent-row-line .agent-row-end { display: inline-flex; align-items: center; gap: 6px; }
 .agent-row-doing { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-row-meta { flex-wrap: wrap; gap: 2px 12px; font-size: 12.5px; color: var(--steel); }
 .agent-row-meta .mono { font-size: 12px; overflow-wrap: anywhere; }
@@ -1194,6 +1195,12 @@ h1 a:hover, h2 a:hover, h3 a:hover, .provider-card-head a:hover, .host-name a:ho
 .grid-bar.slim { padding: 2px 6px 2px 4px; }
 /* A collapsed bar has no controls left to label, and its title is already in the rail and the tab. */
 .grid-bar.slim .part-tag { display: none; }
+/* The running agents' counts and cost beside the title (components/AgentBar.tsx). */
+.agent-totals { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0 0 0 8px; padding: 0; list-style: none; color: var(--steel); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.agent-totals b { color: var(--ink); font-weight: 680; }
+.agent-totals .needs, .agent-totals .needs b { color: var(--accent-ink); }
+.agent-totals .cost-pill { padding: 1px 8px; border-radius: 999px; background: var(--ground); }
+a.grid-agent-option { color: var(--ink); text-decoration: none; }
 .grid-bar.slim h1 { font-size: 15px; }
 .grid-collapse .icon { color: var(--steel); transition: transform 120ms; }
 .grid-collapse .icon.down { transform: rotate(90deg); }

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type TerminalSummary } from "../api";
 import { Icon } from "../components/Icon";
-import { PartTag } from "../components/PartTag";
+import { AgentBar, useDismiss } from "../components/AgentBar";
 import { useAuth } from "../hooks";
 import { PairPanel, terminalState } from "./Terminals";
 import { KEYS, TerminalView, type KeySender } from "./Terminal";
@@ -38,22 +38,6 @@ function readSelection(key: string): string[] {
 }
 
 const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-
-/** Closes a dropdown on Escape or a press outside it, as the account menu does. */
-function useDismiss(open: boolean, box: RefObject<HTMLElement | null>, close: () => void) {
-  useEffect(() => {
-    if (!open) return;
-    const handle = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === "Escape" : !box.current?.contains(event.target as Node)) close();
-    };
-    document.addEventListener("mousedown", handle);
-    document.addEventListener("keydown", handle);
-    return () => {
-      document.removeEventListener("mousedown", handle);
-      document.removeEventListener("keydown", handle);
-    };
-  }, [open, box, close]);
-}
 
 export function TerminalGridPage() {
   const auth = useAuth();
@@ -152,15 +136,13 @@ function TerminalGrid({ selectionKey }: { selectionKey: string }) {
 
   return (
     <div className="page wide terminal-grid-page">
-      <header className={`grid-bar${layout.slim ? " slim" : ""}`}>
+      <AgentBar title="Live agent view" terminals={trusted ? all : []} slim={layout.slim} fromGrid end={
         <button type="button" className="icon-button grid-collapse" aria-expanded={!layout.slim} aria-controls="grid-controls"
           title={layout.slim ? "Show the grid controls" : "Hide the grid controls: more room for the terminals"}
           aria-label={layout.slim ? "Show the grid controls" : "Hide the grid controls"} onClick={toggleSlim}>
           <Icon name="chevron" size={15} className={layout.slim ? "" : "down"} />
         </button>
-        <PartTag />
-        <h1>Live agent view</h1>
-        <div className="grid-actions">
+      }>
           {pages > 1 && <div className="row grid-pages" aria-label="Grid pages">
             <button type="button" className="icon-button" title="Previous page" aria-label="Previous page" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>
               <Icon name="chevron" size={15} className="back" />
@@ -231,8 +213,7 @@ function TerminalGrid({ selectionKey }: { selectionKey: string }) {
               </div>}
             </div>
           </div>}
-        </div>
-      </header>
+      </AgentBar>
 
       {remote.isError && <p role="alert" className="bad">{remote.error.message}</p>}
       {remote.isPending && <p className="subtle">Loading agents…</p>}
