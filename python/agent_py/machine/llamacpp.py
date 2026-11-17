@@ -131,6 +131,14 @@ def models_dir() -> str:
     return managed_env(TABLE.load())["LLAMA_ARG_MODELS_DIR"] or default_models_dir()
 
 
+def cache_dir() -> str:
+    """The folder llama.cpp downloads Hugging Face models into: this machine's setting, or the
+    variable llama-server starts with, or "" for its standard cache, which agent-machine finds
+    itself."""
+    env = managed_env(TABLE.load())
+    return env.get("LLAMA_CACHE") or os.environ.get("LLAMA_CACHE") or ""
+
+
 def environment(base: Dict[str, str], config: Dict[str, Any]) -> Dict[str, str]:
     """The environment llama-server starts with: base without what the console mustn't set, with the managed variables applied."""
     env = TABLE.environment(base, config, _dropped)

@@ -911,6 +911,7 @@ def test_a_fleet_machine_runs_llamacpp_and_its_models_serve_agents_through_its_t
     fake = {
         "AI_PROXY_LLAMACPP_COMMAND": json.dumps([sys.executable, str(Path(__file__).with_name("fake_llamacpp.py"))]),
         "AI_PROXY_LLAMACPP_PORT": str(port),
+        "FAKE_LLAMACPP_HIDE_UNLOADED_PATH": "1",
     }
     cache = tmp_path / "llama-cache"
     with machine(tmp_path, agent_binary) as m, fleet_machine(m, machine_binary, tmp_path, ["servers", "on"], ["address", "203.0.113.9"], env=fake) as fleet:
@@ -934,6 +935,7 @@ def test_a_fleet_machine_runs_llamacpp_and_its_models_serve_agents_through_its_t
             assert lines[-1] == {"status": "success"} and any(line.get("completed") == 3000 for line in lines), lines
             state = httpx.get(provider, headers=m.headers, timeout=30).json()
             assert state["online"] and state["router"] and [(model["name"], model["state"]) for model in state["models"]] == [("ggml-org/tiny-GGUF:Q4_K_M", "unloaded")]
+            assert state["models"][0]["path"] == "" and state["models"][0]["size"] == 3000
             assert (cache / "ggml-org_tiny-GGUF_Q4_K_M.gguf").exists()
             assert httpx.post(f"{provider}/models/load", headers=m.headers, json={"name": "ggml-org/tiny-GGUF:Q4_K_M"}, timeout=60).status_code == 200
             assert "router mode" in httpx.get(f"{provider}/log", headers=m.headers, timeout=30).text

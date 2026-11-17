@@ -8,6 +8,7 @@ package servers
 // MCP client and its agent mode are refused, as are an API key and a presets file.
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -132,7 +133,21 @@ func llamaModelsDir() string {
 	return defaultModelsDir()
 }
 
-func init() { providers.LlamaFolder = llamaModelsDir }
+// llamaCacheDir is the folder llama.cpp downloads Hugging Face models into: this machine's setting,
+// or the variable llama-server starts with, or "" for its standard cache, which agent-machine finds
+// itself.
+func llamaCacheDir() string {
+	env := LlamaManagedEnv(LoadLlamaConfig())
+	if folder := env["LLAMA_CACHE"]; folder != nil {
+		return *folder
+	}
+	return os.Getenv("LLAMA_CACHE")
+}
+
+func init() {
+	providers.LlamaFolder = llamaModelsDir
+	providers.LlamaCache = llamaCacheDir
+}
 
 // LlamaEnvironment is the environment llama-server starts with: base without what the
 // console mustn't set, with the managed variables applied.

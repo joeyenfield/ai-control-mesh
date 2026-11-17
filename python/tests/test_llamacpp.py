@@ -268,6 +268,18 @@ def test_installing_in_termux_uses_its_packages(tmp_path, monkeypatch):
 
 # The provider: llama-server's router, played by an Upstream.
 
+def gguf(path: Path, size: int) -> None:
+    """A file of size bytes where llama.cpp would keep a model."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\0" * size)
+
+
+def own_llama_folders(monkeypatch, models: Path, cache: Path) -> None:
+    """Point agent-machine at test folders for the models, as llamacpp.py points it at the machine's."""
+    monkeypatch.setattr(providers, "llama_folder", lambda: str(models))
+    monkeypatch.setattr(providers, "llama_cache_dir", lambda: str(cache))
+
+
 def router(made: List[Upstream], key: str = "", outcome: str = "") -> Upstream:
     started = threading.Event()
     model = settings.home().parent / "qwen.gguf"
@@ -306,6 +318,7 @@ def router(made: List[Upstream], key: str = "", outcome: str = "") -> Upstream:
             {"id": "unsloth/zeta-GGUF:Q4_K_M", "path": "", "status": {"value": "unloaded", "failed": True}},
             {"id": "ggml-org/qwen-GGUF:Q8_0", "path": str(model), "status": {"value": "loaded"}, "meta": {"n_ctx_train": 32768}},
             {"id": "big/one-GGUF:Q4_K_M", "status": {"value": "downloading", "progress": {"a": {"done": 5, "total": 10}, "b": {"done": 5, "total": 10}}}},
+            {"id": "nobody/absent-GGUF:Q5_K_M", "status": {"value": "unloaded"}},
         ]})),
         "POST /models": guard(post_models),
         "GET /models/sse": guard(events),
@@ -321,15 +334,73 @@ def off() -> settings.Machine:
     return settings.Machine()
 
 
-def test_llama_status_lists_the_routers_models(made):
+def test_llama_status_lists_the_routers_models(made, monkeypatch):
+    # A model the router hasn't loaded comes with no file of its own, so agent-machine finds it
+    # among the folders llama.cpp keeps models in.
+    models, cache = settings.home() / "gguf", settings.home() / "cache"
+    gguf(models / "zeta-GGUF-Q4_K_M" / "zeta-Q4_K_M.gguf", 2222)
+    own_llama_folders(monkeypatch, models, cache)
     fake_router = router(made)
     state = providers.Manager(off).handle({"op": "status", "kind": "llamacpp", "port": fake_router.port})["state"]
     models = state["models"]
-    assert state["online"] and state["router"] and len(models) == 3
+    assert state["online"] and state["router"] and len(models) == 4
     assert models[0]["name"] == "ggml-org/qwen-GGUF:Q8_0" and models[0]["loaded"] and models[0]["size"] == 1234 and models[0]["context_train"] == 32768
     assert models[1]["state"] == "downloading" and models[1]["progress"]["completed"] == 10
-    assert models[2]["failed"] is True
+    assert models[1]["size"] == 20, "a model still downloading shows what it will be"
+    assert models[2]["name"] == "nobody/absent-GGUF:Q5_K_M" and models[2]["size"] is None, "no file of its own anywhere"
+    assert models[3]["failed"] is True
+    assert models[3]["size"] == 2222, "an unloaded model the router names no file for still has a size here"
     assert providers.Manager(off).handle({"op": "status", "kind": "llamacpp", "port": 1})["state"]["online"] is False
+
+
+def test_llama_size_comes_from_the_model_folders(monkeypatch, tmp_path):
+    models, cache = tmp_path / "models", tmp_path / "cache"
+    # How llama.cpp and agent-machine lay models out: a folder per quant in the download cache
+    # and in the GGUF folder, the cache's flat file, a folder named after the model with the
+    # quant as its file, and a model in several files.
+    gguf(cache / "Tiny-GGUF-Q4_K_M" / "tiny-Q4_K_M.gguf", 1000)
+    gguf(cache / "Tiny-GGUF-Q4_K_M" / "tiny-Q4_K_M-mmproj-f16.gguf", 700)  # not part of the model
+    gguf(cache / "Flat-GGUF-Q5_K_M.gguf", 1500)
+    gguf(models / "Small-Llama" / "Q6_K.gguf", 2000)
+    gguf(models / "Huge-Model-Q8_0" / "Huge-Model-00001-of-00003.gguf", 1000)
+    gguf(models / "Huge-Model-Q8_0" / "Huge-Model-00002-of-00003.gguf", 1000)
+    gguf(models / "Huge-Model-Q8_0" / "Huge-Model-00003-of-00003.gguf", 500)
+    gguf(models / "Vision-GGUF" / "Q8_0" / "Vision.Q8_0.gguf", 3000)
+    gguf(models / "Vision-GGUF" / "Q4_K_M" / "Vision.Q4_K_M.gguf", 4000)
+    gguf(models / "Part-GGUF" / "Q4_K_M" / "part-00001-of-00002.gguf", 600)
+    gguf(models / "Part-GGUF" / "Q4_K_M" / "part-00002-of-00002.gguf", 600)
+    own_llama_folders(monkeypatch, models, cache)
+    found = providers.llama_model_files()
+    for model_id, size in [("someone/Tiny-GGUF:Q4_K_M", 1000),
+                           ("someone/Flat-GGUF:Q5_K_M", 1500),
+                           ("acme/Small-Llama-GGUF:Q6_K", 2000),
+                           ("bigorg/Huge-Model:Q8_0", 2500),
+                           ("me/Vision-GGUF:Q8_0", 3000),
+                           ("me/Vision-GGUF:Q4_K_M", 4000),
+                           ("me/Part-GGUF:Q4_K_M", 1200)]:
+        total = providers.llama_size_for(model_id, *found)
+        assert total == size, f"{model_id} is {total}, not {size}: {found}"
+    for model_id in ["no/such-model:Q4_K_M", "someone/Tiny-GGUF:Q8_0", "me/Part-GGUF:Q8_0"]:
+        assert providers.llama_size_for(model_id, *found) is None, f"{model_id} found bytes of files that aren't its"
+
+
+def test_llama_size_counts_each_root_once_and_follows_weight_links(monkeypatch, tmp_path):
+    root = tmp_path / "models"
+    gguf(root / "Tiny-Q4_0.gguf", 1234)
+    own_llama_folders(monkeypatch, root, root)
+    assert providers.llama_size_for("Tiny:Q4_0", *providers.llama_model_files()) == 1234
+    alias = tmp_path / "alias"
+    try:
+        alias.symlink_to(root, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"symlinks unavailable: {error}")
+    weight = tmp_path / "weights.bin"
+    gguf(weight, 2345)
+    (root / "Linked-Q4_0.gguf").symlink_to(weight)
+    own_llama_folders(monkeypatch, root, alias)
+    found = providers.llama_model_files()
+    assert providers.llama_size_for("Tiny:Q4_0", *found) == 1234
+    assert providers.llama_size_for("Linked:Q4_0", *found) == 2345
 
 
 def test_llama_pull_relays_the_downloads_progress(made):

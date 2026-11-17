@@ -108,8 +108,11 @@ class Handler(BaseHTTPRequestHandler):
         if url.path in ("/models", "/v1/models"):
             data = []
             for model, path in sorted(cached().items()):
-                data.append({"id": model, "object": "model", "owned_by": "llamacpp", "path": str(path),
-                             "status": {"value": STATUS.get(model, "unloaded")}})
+                state = STATUS.get(model, "unloaded")
+                # Older routers report no file until the model has been loaded once.
+                shown_path = "" if os.environ.get("FAKE_LLAMACPP_HIDE_UNLOADED_PATH") and state == "unloaded" else str(path)
+                data.append({"id": model, "object": "model", "owned_by": "llamacpp", "path": shown_path,
+                             "status": {"value": state}})
             for model, state in STATUS.items():
                 if state == "downloading":
                     data.append({"id": model, "status": {"value": "downloading", "progress": {"f": {"done": 1, "total": 3}}}})

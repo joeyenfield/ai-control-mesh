@@ -31,7 +31,7 @@ pipeline {
         stage('Server unit tests') {
             steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage server' }
         }
-        stage('Ollama and Adreno setup Python parity') {
+        stage('Model server Python parity') {
             steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage ollama-setup' }
         }
         stage('UI verification') {
