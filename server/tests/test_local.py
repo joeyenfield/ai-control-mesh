@@ -7,6 +7,7 @@ import socket
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import psutil
@@ -138,7 +139,17 @@ def test_stop_can_stop_a_verified_parent_when_other_processes_are_hidden(monkeyp
 
 def _sleeper(marked: bool) -> subprocess.Popen:
     code = "import time; time.sleep(60)" + (f"  # {local.MARK}" if marked else "")
-    return subprocess.Popen([sys.executable, "-c", code])
+    child = subprocess.Popen([sys.executable, "-c", code])
+    # Until the child has exec'd, its command line is still pytest's: wait, or a busy machine sees no mark.
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            if code in psutil.Process(child.pid).cmdline():
+                break
+        except psutil.Error:
+            pass
+        time.sleep(0.01)
+    return child
 
 
 def test_stop_stops_only_the_processes_it_started(tmp_path):
