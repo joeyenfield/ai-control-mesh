@@ -93,3 +93,13 @@ releases reuse the existing backup and health checks; GitHub releases upload the
 distribution archive and standalone installer files as a prerelease. Neither
 operation rebuilds source. Builds and verification never trigger production
 deployment or GitHub publication.
+
+To deploy, open **Build with Parameters** on `ai-control-mesh-distribute` and
+choose **VERSION** from the dropdown, then select **TARGET**. Available versions
+have passed deployment testing and are ordered newest first. The initial
+`Select a tested distribution` entry requires an explicit selection. The release
+runner rechecks all promotion gates, including branch verification, before deployment.
+The dropdown refreshes after every deployment-test run and when jobs are installed.
+For a manual refresh, run `python3 pipelines/refresh-versions.py` from the source
+checkout on the trusted CI host with `MESH_CI_HOME` set. Removed distributions and
+versions whose test results no longer match disappear on the next refresh.

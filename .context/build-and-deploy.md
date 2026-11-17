@@ -15,6 +15,11 @@ pipeline trust. Distribution builds discover origin branches; only `master`
 builds automatically. Both folders are indexed every five minutes.
 `Jenkinsfile.test` and `Jenkinsfile.distribute` remain parameterized SCM pipelines
 for exact built versions. Release requires the matching deployment-test result.
+The release job's native VERSION dropdown is maintained by
+`pipelines/refresh-versions.py` on the trusted CI host. It lists matching passed
+deployment tests newest first, refreshes after tests and job installation, and
+preserves the destination parameter. Its parameters must not be redeclared
+statically in `Jenkinsfile.distribute`, which would erase the refreshed choices.
 `pipelines/configure.groovy` migrates the controller while preserving legacy job
 history. The definitions call installed host runners through `MESH_CI_HOME`;
 credentials and artifacts stay outside Git. See `docs/pipelines.md` for setup and

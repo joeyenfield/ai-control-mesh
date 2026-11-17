@@ -85,7 +85,8 @@ multibranch('ai-control-mesh-verify', 'pipelines/Jenkinsfile.verify', true)
     'ai-control-mesh-test': ['pipelines/Jenkinsfile.test', [
         new StringParameterDefinition('VERSION', '', 'Exact distribution version to test.')]],
     'ai-control-mesh-distribute': ['pipelines/Jenkinsfile.distribute', [
-        new StringParameterDefinition('VERSION', '', 'Exact tested distribution version to release.'),
+        new ChoiceParameterDefinition('VERSION', ['Select a tested distribution'] as String[],
+            'Select a deployment-tested distribution (newest first).'),
         new ChoiceParameterDefinition('TARGET', ['pi', 'github', 'both'] as String[], 'Distribution destination.')]]
 ].each { name, configuration ->
     def job = controller.getItem(name) ?: controller.createProject(WorkflowJob, name)
@@ -95,6 +96,9 @@ multibranch('ai-control-mesh-verify', 'pipelines/Jenkinsfile.verify', true)
     def definition = new CpsScmFlowDefinition(scm, configuration[0])
     definition.setLightweight(true)
     job.setDefinition(definition)
+    while (job.getProperty(ParametersDefinitionProperty) != null) {
+        job.removeProperty(ParametersDefinitionProperty)
+    }
     job.addProperty(new ParametersDefinitionProperty(configuration[1]))
     job.save()
     println('Configured SCM pipeline: ' + name)
