@@ -53,7 +53,7 @@ flowchart LR
   out --> e["SHA256SUMS"]
 ```
 
-- 16 targets (Windows, Linux incl. arm/riscv64/s390x/loong64, Android ARM64 for Termux, macOS, FreeBSD), built with `CGO_ENABLED=0 -trimpath` and `-X main.version`. Android ARM64 uses `-buildmode=pie`, producing `ET_DYN` with `/system/bin/linker64`; the Linux ARM64 build is for Linux. Components: `agent` (agent and agent-proxy) and `agent-machine`.
+- 16 targets (Windows, Linux incl. arm/riscv64/s390x/loong64, Android ARM64 for Termux, macOS, FreeBSD), built with `-trimpath` and `-X main.version`. Most use `CGO_ENABLED=0`. Android ARM64 uses `CGO_ENABLED=1` with the NDK API 24 compiler and `-buildmode=pie`, producing `ET_DYN` with `/system/bin/linker64` and libc DNS (`getaddrinfo`). `android_compiler.go` finds `CC`, the compiler on `PATH`, `ANDROID_NDK_HOME`, or SDK `ndk/*` folders; a missing compiler fails the build rather than shipping broken DNS. The ELF regression test checks both the loader and the libc resolver import when an NDK is available. The Linux ARM64 build is for Linux. Components: `agent` (agent and agent-proxy) and `agent-machine`.
 - Archives and Linux packages are written in Go (execute bits survive NTFS). A missing external tool (wix, pkgbuild, a JDK or Android SDK) skips its format with a note.
 - The wheel is written in Go from `python/pyproject.toml`, with `_version.py` stamped in. It is skipped when the version isn't PEP 440.
 - Flags: `-version`, `-root`, `-out`, `-only`, `-packages`, `-android`, `-python`, `-print-version` (used by the build scripts).

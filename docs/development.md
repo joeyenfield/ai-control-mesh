@@ -164,7 +164,7 @@ Pushing a tag does not start a build. Run `devhelpers/release_scripts/release.ps
 
 ### Distributions
 
-`devhelpers/scripts/build-dist.sh` (`.\devhelpers\scripts\build-dist.ps1`) runs `tools/dist` (`go run ./dist` in `tools/`), which builds both Go components for every target with `CGO_ENABLED=0`, packs them, and builds the Android app and the Python wheel.
+`devhelpers/scripts/build-dist.sh` (`.\devhelpers\scripts\build-dist.ps1`) runs `tools/dist` (`go run ./dist` in `tools/`), which builds both Go components for every target, packs them, and builds the Android app and the Python wheel. Most targets use `CGO_ENABLED=0`. Android uses `CGO_ENABLED=1` and the Android NDK so DNS goes through Android's system resolver. Set `ANDROID_NDK_HOME` to the NDK folder, install an NDK under `ANDROID_HOME/ndk` (or `ANDROID_SDK_ROOT/ndk`), put `aarch64-linux-android24-clang` on `PATH`, or set `CC` to your Android clang compiler. The Android build fails if no compiler is available. `ANDROID=0` skips the APK only; select explicit targets to omit Android binaries.
 
 | System | Folder names |
 |---|---|
