@@ -100,6 +100,8 @@ Authentication lives in the common `agent-proxy/credentials.json` (or `AI_PROXY_
 
 ## Extending and testing
 
+Ollama startup uses `process.NativeCommand()` so Android executes the native Termux binary through its system linker rather than a raw exec syscall into app storage. Python's `subprocess.Popen` already goes through libc and Termux's execution hook. `servers/native_test.go` starts the test executable as a native Ollama stand-in, checks its HTTP readiness and saved process id, then stops it; this also runs as a compiled Android test on the emulator.
+
 - **Provider kind**: a case in `providers.handle` (status, model operations, log), a probe in presence, Go tests, then the server and console sides (the checklist in `server.md`, Extending).
 - **Message type**: a branch in `presence.session` answering `<type>_result` with its own toggle check; a new toggle goes into `settings.Machine`, `configure`, `show` and `describe`. Mirror it in `python/agent_py/machine/presence.py` and the server's `Fleet`.
 - `go test ./...`, and vet for Windows and Linux (the `process_*.go` files differ). End to end: `server/tests/test_client.py::fleet_machine` with `fake_docker.py`, `fake_strata.py`, `fake_llamacpp.py`, `fake_mcp.py`. The installer's tests play GitHub with `httptest` (`AI_PROXY_LLAMACPP_RELEASES`) and Termux's apt-get with a script (`AI_PROXY_LLAMACPP_APT`).

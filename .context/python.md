@@ -33,6 +33,8 @@ It mirrors the Go programs behaviour for behaviour, and the Go code is the refer
 
 ## What's different
 
+Ollama startup already uses libc-backed `subprocess.Popen`, so Termux's execution hook handles native model-server binaries. Go uses its explicit Android linker helper for the same behavior. `test_servers.py::test_ollama_starts_serves_and_stops` covers the mirrored lifecycle.
+
 Background machine startup opens the private machine log before spawning and redirects the child's stdout and stderr there, preserving early interpreter/startup failures. `Popen.poll()` detects an exited child. Go's Android executable identity and linker invocation helpers are native binary details; Python already uses its interpreter path and libc subprocess execution.
 
 `common.command_args()` mirrors Go's `settings.CommandArgs()`: on Android, strip only a duplicated absolute executable path before dispatch. The agent, standalone proxy and machine entry points use it when reading `sys.argv`; explicitly supplied argument lists are preserved. `test_units.py` covers normalization and login dispatch.
