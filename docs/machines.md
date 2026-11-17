@@ -419,7 +419,7 @@ The `agent-machine` deb, rpm and Arch packages include a systemd user unit, not 
 
 ## A sandbox machine in Docker
 
-**agent-sandbox** (`ghcr.io/joeyenfield/agent-sandbox`, built from `sandbox/Dockerfile`) is a container that is a machine of its own. It's Ubuntu 24.04 with `agent`, `agent-proxy` and `agent-machine`, plus Claude Code, Codex, OpenCode, Qwen Code and Copilot CLI (the npm packages in the `AGENTS` build argument), and Ollama (CPU only) for the console to start.
+**agent-sandbox** (`ghcr.io/joeyenfield/agent-sandbox`, built from `sandbox/Dockerfile`) is a container that is a machine of its own. It's Ubuntu 24.04 with `agent`, `agent-proxy` and `agent-machine`, plus Claude Code, Codex, OpenCode, Qwen Code and Copilot CLI (the npm packages in the `AGENTS` build argument), the Antigravity CLI (`agy`, from Google's installer), and Ollama (CPU only) for the console to start.
 
 It has the tools a person at a terminal reaches for, so the agents can use them too:
 
@@ -491,6 +491,7 @@ docker compose logs -f agent-sandbox
 | `AGENT_APT_PACKAGES` | More apt packages to install on start, space-separated (needs the image's `sudo`; ones already installed are skipped, and a failed install doesn't stop the sandbox) |
 | `TERM`, `COLORTERM` | The terminal type agents see: `xterm-256color` and `truecolor` by default, so they print in color without `-t` |
 | `--build-arg AGENTS="..."` | The npm packages of the agents to install, when you build the image yourself |
+| `--build-arg ANTIGRAVITY=0` | Leave out the Antigravity CLI (`agy`), which isn't an npm package. The build installs the newest release, checked against Google's manifest. |
 | `--build-arg EXTRA_PACKAGES="..."` | More apt packages to build in |
 | `--build-arg AGENT_SUDO=0` | No `sudo` for the agent user |
 | `--build-arg OLLAMA_VERSION=...` | The Ollama release to copy in (from the `ollama/ollama` image), when you build the image yourself |

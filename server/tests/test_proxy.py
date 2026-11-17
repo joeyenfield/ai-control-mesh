@@ -302,6 +302,11 @@ def test_agents_and_models_endpoints(tmp_path):
         url = f"/session/{hermes['session']['session_id']}/v1"
         assert hermes["command"][:5] == ["hermes", "chat", "--provider", "custom", "--base-url"] and hermes["command"][5].endswith(url)
         assert hermes["command"][6:] == ["--api-key", "local-ollama", "-m", "hermes3"] and "HERMES_HOME" not in hermes["env"]
+        # Antigravity runs in gateway mode on the session's OpenAI Chat URL, for this model only.
+        agy = client.post("/api/agents/antigravity/sessions", json={"model": "qwen3.6:35b", "backend": "test"}).json()
+        assert agy["command"] == ["agy", "--model", "qwen3.6:35b"]
+        assert agy["env"]["AGY_LLM_GATEWAY_URL"].endswith(f"/session/{agy['session']['session_id']}/v1")
+        assert agy["env"]["AGY_LLM_GATEWAY_WIRE_PROTOCOL"] == "openai" and agy["env"]["AGY_LLM_GATEWAY_MODELS"] == "qwen3.6:35b"
         assert client.post("/api/agents/missing/sessions", json={"model": "m"}).status_code == 404
         # A backend no machine runs isn't asked: the server doesn't manage model servers itself.
         models = client.get("/api/models").json()["backends"]["test"]

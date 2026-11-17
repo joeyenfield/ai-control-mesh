@@ -392,6 +392,46 @@ agents:
     # sessions) stays the person's own. --api-key is held for this run only, never saved.
     args: [chat, --provider, custom, --base-url, "{openai_url}", --api-key, local-ollama, -m, "{model}"]
     notes: Hermes needs a model with at least 64K context. MCP servers come from your own ~/.hermes/config.yaml (mcp_servers), not --mcp.
+
+  antigravity:
+    name: Antigravity CLI (own provider)
+    executable: agy
+    protocol: openai-chat
+    description: Google's terminal agent, in enterprise gateway mode with the session as its OpenAI Chat gateway.
+    install:
+      linux: curl -fsSL https://antigravity.google/cli/install.sh | bash
+      macos: curl -fsSL https://antigravity.google/cli/install.sh | bash
+      windows: irm https://antigravity.google/cli/install.ps1 | iex
+    homepage: https://docs.cloud.google.com/gemini/enterprise/docs/ai-developer-tools/connect-enterprise-gateway
+    # Gateway mode (agy 1.2.15 and later) replaces the Google sign-in for this run only: the
+    # person's own login and ~/.gemini settings are left as they are. "openai" is its OpenAI Chat
+    # Completions wire protocol; the default, "genai", is the Gemini API, which the server doesn't speak.
+    env:
+      AGY_LLM_GATEWAY_URL: "{openai_url}"
+      AGY_LLM_GATEWAY_API_KEY: local-ollama
+      AGY_LLM_GATEWAY_WIRE_PROTOCOL: openai
+      AGY_LLM_GATEWAY_MODELS: "{model}"
+    args: [--model, "{model}"]
+    notes: Needs agy 1.2.15 or later. MCP servers come from your own ~/.gemini/config/mcp_config.json or the project's .agents/mcp_config.json, not --mcp.
+
+  antigravity-account:
+    name: Antigravity CLI (Google account)
+    executable: agy
+    protocol: openai-chat
+    intercept: true
+    description: The Antigravity CLI signed in to your Google account. All of its HTTPS traffic to Google - model calls, sign-in, telemetry - is recorded.
+    install:
+      linux: curl -fsSL https://antigravity.google/cli/install.sh | bash
+      macos: curl -fsSL https://antigravity.google/cli/install.sh | bash
+      windows: irm https://antigravity.google/cli/install.ps1 | iex
+    homepage: https://antigravity.google/docs/getting-started
+    # agy is a Go program: it takes HTTPS_PROXY, and on Linux trusts the bundle in SSL_CERT_FILE
+    # that every account agent gets. Its gateway settings would bypass the Google login, so a
+    # launch must not inherit them.
+    env:
+      AGY_LLM_GATEWAY_URL: ""
+      AGY_LLM_GATEWAY_API_KEY: ""
+    notes: Sign in by running agy once first. Pass a model with -- --model <name> (agy models lists them).
 """
 
 
