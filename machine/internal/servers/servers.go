@@ -344,7 +344,7 @@ func (m *Manager) startOllama(bind string) error {
 	cmd := process.Command(program[0], append(program[1:], "serve")...)
 	// The saved settings, then OLLAMA_HOST, which is where it listens: loopback for the
 	// server on this computer, else every address, so the server can reach it.
-	cmd.Env = append(Environment(os.Environ(), config), fmt.Sprintf("OLLAMA_HOST=%s:%d", bind, m.port()))
+	cmd.Env = process.ExecutableEnvironment(cmd, append(Environment(os.Environ(), config), fmt.Sprintf("OLLAMA_HOST=%s:%d", bind, m.port())))
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, logFile, logFile
 	process.Detach(cmd)
 	if err := cmd.Start(); err != nil {

@@ -442,12 +442,16 @@ It listens on `127.0.0.1:9931` (llama-server's own default port) and nowhere els
 
 With `agent-machine servers on`, the machine's llama.cpp **Server settings** (on its Providers tab; **Install llama.cpp** until it's there) installs llama.cpp there. **Install llama.cpp** asks the machine which builds fit it and suggests one:
 
-- **In Termux on Android**, Termux's own packages, through its `apt-get`: `llama-cpp` with its OpenCL backend (`llama-cpp-backend-opencl`, `ocl-icd`, `opencl-vendor-driver`, for the phone's own OpenCL driver: the fastest on Snapdragon phones), its Vulkan backend (`llama-cpp-backend-vulkan`, `vulkan-loader-android`), or the CPU only.
+- **In Termux on Android**, Termux's own packages, through its `apt-get`: `llama-cpp` with its OpenCL backend (`llama-cpp-backend-opencl`, `ocl-icd`, `opencl-vendor-driver`, requiring access to a compatible vendor driver), its Vulkan backend (`llama-cpp-backend-vulkan`, `vulkan-loader-android`), or the CPU only. Installing a backend package does not establish that the phone exposes a usable GPU.
 - **Anywhere else**, the newest build llama.cpp publishes on GitHub (`ggml-org/llama.cpp`) for the machine's system and processor, with the backend you pick: CPU, Vulkan, CUDA (NVIDIA; its runtime is downloaded too), ROCm, SYCL, OpenVINO, Metal on a Mac, or Snapdragon. agent-machine installs a download only when its SHA-256 is the one GitHub lists for it, and unpacks it into `llamacpp/<release>-<build>/` in its own folder. Nothing outside that folder changes and nothing needs root. The build before it is kept until the next install, so a running llama-server keeps its files until it restarts onto the new one.
 
 Installing runs on the machine as a job; the tab shows its step, download progress, and the result. **Update or change build** installs the newest release again, or another backend. **Remove** deletes the builds installed from the console (Termux's packages are Termux's to remove). A llama-server already on the machine's PATH (or Homebrew's, or Termux's) is used too; the tab says it was found there and shows its version. For Termux's packages, that's the package's version, because their `--version` names no build.
 
 ### Starting it and its settings
+
+On Samsung S24 Ultra / Adreno 750, the stock OpenCL package can report `platform IDs not available`. A specialized llama.cpp build using Android's `sphal` vendor namespace was verified with Qwen2.5-3B-Instruct Q4_0, F16 K/V cache, Flash Attention off, an 8K context, one slot and `GPUOpenCL`. This uses the [S24 Ultra vendor-loader patch](https://github.com/Ishabdullah/OpenCL-S24-Ultra), pinned llama.cpp commit `e358d59178377be4c58ba567925e05faadbccb57`, with generic OpenCL kernels (`GGML_OPENCL_USE_ADRENO_KERNELS=OFF`). It is a custom source build, not what the console's stock package installer supplies. Reinstalling a stock build replaces the selected custom executable. Test real model replies after any backend change.
+
+Android native launches also need the correct executable identity: an inherited Termux `TERMUX_EXEC__PROC_SELF_EXE` pointing at agent-machine makes the router respawn the wrong program. agent-machine resets it for its model servers; Python subprocess already updates it through libc.
 
 The tab's **Start**, **Restart** and **Stop** run the installed `llama-server --host 127.0.0.1 --port 9931` in router mode. agent-machine only stops a llama-server it started itself; it stops the router's model instances with it.
 
