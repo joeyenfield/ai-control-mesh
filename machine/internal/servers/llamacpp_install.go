@@ -429,7 +429,7 @@ func runLogged(timeout time.Duration, program []string, args []string) error {
 	defer file.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, program[0], append(append([]string(nil), program[1:]...), args...)...)
+	cmd := process.CommandContext(ctx, program[0], append(append([]string(nil), program[1:]...), args...)...)
 	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, file, file
 	process.Quiet(cmd)

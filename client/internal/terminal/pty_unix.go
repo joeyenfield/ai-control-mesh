@@ -12,6 +12,8 @@ import (
 
 	"github.com/creack/pty"
 	"golang.org/x/term"
+
+	"ai-control-mesh/client/internal/process"
 )
 
 func platformUnavailable() string { return "" }
@@ -23,7 +25,7 @@ type posixChild struct {
 }
 
 func startChild(command []string, dir string, env []string, cols, rows int) (child, error) {
-	cmd := exec.Command(command[0], command[1:]...)
+	cmd := process.Command(command[0], command[1:]...)
 	cmd.Dir = dir
 	cmd.Env = withColor(env)
 	file, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})

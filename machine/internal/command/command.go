@@ -395,7 +395,7 @@ func startWith(binary string, args []string) int {
 		return 1
 	}
 	defer output.Close()
-	cmd := process.NativeCommand(binary, append([]string{"run"}, args...)...)
+	cmd := process.Command(binary, append([]string{"run"}, args...)...)
 	cmd.Env = append(os.Environ(), startedEnv+"=background")
 	cmd.Stdout, cmd.Stderr = output, output
 	process.Detach(cmd)

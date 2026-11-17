@@ -310,7 +310,7 @@ func run(command []string, dir string, env []string, share *terminal.Share) int 
 		}
 		return status
 	}
-	cmd := exec.Command(command[0], command[1:]...)
+	cmd := process.Command(command[0], command[1:]...)
 	cmd.Dir, cmd.Env = dir, env
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	err := cmd.Run()

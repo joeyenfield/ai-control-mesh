@@ -105,7 +105,7 @@ func nvidiaGPUs() ([]map[string]any, string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, program, "--query-gpu="+nvidiaQuery, "--format=csv,noheader,nounits")
+	cmd := process.CommandContext(ctx, program, "--query-gpu="+nvidiaQuery, "--format=csv,noheader,nounits")
 	process.Quiet(cmd)
 	output, err := cmd.Output()
 	if err != nil {
@@ -160,7 +160,7 @@ func mib(text string) any {
 
 // sysctl reads one number with sysctl -n, for the systems without /proc.
 func sysctl(name string) uint64 {
-	output, err := exec.Command("sysctl", "-n", name).Output()
+	output, err := process.Command("sysctl", "-n", name).Output()
 	if err != nil {
 		return 0
 	}

@@ -3,7 +3,6 @@ package presence
 import (
 	"context"
 	"encoding/json"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -85,7 +84,7 @@ func detectAccounts() map[string]any {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), accountsTimeout)
 	defer cancel()
-	command := exec.CommandContext(ctx, program, "accounts", "detect", "--json")
+	command := process.CommandContext(ctx, program, "accounts", "detect", "--json")
 	command.Stdin = nil
 	// Without this Windows opens a console window for agent every few minutes.
 	process.Quiet(command)

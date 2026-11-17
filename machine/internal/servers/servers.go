@@ -330,7 +330,7 @@ func (m *Manager) startOllama(bind string) error {
 	for name, value := range publicEnv(ManagedEnv(config)) {
 		fmt.Fprintf(logFile, "#   %s=%v\n", name, orUnset(value))
 	}
-	cmd := process.NativeCommand(program[0], append(program[1:], "serve")...)
+	cmd := process.Command(program[0], append(program[1:], "serve")...)
 	// The saved settings, then OLLAMA_HOST, which is where it listens: loopback for the
 	// server on this computer, else every address, so the server can reach it.
 	cmd.Env = append(Environment(os.Environ(), config), fmt.Sprintf("OLLAMA_HOST=%s:%d", bind, m.port()))
@@ -435,7 +435,7 @@ func strata(timeout time.Duration, args ...string) (map[string]any, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, program[0], append(append(program[1:], args...), "--json")...)
+	cmd := process.CommandContext(ctx, program[0], append(append(program[1:], args...), "--json")...)
 	process.Quiet(cmd)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

@@ -769,7 +769,7 @@ func (p *Presence) runHeadless(machine *settings.Machine, project string, args [
 	if running := agentProxyServer(); running != "" && settings.Normalize(running) != settings.Normalize(server) {
 		return "", fmt.Errorf("the agent-proxy here carries traffic to %s, not %s; sign the agent command in there (agent login %s)", running, server, server)
 	}
-	cmd := exec.Command(program, args...)
+	cmd := process.Command(program, args...)
 	cmd.Dir = project
 	// AI_PROXY_URL points a newly started agent-proxy at this machine's server; the machine
 	// variables tag the session with the machine it runs on.

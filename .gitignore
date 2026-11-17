@@ -25,3 +25,4 @@ devhelpers/release_scripts/deploy-setup-remote.sh
 .screenshot-demo-*/
 .screenshot-demo.json
 /.test-site/
+/android-runtime-results/

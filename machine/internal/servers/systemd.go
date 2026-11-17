@@ -77,7 +77,7 @@ func serviceControl() []string {
 func run(timeout time.Duration, program []string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, program[0], append(program[1:], args...)...)
+	cmd := process.CommandContext(ctx, program[0], append(program[1:], args...)...)
 	process.Quiet(cmd)
 	var output bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &output, &output

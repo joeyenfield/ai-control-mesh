@@ -254,7 +254,7 @@ func (b *Bridge) open(server Server) (*session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s isn't installed here (%v)", server.Command[0], err)
 	}
-	cmd := exec.Command(program, server.Command[1:]...)
+	cmd := process.Command(program, server.Command[1:]...)
 	cmd.Dir = server.Dir
 	cmd.Env = os.Environ()
 	for name, value := range server.Env {
