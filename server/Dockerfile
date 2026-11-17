@@ -40,6 +40,9 @@ RUN useradd --system --uid 10001 --home-dir /app agent \
 # Stamp the runtime version after dependency installation so snapshots reuse that layer.
 ARG AI_PROXY_VERSION=
 ENV AI_PROXY_VERSION=${AI_PROXY_VERSION}
+# Podman (Buildah) reuses a cached ENV layer when only the build argument changed, so a snapshot
+# whose image files didn't change kept the previous version. A RUN that reads the argument is keyed by it.
+RUN printf '%s\n' "${AI_PROXY_VERSION}" > /etc/agent-server-version
 USER agent
 # Everything the server keeps is in its database (AI_PROXY_DATABASE_URL; deploy/compose/server runs
 # PostgreSQL). Without one it's a SQLite file in logs/. logs/ also holds the server's own log,
