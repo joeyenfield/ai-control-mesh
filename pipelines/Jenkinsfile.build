@@ -40,6 +40,15 @@ pipeline {
         stage('Platform packages and Python wheel') {
             steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage packages' }
         }
+        stage('Android runtime regressions') {
+            steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage android-runtime' }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'android-runtime-results/*.xml,android-runtime-results/*.json,android-runtime-results/*.log', allowEmptyArchive: false
+                    junit testResults: 'android-runtime-results/junit.xml', allowEmptyResults: false
+                }
+            }
+        }
         stage('Android APK') {
             steps { sh 'python3 "$MESH_CI_HOME/build.py" . --stage android' }
         }

@@ -63,7 +63,7 @@ func (c CLI) command(ctx context.Context, args []string) (*exec.Cmd, error) {
 	if command == nil {
 		return nil, errors.New(c.missing())
 	}
-	cmd := exec.CommandContext(ctx, command[0], append(command[1:], args...)...)
+	cmd := process.CommandContext(ctx, command[0], append(command[1:], args...)...)
 	cmd.Env = os.Environ()
 	process.Quiet(cmd)
 	return cmd, nil

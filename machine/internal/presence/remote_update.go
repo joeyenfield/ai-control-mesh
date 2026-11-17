@@ -61,7 +61,7 @@ func spawnUpdate(args []string) error {
 	if err != nil {
 		return err
 	}
-	cmd := process.NativeCommand(self, args...)
+	cmd := process.Command(self, args...)
 	process.Detach(cmd)
 	if log, err := os.OpenFile(settings.LogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
 		cmd.Stdout, cmd.Stderr = log, log

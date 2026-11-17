@@ -49,7 +49,7 @@ func EnsureProxy() (map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := start(process.NativeCommand(self, "proxy", "--port", strconv.Itoa(settings.ProxyPort())), local, "agent-proxy", "agent proxy", 30*time.Second); err != nil {
+		if err := start(process.Command(self, "proxy", "--port", strconv.Itoa(settings.ProxyPort())), local, "agent-proxy", "agent proxy", 30*time.Second); err != nil {
 			return nil, err
 		}
 		status = api.Health(local)
@@ -77,7 +77,7 @@ func EnsureProxy() (map[string]any, error) {
 			}
 		}
 		// Generous: a fresh agent-server rebuilds the web UI first when its sources changed.
-		if err := start(exec.Command(program, "--port", port), server, "agent-server", "agent-server", 120*time.Second); err != nil {
+		if err := start(process.Command(program, "--port", port), server, "agent-server", "agent-server", 120*time.Second); err != nil {
 			return nil, err
 		}
 	}
@@ -125,7 +125,7 @@ func proxyReviver() func() {
 	local := settings.ProxyURL()
 	return func() {
 		if api.Health(local) == nil {
-			_ = start(process.NativeCommand(self, "proxy", "--port", strconv.Itoa(settings.ProxyPort())), local, "agent-proxy", "agent proxy", 30*time.Second)
+			_ = start(process.Command(self, "proxy", "--port", strconv.Itoa(settings.ProxyPort())), local, "agent-proxy", "agent proxy", 30*time.Second)
 		}
 	}
 }

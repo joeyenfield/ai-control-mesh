@@ -33,6 +33,8 @@ the full distribution archive.
 
 ## Versions
 
+The distribution build has a mandatory `Android runtime regressions` stage after platform packaging. `pipelines/android-runtime/run.py` compiles Go tests for Android x86-64 and runs them through a temporary APK in a fresh emulator's app domain, where raw app-storage exec is denied. Twelve required checks cover ARM64 loader/libc DNS linkage, both modules' native/script execution and cancellation, PTY I/O, machine-to-agent shell launch, and native Ollama start/stop. The runner creates its own AVD, ADB server and test keys and removes them afterwards. JUnit and logs are archived in Jenkins and checksummed under `android-runtime/` in the distribution. A missing, failed, skipped, incomplete or other-commit report blocks release. PR verification still runs its disposable Go/server/UI containers; host Android tooling is used only by trusted origin distribution builds.
+
 The server Dockerfile applies `AI_PROXY_VERSION` after installing dependencies.
 Changing a CI snapshot version therefore preserves the dependency build cache.
 

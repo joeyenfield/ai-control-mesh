@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"ai-control-mesh/machine/internal/presence"
 	"ai-control-mesh/machine/internal/process"
@@ -82,7 +81,7 @@ func updateAgent(server string) {
 		fmt.Println("Not updating agent:", err)
 		return
 	}
-	cmd := exec.Command(program, "update", "--server", server)
+	cmd := process.Command(program, "update", "--server", server)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	process.Quiet(cmd)
 	if err := cmd.Run(); err != nil {

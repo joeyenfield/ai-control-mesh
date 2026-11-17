@@ -77,7 +77,7 @@ func Local() System {
 func run(path string, args ...string) (string, int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	command := exec.CommandContext(ctx, path, args...)
+	command := process.CommandContext(ctx, path, args...)
 	command.Stdin = nil
 	output, err := command.CombinedOutput()
 	var exit *exec.ExitError

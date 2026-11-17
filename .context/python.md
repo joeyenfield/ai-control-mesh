@@ -33,6 +33,8 @@ It mirrors the Go programs behaviour for behaviour, and the Go code is the refer
 
 ## What's different
 
+The Go client and machine route all child commands through their Android-aware `process.Command` / `CommandContext` helpers, including the machine-to-agent launch and the client's PTY shell. Python's subprocess and exec calls already use libc and Termux's execution hook, so this syscall adaptation needs no Python command-line or protocol change. The shared `test_a_fleet_machine_lists_its_folders_and_opens_a_shell_when_commands_are_on` and launcher contract test cover the mirrored terminal and agent behavior.
+
 Ollama startup already uses libc-backed `subprocess.Popen`, so Termux's execution hook handles native model-server binaries. Go uses its explicit Android linker helper for the same behavior. `test_servers.py::test_ollama_starts_serves_and_stops` covers the mirrored lifecycle.
 
 Background machine startup opens the private machine log before spawning and redirects the child's stdout and stderr there, preserving early interpreter/startup failures. `Popen.poll()` detects an exited child. Go's Android executable identity and linker invocation helpers are native binary details; Python already uses its interpreter path and libc subprocess execution.

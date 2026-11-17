@@ -128,7 +128,7 @@ func llamaVersion(program []string) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, program[0], append(program[1:], "--version")...)
+	cmd := process.CommandContext(ctx, program[0], append(program[1:], "--version")...)
 	cmd.Env = withLibraries(os.Environ(), program[0])
 	process.Quiet(cmd)
 	output, _ := cmd.CombinedOutput()
@@ -158,7 +158,7 @@ func parseVersion(output []byte) string {
 func termuxVersion(prefix string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, filepath.Join(prefix, "bin", "dpkg-query"), "-W", "-f=${Version}", "llama-cpp")
+	cmd := process.CommandContext(ctx, filepath.Join(prefix, "bin", "dpkg-query"), "-W", "-f=${Version}", "llama-cpp")
 	process.Quiet(cmd)
 	output, err := cmd.Output()
 	if err != nil {
@@ -262,7 +262,7 @@ func (m *Manager) startLlama() error {
 	}
 	// No model: router mode. Where it listens is agent-machine's to say, on the command line,
 	// which wins over any variable.
-	cmd := exec.Command(program[0], append(program[1:], "--host", "127.0.0.1", "--port", port)...)
+	cmd := process.Command(program[0], append(program[1:], "--host", "127.0.0.1", "--port", port)...)
 	cmd.Env = withLibraries(LlamaEnvironment(os.Environ(), config), program[0])
 	cmd.Dir = settings.Home()
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, logFile, logFile

@@ -50,7 +50,12 @@ Changing a Jenkinsfile does not replace those installed runners. Host secrets,
 toolchains, caches and distribution storage remain outside the Git checkout.
 
 The agent needs Python, Go, Node/npm, Podman, podman-compose, the Android SDK and
-Java for complete distributions. Verification runs source in disposable
+Java for complete distributions. Install Jenkins' JUnit plugin for test reporting.
+The Android runtime stage also requires the NDK, build tools, the Android 36
+platform, the Android 36.1 Google Play x86-64 system image, the emulator and KVM.
+Set `ANDROID_HOME` and `JAVA_HOME`; install the NDK under the SDK's `ndk/` directory
+or set `ANDROID_NDK_HOME`. Missing tooling fails the stage rather than skipping it.
+Verification runs source in disposable
 containers without deployment credentials or host service sockets. The build
 and release runners require the existing trusted host installation and Pi
 connection configuration.
@@ -70,6 +75,21 @@ It refuses to migrate a running job or overwrite an existing legacy backup.
 Run it again after merging to update the operations jobs to `master`.
 
 ## Distributions and promotion
+
+Every distribution build runs **Android runtime regressions** after packaging.
+It creates a fresh emulator, private ADB server and disposable test APK, then
+executes the Go regressions as an Android app user. This reproduces Android's
+app-storage execution restrictions, which an ordinary Linux Go test cannot test.
+The required checks cover native commands, scripts, literal arguments, environment
+and working directory, cancellation, PTY input/output, the machine launching the
+agent for a console shell, Ollama startup/shutdown, and ARM64 loader/DNS linkage.
+
+Jenkins publishes JUnit results and archives logs in that stage. The distribution
+also contains the checksummed `android-runtime/result.json`, JUnit and logs.
+Build finalization and release require a successful result for the exact commit,
+with no skipped checks. A failed retry invalidates the earlier result. This stage
+belongs to trusted origin builds; fork PR verification retains its container
+isolation and does not receive access to host Android tools or devices.
 
 The shared host directory is `MESH_CI_HOME/dist/<version>/`, unless the installed
 runners' `DIST_ROOT` environment setting selects another disk location. The

@@ -5,11 +5,12 @@ package providers
 import (
 	"context"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"ai-control-mesh/machine/internal/process"
 )
 
 func platform() string { return runtime.GOOS }
@@ -30,7 +31,7 @@ func memory() (uint64, uint64) {
 func output(name string, args ...string) (string, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	data, err := exec.CommandContext(ctx, name, args...).Output()
+	data, err := process.CommandContext(ctx, name, args...).Output()
 	return string(data), err == nil
 }
 
