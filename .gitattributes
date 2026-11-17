@@ -5,3 +5,8 @@ server/docker/postgres-init.sh text eol=lf
 # option -`): keep them LF in every checkout, whatever core.autocrlf says. tools/dist embeds
 # tools/dist/install/install.sh into every archive exactly as it is on disk.
 *.sh text eol=lf
+
+# Hashed source-build assets are embedded by Go and mirrored in the Python wheel.
+machine/internal/servers/adreno/* text eol=lf
+machine/internal/servers/adreno/loader.patch whitespace=-blank-at-eol
+python/agent_py/machine/adreno_builder.py text eol=lf

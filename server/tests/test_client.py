@@ -832,6 +832,80 @@ def test_a_fleet_machine_installs_ollama_with_explicit_gpu_setup(tmp_path, agent
         assert refused.status_code == 409 and "servers on" in refused.text
 
 
+def test_a_fleet_machine_installs_adreno_from_verified_source(tmp_path, agent_binary, machine_binary):
+    """The same installer contract runs against both native and Python machines."""
+    import hashlib
+    import io
+    import tarfile
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    if os.name == "nt":
+        pytest.skip("Termux source installation")
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        for name, content in {"llama-source/CMakeLists.txt": b"fixture", "llama-source/LICENSE": b"MIT fixture"}.items():
+            item = tarfile.TarInfo(name)
+            item.size = len(content)
+            archive.addfile(item, io.BytesIO(content))
+    data = buffer.getvalue()
+
+    class Source(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("content-length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass
+
+    source = ThreadingHTTPServer(("127.0.0.1", 0), Source)
+    threading.Thread(target=source.serve_forever, daemon=True).start()
+    prefix = tmp_path / "termux-prefix"
+    prefix.mkdir()
+    url = f"http://127.0.0.1:{source.server_port}/source.tar.gz"
+    env = {"PREFIX": str(prefix), "TERMUX_VERSION": "test", "AI_PROXY_LLAMACPP_COMMAND": "",
+           "AI_PROXY_LLAMACPP_RELEASES": url,
+           "AI_PROXY_LLAMACPP_APT": json.dumps([sys.executable, str(Path(__file__).with_name("fake_ollama_apt.py"))]),
+           "AI_PROXY_LLAMACPP_ADRENO_BUILDER": json.dumps([sys.executable, str(Path(__file__).with_name("fake_adreno_builder.py"))]),
+           "AI_PROXY_LLAMACPP_ADRENO_SOURCE": json.dumps({"browser_download_url": url, "digest": "sha256:" + hashlib.sha256(data).hexdigest()})}
+    try:
+        with machine(tmp_path, agent_binary) as m, fleet_machine(m, machine_binary, tmp_path, ["servers", "on"], env=env) as fleet:
+            base = f"{m.server}/api/machines/{fleet.box['id']}/servers/llamacpp"
+            options = httpx.get(base + "/install", headers=m.headers, timeout=30)
+            assert options.status_code == 200, options.text
+            assert options.json()["variants"][0]["id"] == "opencl-adreno"
+            assert options.json()["variants"][0]["recommended"]
+            original = httpx.get(base, headers=m.headers, timeout=30).json()["config"]
+            saved = httpx.put(base, headers=m.headers, json={**original, "models_dir": "existing-models", "extra_env": "LLAMA_ARG_CTX_SIZE=65536"}, timeout=30)
+            assert saved.status_code == 200, saved.text
+            previous_at = None
+            for _ in range(2):
+                started = httpx.post(base + "/install", headers=m.headers, json={"variant": "opencl-adreno"}, timeout=30)
+                assert started.status_code == 200, started.text
+                deadline = time.monotonic() + 20
+                while time.monotonic() < deadline:
+                    info = httpx.get(base, headers=m.headers, timeout=30).json()
+                    job = info["status"].get("install") or {}
+                    if job.get("state") != "installing":
+                        break
+                    time.sleep(.1)
+                assert job.get("state") == "installed", job
+                assert job["at"] != previous_at
+                previous_at = job["at"]
+                assert info["status"]["source"] == "source" and info["status"]["variant"] == "opencl-adreno"
+                assert info["config"]["ctx_size"] == 8192 and info["config"]["models_dir"] == "existing-models"
+                assert info["env"]["LLAMA_ARG_DEVICE"] == "GPUOpenCL" and info["env"]["LLAMA_ARG_CTX_SIZE"] == "8192"
+                assert info["config"]["cache_type_v"] == "f16" and info["config"]["flash_attn"] == "off"
+            assert len((prefix / "adreno-builds.jsonl").read_text().splitlines()) == 1
+            fleet.command("servers", "off")
+            refused = httpx.post(base + "/install", headers=m.headers, json={"variant": "opencl-adreno"}, timeout=30)
+            assert refused.status_code == 409 and "servers on" in refused.text
+    finally:
+        source.shutdown()
+        source.server_close()
+
+
 def test_a_fleet_machine_runs_llamacpp_and_its_models_serve_agents_through_its_tunnel(tmp_path, agent_binary, machine_binary):
     port = free_port()
     fake = {

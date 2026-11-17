@@ -52,7 +52,7 @@ func installLog() string { return filepath.Join(settings.Home(), "llamacpp-insta
 
 // installRecord is llamacpp-install.json: what the console installed, and where its llama-server is.
 type installRecord struct {
-	Source      string `json:"source"` // github or termux
+	Source      string `json:"source"` // github, termux or source
 	Release     string `json:"release,omitempty"`
 	Variant     string `json:"variant"`
 	Binary      string `json:"binary"`
@@ -154,7 +154,7 @@ type release struct {
 // Termux's packages: the backends are split out, each with what it needs to reach the
 // phone's own driver (the vendor's OpenCL library, Android's Vulkan loader).
 var termuxVariants = []Variant{
-	{ID: "opencl", Label: "OpenCL (phone GPU)", Help: "Adreno and other phone GPUs, through the phone's own OpenCL driver. The fastest on Snapdragon phones.", packages: []string{"llama-cpp", "llama-cpp-backend-opencl", "ocl-icd", "opencl-vendor-driver"}},
+	{ID: "opencl", Label: "OpenCL (ICD driver)", Help: "Requires a compatible vendor OpenCL ICD. Qualcomm phones may need the Adreno source build instead.", packages: []string{"llama-cpp", "llama-cpp-backend-opencl", "ocl-icd", "opencl-vendor-driver"}},
 	{ID: "vulkan", Label: "Vulkan (phone GPU)", Help: "Through Android's Vulkan driver; often slower than OpenCL on Adreno, and not every model works.", packages: []string{"llama-cpp", "llama-cpp-backend-vulkan", "vulkan-loader-android"}},
 	{ID: "cpu", Label: "CPU only", packages: []string{"llama-cpp"}},
 }
@@ -330,8 +330,7 @@ func latestRelease() (release, []Variant, error) {
 // installOptions is the "llamacpp_install" answer: how llama.cpp can be installed here.
 func installOptions() map[string]any {
 	if termuxPrefix() != "" {
-		variants := append([]Variant(nil), termuxVariants...)
-		variants[0].Recommended = true
+		variants := adrenoOptions()
 		return map[string]any{"source": "termux", "variants": variants}
 	}
 	found, variants, err := latestRelease()
@@ -350,7 +349,7 @@ func startInstall(variant string) error {
 		jobMu.Unlock()
 		return errors.New("llama.cpp is already being installed here")
 	}
-	job = &installJob{State: "installing", Variant: variant, Step: "starting", At: time.Now().UTC().Format(time.RFC3339)}
+	job = &installJob{State: "installing", Variant: variant, Step: "starting", At: time.Now().UTC().Format(time.RFC3339Nano)}
 	jobMu.Unlock()
 	go func() {
 		var err error
@@ -360,7 +359,7 @@ func startInstall(variant string) error {
 			err = installRelease(variant)
 		}
 		setJob(func(j *installJob) {
-			j.At = time.Now().UTC().Format(time.RFC3339)
+			j.At = time.Now().UTC().Format(time.RFC3339Nano)
 			if err != nil {
 				j.State, j.Error = "failed", err.Error()
 			} else {
@@ -388,6 +387,9 @@ func logInstall(format string, args ...any) {
 
 // installTermux installs Termux's packages for the variant with its own apt-get.
 func installTermux(variant string) error {
+	if variant == "opencl-adreno" {
+		return installAdreno()
+	}
 	var packages []string
 	for _, item := range termuxVariants {
 		if item.ID == variant {
@@ -430,7 +432,7 @@ func runLogged(timeout time.Duration, program []string, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := process.CommandContext(ctx, program[0], append(append([]string(nil), program[1:]...), args...)...)
-	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	cmd.Env = process.ExecutableEnvironment(cmd, append(os.Environ(), "DEBIAN_FRONTEND=noninteractive"))
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, file, file
 	process.Quiet(cmd)
 	return cmd.Run()

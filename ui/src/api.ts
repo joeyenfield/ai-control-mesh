@@ -1064,7 +1064,7 @@ export interface LlamaServerState {
   /** The build, such as b12032. */
   version?: string | null;
   /** github or termux when the console installed it (with which build), found when it was there already. */
-  source?: "github" | "termux" | "found" | null;
+  source?: "github" | "termux" | "source" | "found" | null;
   variant?: string | null;
   release?: string | null;
   /** termux, or the machine's os-arch. */

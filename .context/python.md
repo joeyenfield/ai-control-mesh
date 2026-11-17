@@ -33,6 +33,8 @@ It mirrors the Go programs behaviour for behaviour, and the Go code is the refer
 
 ## What's different
 
+`machine/adreno_install.py` mirrors Go's pinned Termux Qualcomm source installer, cache manifest, GPU gate and profile merge. `adreno_assets.py` carries the exact patch and MIT license as Python literals, because the distribution wheel ships Python modules; `adreno_builder.py` is embedded verbatim as Go's `servers/adreno/build.py`. Tests assert byte/hash parity. Update both recipes together. `test_adreno_install.py` covers success/cache reuse and checksum/compiler/GPU failure recovery. The imported `test_a_fleet_machine_installs_adreno_from_verified_source` covers the fleet API and servers toggle; Jenkins runs these alongside Ollama setup parity.
+
 Go's native model-server commands reset Termux's `TERMUX_EXEC__PROC_SELF_EXE` to the child executable after building its environment. Python's libc-backed subprocess updates that identity through Termux's exec hook already; there is no Python protocol or settings change for this native-launch fix.
 
 `machine/ollama_install.py` mirrors Go's Ollama Termux install job, fixed CPU/Vulkan/Turnip package lists, file checks, hardware config merge and concurrency guards. `tests/test_ollama_install.py` and the imported `test_a_fleet_machine_installs_ollama_with_explicit_gpu_setup` contract exercise it. Jenkins's Ollama setup parity stage runs both.

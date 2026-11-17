@@ -474,7 +474,7 @@ def _set(**fields: Any) -> None:
 # Termux's packages: the backends are split out, each with what it needs to reach the phone's own
 # driver (the vendor's OpenCL library, Android's Vulkan loader).
 TERMUX_VARIANTS = [
-    {"id": "opencl", "label": "OpenCL (phone GPU)", "help": "Adreno and other phone GPUs, through the phone's own OpenCL driver. The fastest on Snapdragon phones.",
+    {"id": "opencl", "label": "OpenCL (ICD driver)", "help": "Requires a compatible vendor OpenCL ICD. Qualcomm phones may need the Adreno source build instead.",
      "packages": ["llama-cpp", "llama-cpp-backend-opencl", "ocl-icd", "opencl-vendor-driver"]},
     {"id": "vulkan", "label": "Vulkan (phone GPU)", "help": "Through Android's Vulkan driver; often slower than OpenCL on Adreno, and not every model works.",
      "packages": ["llama-cpp", "llama-cpp-backend-vulkan", "vulkan-loader-android"]},
@@ -639,10 +639,8 @@ def latest_release() -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
 def install_options() -> Dict[str, Any]:
     """The "llamacpp_install" answer: how llama.cpp can be installed here."""
     if termux_prefix():
-        variants = [{key: value for key, value in item.items() if key != "packages"} for item in TERMUX_VARIANTS]
-        for index, variant in enumerate(variants):
-            variant["recommended"] = index == 0
-        return {"source": "termux", "variants": variants}
+        from . import adreno_install
+        return {"source": "termux", "variants": adreno_install.options()}
     try:
         found, variants = latest_release()
     except Refused as error:
@@ -657,7 +655,7 @@ def start_install(variant: str) -> None:
     with _job_lock:
         if _job is not None and _job["state"] == "installing":
             raise Refused("llama.cpp is already being installed here")
-        _job = {"state": "installing", "variant": variant, "release": "", "step": "starting", "done": 0, "total": 0, "error": "", "at": now()}
+        _job = {"state": "installing", "variant": variant, "release": "", "step": "starting", "done": 0, "total": 0, "error": "", "at": install_now()}
 
     def work() -> None:
         error: Optional[BaseException] = None
@@ -669,12 +667,17 @@ def start_install(variant: str) -> None:
         except Exception as failure:  # noqa: BLE001 - a failed install is reported, never raised into the connection
             error = failure
         if error is None:
-            _set(state="installed", step="", at=now())
+            _set(state="installed", step="", at=install_now())
         else:
-            _set(state="failed", error=str(error), at=now())
+            _set(state="failed", error=str(error), at=install_now())
         log_install(f"install {variant}: {'done' if error is None else error}")
 
     threading.Thread(target=work, name="llamacpp-install", daemon=True).start()
+
+
+def install_now() -> str:
+    """Distinguish completed cache hits even when both finish in the same second."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def log_install(line: str) -> None:
@@ -688,6 +691,10 @@ def log_install(line: str) -> None:
 
 def install_termux(variant: str) -> None:
     """Installs Termux's packages for the variant with its own apt-get."""
+    if variant == "opencl-adreno":
+        from . import adreno_install
+        adreno_install.install()
+        return
     packages = next((item["packages"] for item in TERMUX_VARIANTS if item["id"] == variant), None)
     if packages is None:
         raise Refused(f"Termux has no {json.dumps(variant)} build of llama.cpp: pick opencl, vulkan or cpu")
@@ -712,7 +719,8 @@ def install_termux(variant: str) -> None:
 
 def run_logged(timeout: float, program: List[str], args: List[str]) -> Optional[str]:
     install_log().parent.mkdir(parents=True, exist_ok=True)
-    with open(install_log(), "ab") as log:
+    fd = os.open(str(install_log()), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    with os.fdopen(fd, "ab") as log:
         try:
             done = subprocess.run([*program, *args], stdin=subprocess.DEVNULL, stdout=log, stderr=log, timeout=timeout, check=False,
                                   env={**os.environ, "DEBIAN_FRONTEND": "noninteractive"}, **servers.QUIET)
