@@ -19,7 +19,7 @@ Open source, MIT licensed, and hosted on your own infrastructure.
 
 AI Control Mesh is a server and web console for managing terminal coding agents across your computers. Start agents on connected machines, watch their terminals, answer permission prompts from your phone, and see which models and tools they use. Review recorded sessions to improve your prompts and understand token use and estimated costs.
 
-Use agents such as **Claude Code, Codex, Copilot CLI, OpenCode, Qwen Code, Aider, Goose and Hermes Agent**. You supply the models, hosted API keys or supported vendor accounts. Agent and provider compatibility varies; see the [compatibility guide](docs/providers.md#compatibility).
+Use agents such as **Claude Code, Codex, Copilot CLI, OpenCode, Qwen Code, Aider, Goose, Hermes Agent and Antigravity CLI**. You supply the models, hosted API keys or supported vendor accounts. Agent and provider compatibility varies; see the [compatibility guide](docs/providers.md#compatibility).
 
 ## What you can do
 

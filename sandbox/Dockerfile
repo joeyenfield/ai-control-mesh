@@ -13,7 +13,7 @@
 #   docker build -f sandbox/Dockerfile -t agent-sandbox .
 #
 # AGENTS picks the npm packages (the install lines of the shipped agents, server/agent_server/defaults.py),
-# EXTRA_PACKAGES adds apt packages:
+# ANTIGRAVITY=0 leaves out the Antigravity CLI (agy, not on npm), EXTRA_PACKAGES adds apt packages:
 #   docker build -f sandbox/Dockerfile --build-arg AGENTS="@openai/codex opencode-ai" -t agent-sandbox .
 #   docker build -f sandbox/Dockerfile --build-arg EXTRA_PACKAGES="postgresql-client nmap" -t agent-sandbox .
 
@@ -67,6 +67,7 @@ FROM docker.io/library/ubuntu:24.04
 ARG AGENTS="@anthropic-ai/claude-code @openai/codex opencode-ai @qwen-code/qwen-code @github/copilot"
 ARG PACKAGES="ca-certificates curl wget git git-lfs gh openssh-client rsync less nano vim-tiny procps psmisc htop lsof strace file tree jq ripgrep fd-find unzip zip xz-utils bzip2 zstd iputils-ping iputils-tracepath traceroute dnsutils net-tools iproute2 netcat-openbsd telnet socat build-essential pkg-config python3 python-is-python3 python3-pip python3-venv pipx sqlite3 openssl gnupg sudo tini libgomp1 tzdata bash-completion"
 ARG EXTRA_PACKAGES=""
+ARG ANTIGRAVITY=1
 ARG AGENT_SUDO=1
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8
 # The package index is tried again when a mirror doesn't answer: a plain `apt-get update` goes on
@@ -80,6 +81,13 @@ RUN for attempt in 1 2 3 4 5 6; do \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd
 COPY --from=node /usr/local/ /usr/local/
 RUN if [ -n "$AGENTS" ]; then npm install -g --no-audit --no-fund $AGENTS && npm cache clean --force; fi
+# The Antigravity CLI (agy) isn't an npm package: Google's installer checks its binary against the
+# release manifest's SHA-512 and puts it beside the other programs. ANTIGRAVITY=0 leaves it out.
+RUN if [ "$ANTIGRAVITY" = 1 ]; then \
+         curl -fsSL https://antigravity.google/cli/install.sh -o /tmp/agy-install.sh \
+         && bash /tmp/agy-install.sh --dir /usr/local/bin \
+         && rm -rf /tmp/agy-install.sh /root/.cache/antigravity; \
+       fi
 COPY --from=build /out/ /usr/local/bin/
 # ollama finds its backends in ../lib/ollama beside itself.
 COPY --from=ollama /out/ /usr/local/

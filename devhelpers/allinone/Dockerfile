@@ -63,6 +63,7 @@ FROM docker.io/library/ubuntu:24.04
 ARG AGENTS="@anthropic-ai/claude-code @openai/codex opencode-ai @qwen-code/qwen-code @github/copilot"
 ARG PACKAGES="ca-certificates curl wget git git-lfs gh openssh-client rsync less nano vim-tiny procps psmisc htop lsof strace file tree jq ripgrep fd-find unzip zip xz-utils bzip2 zstd iputils-ping iputils-tracepath traceroute dnsutils net-tools iproute2 netcat-openbsd telnet socat build-essential pkg-config python3 python-is-python3 python3-pip python3-venv pipx sqlite3 openssl gnupg sudo tini libgomp1 tzdata bash-completion"
 ARG EXTRA_PACKAGES=""
+ARG ANTIGRAVITY=1
 ARG AGENT_SUDO=1
 ARG AI_PROXY_VERSION=
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8
@@ -76,6 +77,12 @@ RUN for attempt in 1 2 3 4 5 6; do \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd
 COPY --from=node /usr/local/ /usr/local/
 RUN if [ -n "$AGENTS" ]; then npm install -g --no-audit --no-fund $AGENTS && npm cache clean --force; fi
+# The Antigravity CLI (agy), as in agent-sandbox.
+RUN if [ "$ANTIGRAVITY" = 1 ]; then \
+         curl -fsSL https://antigravity.google/cli/install.sh -o /tmp/agy-install.sh \
+         && bash /tmp/agy-install.sh --dir /usr/local/bin \
+         && rm -rf /tmp/agy-install.sh /root/.cache/antigravity; \
+       fi
 COPY --from=build /out/ /usr/local/bin/
 COPY --from=ollama /out/ /usr/local/
 # The server, as the release bundle lays it out (devhelpers/release_scripts/release/release.py): installed editable, so

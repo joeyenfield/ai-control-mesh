@@ -10,7 +10,7 @@ Each agent takes one of three routes to a model. The console colours requests, s
 
 | | Your accounts | Own provider | Hosted API |
 |---|---|---|---|
-| **Agents** | `claude-account`, `copilot-account`, `codex-account` | `qwen`, `opencode`, `copilot`, `claude`, `codex`, `aider`, `goose`, `hermes` | `claude-subscription` |
+| **Agents** | `claude-account`, `copilot-account`, `codex-account`, `antigravity-account` | `qwen`, `opencode`, `copilot`, `claude`, `codex`, `aider`, `goose`, `hermes`, `antigravity` | `claude-subscription` |
 | **Set in its definition by** | `intercept: true` | `backend_type: ollama` (the default) | `backend_type: anthropic` |
 | **Model** | The vendor's, on your plan | Ollama, llama.cpp, Strata or Docker Model Runner on your machines, an OpenAI-compatible server on a machine (LM Studio, vLLM, SGLang), or a hosted [API provider](providers.md#api-providers-openai-and-anthropic-compatible) named with `--backend` | Anthropic's, through an `anthropic` backend |
 | **How the agent reaches the proxy** | `HTTPS_PROXY` pointing at the `agent-proxy` (`127.0.0.1:8183`) | Its API base URL points at the `agent-proxy` (`127.0.0.1:8184`) | `ANTHROPIC_BASE_URL` points at the `agent-proxy` |
@@ -268,10 +268,12 @@ The server keeps every agent's definition in its database and renders it for eac
 | Claude Code (claude.ai account) | `agent claude-account` | Your accounts | Anthropic Messages | Yes |
 | GitHub Copilot CLI (GitHub account) | `agent copilot-account` | Your accounts | OpenAI Chat | Yes |
 | OpenAI Codex CLI (ChatGPT account) | `agent codex-account` | Your accounts | OpenAI Responses | Yes |
+| Antigravity CLI (Google account) | `agent antigravity-account` | Your accounts | Google's own | No |
 | OpenAI Codex CLI (own provider) | `agent codex` | Own provider | OpenAI Responses | Yes |
 | Aider | `agent aider` | Own provider | Native Ollama | No |
 | Goose | `agent goose` | Own provider | Native Ollama | Yes |
 | Hermes Agent | `agent hermes` | Own provider | OpenAI Chat | No |
+| Antigravity CLI (own provider) | `agent antigravity` | Own provider | OpenAI Chat | No |
 
 "MCP" says whether the agent can take the MCP servers your machines share (`--mcp`). How each one is given them (its settings file, or arguments) is in [MCP servers](mcp.md#what-each-agent-gets).
 
@@ -287,6 +289,7 @@ Install commands:
 | `aider` | `python -m pip install aider-install && aider-install` |
 | `goose` | `curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh \| bash`. On Windows, run it in Git Bash (it needs bash, curl and unzip). |
 | `hermes` | Linux, macOS and WSL: `curl -fsSL https://hermes-agent.nousresearch.com/install.sh \| bash`. Windows: `iex (irm https://hermes-agent.nousresearch.com/install.ps1)`. |
+| `antigravity`, `antigravity-account` | Linux and macOS: `curl -fsSL https://antigravity.google/cli/install.sh \| bash`. Windows: `irm https://antigravity.google/cli/install.ps1 \| iex`. |
 
 ### Local-model agents
 
@@ -300,6 +303,7 @@ Install commands:
 - **`aider`: Aider.** Pair-programming agent that talks to Ollama's native chat API. Sets `OLLAMA_API_BASE` (`{ollama_url}`). Runs `aider --model ollama_chat/<model>`. It speaks native Ollama, so it can use Ollama and Docker Model Runner backends, not llama.cpp or Strata. It has no MCP support.
 - **`goose`: Goose.** Block's extensible open-source agent. Sets `GOOSE_PROVIDER=ollama`, `OLLAMA_HOST` (`{ollama_url}`) and `GOOSE_MODEL`. Runs `goose session`. Like Aider, it can use Ollama and Docker Model Runner backends, not llama.cpp or Strata.
 - **`hermes`: Hermes Agent.** Nous Research's self-improving agent, with memory, skills and many built-in tools. Runs `hermes chat --provider custom --base-url <openai_url> --api-key local-ollama -m <model>`. It sets no environment and writes no files, so your own `~/.hermes` (its memory, skills, sessions and settings) is used as it is, and the key is held for that run only. Hermes needs a model with at least 64K context. It doesn't take `--mcp`: add MCP servers under `mcp_servers` in your `~/.hermes/config.yaml`.
+- **`antigravity`: Antigravity CLI (own provider).** Google's terminal agent (`agy`), in its enterprise gateway mode with the session as the gateway. Sets `AGY_LLM_GATEWAY_URL` (`{openai_url}`), `AGY_LLM_GATEWAY_API_KEY=local-ollama`, `AGY_LLM_GATEWAY_WIRE_PROTOCOL=openai` (OpenAI Chat Completions; the default is the Gemini API, which the server doesn't speak) and `AGY_LLM_GATEWAY_MODELS` (the model). Runs `agy --model <model>`. Gateway mode needs `agy` 1.2.15 or later and needs no Google sign-in; your own sign-in and `~/.gemini` settings are left as they are. It doesn't take `--mcp`: add MCP servers to your `~/.gemini/config/mcp_config.json` or the project's `.agents/mcp_config.json`.
 
 ### Account and hosted agents
 
@@ -311,6 +315,7 @@ Sign each one in with its own client first. The account agents get the HTTPS cap
 - **`codex-account`: OpenAI Codex CLI (ChatGPT account).** Codex signed in with your ChatGPT plan. All of its HTTPS and WebSocket traffic to OpenAI and ChatGPT is recorded. Also sets `CODEX_CA_CERTIFICATE` to the bundle: Codex replaces its trusted roots with this file, so it gets the full bundle, not only the CA. Runs `codex --no-daemon`. Pass a model with `-- -m <model>`. Sign in with `codex login` (ChatGPT) first, and unset `OPENAI_API_KEY` and `OPENAI_BASE_URL` so the ChatGPT login is used.
   - `--no-daemon` matters: without it the interactive TUI hands conversations to Codex's shared background app-server daemon, which runs without the proxy settings, so only startup calls would be captured.
   - Each Codex conversation opens with a *prewarm* turn (`generate: false`), which shows up as a model call with no output.
+- **`antigravity-account`: Antigravity CLI (Google account).** The Antigravity CLI (`agy`) signed in to your Google account. All of its HTTPS traffic to Google is recorded: model calls, sign-in and telemetry. It sets `AGY_LLM_GATEWAY_URL` and `AGY_LLM_GATEWAY_API_KEY` empty, so gateway settings in your shell can't take it off your Google login. Runs `agy`. Pass a model with `-- --model <name>` (`agy models` lists them). Sign in by running `agy` once first. `agy` is a Go program: on Linux it trusts the server's CA through `SSL_CERT_FILE`, but on macOS and Windows Go uses the system's certificate store, so add the server's CA there (or use `antigravity`, which needs no CA). For your own models, use `antigravity` instead.
   - Codex may print `[UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental` when it picks up the proxy settings. It's harmless.
 
 ## Sharing a terminal with --control

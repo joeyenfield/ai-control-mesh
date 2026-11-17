@@ -156,6 +156,37 @@ def test_openai_request_translates_to_native_ollama_with_profile():
     assert result["tools"] == payload["tools"]
 
 
+def test_antigravity_gateway_request_translates():
+    # What agy 1.5 sends in gateway mode (wire protocol openai): a system message as text parts,
+    # max_completion_tokens rather than max_tokens, and usage asked for in the stream.
+    settings = Settings(**QWEN_SETTINGS)
+    payload = {
+        "model": "fast", "stream": True, "stream_options": {"include_usage": True}, "max_completion_tokens": 4096,
+        "messages": [
+            {"role": "system", "content": [{"type": "text", "text": "<identity>You are Antigravity"}]},
+            {"role": "user", "content": "Say pong"},
+        ],
+        "tools": [{"type": "function", "function": {"name": "view_file", "description": "Read a file", "parameters": {"type": "object"}}}],
+    }
+    result = openai_to_ollama(payload, settings.profile("fast"))
+    assert result["messages"] == [{"role": "system", "content": "<identity>You are Antigravity"}, {"role": "user", "content": "Say pong"}]
+    assert result["options"]["num_predict"] == 4096 and result["stream"] is True
+    assert result["tools"] == payload["tools"]
+
+
+def test_antigravity_account_goes_through_the_intercept_on_its_google_login():
+    agent = parse_agents(defaults.agents())["antigravity-account"]
+    assert agent.intercept and agent.subscription is None
+    launch = agent.render("http://127.0.0.1:8184", "s1", "", intercept={
+        "url": "http://127.0.0.1:8183", "ca_path": "/ca.pem", "bundle_path": "/bundle.pem"})
+    # agy is a Go program: HTTPS_PROXY and, on Linux, the bundle in SSL_CERT_FILE.
+    assert launch["env"]["HTTPS_PROXY"] == "http://s1:agent-proxy@127.0.0.1:8183"
+    assert launch["env"]["SSL_CERT_FILE"] == "/bundle.pem"
+    # Gateway settings left in the person's shell would skip the Google login and the recording of it.
+    assert launch["env"]["AGY_LLM_GATEWAY_URL"] == "" and launch["env"]["AGY_LLM_GATEWAY_API_KEY"] == ""
+    assert launch["command"] == ["agy"]
+
+
 def test_openai_stream_translator_emits_reasoning_tools_and_usage():
     translator = OpenAIStreamTranslator("qwen", include_usage=True)
     events = translator.feed({"message": {"thinking": "hmm"}, "done": False})
