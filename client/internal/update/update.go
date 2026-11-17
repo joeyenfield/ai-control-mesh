@@ -227,7 +227,7 @@ func writable(dir string, err error) error {
 
 // Location is the folder of the running binary, links resolved.
 func Location() (string, error) {
-	self, err := os.Executable()
+	self, err := settings.Executable()
 	if err != nil {
 		return "", err
 	}

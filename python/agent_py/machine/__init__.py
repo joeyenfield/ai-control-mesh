@@ -472,8 +472,12 @@ def start(args: List[str], cwd: Optional[str] = None) -> int:
     else:
         flags = {"start_new_session": True}
     try:
-        process = subprocess.Popen([sys.executable, "-m", "agent_py.machine", "run", *args], env={**os.environ, STARTED_ENV: "background"}, cwd=cwd,
-                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True, **flags)
+        path = settings.log_path()
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with path.open("ab") as output:
+            os.chmod(path, 0o600)
+            process = subprocess.Popen([sys.executable, "-m", "agent_py.machine", "run", *args], env={**os.environ, STARTED_ENV: "background"}, cwd=cwd,
+                                       stdin=subprocess.DEVNULL, stdout=output, stderr=output, close_fds=True, **flags)
     except OSError as error:
         print(f"agent-machine: couldn't start: {error}", file=sys.stderr)
         return 1

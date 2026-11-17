@@ -2,7 +2,6 @@ package presence
 
 import (
 	"os"
-	"os/exec"
 
 	"ai-control-mesh/machine/internal/process"
 	"ai-control-mesh/machine/internal/settings"
@@ -58,11 +57,11 @@ func (p *Presence) RemoteUpdate(server string, request UpdateRequest) map[string
 
 // spawnUpdate runs this binary with args, detached from this process so it outlives it, writing to the log.
 func spawnUpdate(args []string) error {
-	self, err := os.Executable()
+	self, err := settings.Executable()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(self, args...)
+	cmd := process.NativeCommand(self, args...)
 	process.Detach(cmd)
 	if log, err := os.OpenFile(settings.LogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
 		cmd.Stdout, cmd.Stderr = log, log

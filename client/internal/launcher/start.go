@@ -45,11 +45,11 @@ func EnsureProxy() (map[string]any, error) {
 	local := settings.ProxyURL()
 	status := api.Health(local)
 	if status == nil {
-		self, err := os.Executable()
+		self, err := settings.Executable()
 		if err != nil {
 			return nil, err
 		}
-		if err := start(self, []string{"proxy", "--port", strconv.Itoa(settings.ProxyPort())}, local, "agent-proxy", "agent proxy", 30*time.Second); err != nil {
+		if err := start(process.NativeCommand(self, "proxy", "--port", strconv.Itoa(settings.ProxyPort())), local, "agent-proxy", "agent proxy", 30*time.Second); err != nil {
 			return nil, err
 		}
 		status = api.Health(local)
@@ -77,7 +77,7 @@ func EnsureProxy() (map[string]any, error) {
 			}
 		}
 		// Generous: a fresh agent-server rebuilds the web UI first when its sources changed.
-		if err := start(program, []string{"--port", port}, server, "agent-server", "agent-server", 120*time.Second); err != nil {
+		if err := start(exec.Command(program, "--port", port), server, "agent-server", "agent-server", 120*time.Second); err != nil {
 			return nil, err
 		}
 	}
@@ -118,20 +118,19 @@ func VersionNotices(own string, proxy, server map[string]any) []string {
 // its model traffic both go through it. The program's path is taken now, before an update can
 // rename this binary to .old, so the new build is the one started.
 func proxyReviver() func() {
-	self, err := os.Executable()
+	self, err := settings.Executable()
 	if err != nil {
 		return nil
 	}
 	local := settings.ProxyURL()
 	return func() {
 		if api.Health(local) == nil {
-			_ = start(self, []string{"proxy", "--port", strconv.Itoa(settings.ProxyPort())}, local, "agent-proxy", "agent proxy", 30*time.Second)
+			_ = start(process.NativeCommand(self, "proxy", "--port", strconv.Itoa(settings.ProxyPort())), local, "agent-proxy", "agent proxy", 30*time.Second)
 		}
 	}
 }
 
-func start(program string, args []string, url, name, manual string, timeout time.Duration) error {
-	cmd := exec.Command(program, args...)
+func start(cmd *exec.Cmd, url, name, manual string, timeout time.Duration) error {
 	// All nil on purpose: a pipe here would hit the detached child with EPIPE/SIGPIPE
 	// on a stderr write after this launcher exits.
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil

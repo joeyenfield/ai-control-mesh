@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import signal
+import subprocess
 import sys
 import threading
 from contextlib import contextmanager
@@ -26,6 +27,21 @@ from agent_py.machine import mcp, presence
 from agent_py.machine import settings as machine_settings
 
 Seen = List[Tuple[str, str, Dict[str, str], bytes]]
+
+
+def test_machine_start_keeps_early_child_errors(tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROXY_MACHINE_HOME", str(tmp_path / "machine"))
+    monkeypatch.setattr(machine_main, "sign_in_first", lambda server: 0)
+    popen = subprocess.Popen
+
+    def failed_child(command, **options):
+        return popen([sys.executable, "-c", "import sys; print('startup-failed', file=sys.stderr); sys.exit(42)"], **options)
+
+    monkeypatch.setattr(subprocess, "Popen", failed_child)
+    assert machine_main.start([]) == 1
+    assert "startup-failed" in machine_settings.log_path().read_text()
+    if os.name != "nt":
+        assert machine_settings.log_path().stat().st_mode & 0o777 == 0o600
 
 
 @pytest.mark.parametrize(("platform", "arguments", "expected"), [
