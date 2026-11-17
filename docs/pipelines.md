@@ -84,6 +84,8 @@ The required checks cover native commands, scripts, literal arguments, environme
 and working directory, cancellation, PTY input/output, the machine launching the
 agent for a console shell, Ollama startup/shutdown, and ARM64 loader/DNS linkage.
 
+Branch/PR verification includes **Ollama setup Python parity**. It runs the Python install tests and the same real fleet/server install contract used by the Go server suite, in a disposable container. The machine unit stage covers CPU, Android Vulkan and Turnip package selection, environment overrides, failure preservation, concurrent changes and refusing setup while Ollama runs. No test installs host packages or requires GPU hardware; real model correctness on a GPU still needs a hardware check.
+
 Jenkins publishes JUnit results and archives logs in that stage. The distribution
 also contains the checksummed `android-runtime/result.json`, JUnit and logs.
 Build finalization and release require a successful result for the exact commit,

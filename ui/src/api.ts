@@ -1039,6 +1039,8 @@ export interface MachineServers {
     /** "systemd" when Ollama there is ollama.service; agent-machine restarts it once allowed (service_allowed). */
     service?: "systemd" | null;
     service_allowed?: boolean;
+    install_available?: boolean;
+    install?: LlamaInstallJob | null;
   };
   strata?: {
     found: boolean;
@@ -2700,6 +2702,7 @@ export const api = {
   llamaSettings: (machine: string) => request<LlamaSettings>(`${machineUrl(machine)}/servers/llamacpp`),
   saveLlamaSettings: (machine: string, config: OllamaConfig) =>
     request<LlamaSettings>(`${machineUrl(machine)}/servers/llamacpp`, { method: "PUT", body: JSON.stringify(config) }),
+  ollamaInstallOptions: (machine: string) => request<{ source?: string; variants: LlamaInstallOptions["variants"]; error?: string }>(`${machineUrl(machine)}/servers/ollama/install`),
   llamaInstallOptions: (machine: string) => request<LlamaInstallOptions>(`${machineUrl(machine)}/servers/llamacpp/install`),
   providerStatus: <T extends ProviderBase>(ref: ProviderRef) => request<T>(providerUrl(ref)),
   /** A llama.cpp model's files on Hugging Face, to download them by hand into the machine's GGUF folder. */

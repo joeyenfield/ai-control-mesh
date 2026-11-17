@@ -7,6 +7,7 @@ import { ALL_LINES, LogPanel, PROBLEMS, quietView, type LogTone } from "../compo
 import { TabBar, TabPanel, UnsavedDot, useTabParam } from "../components/Tabs";
 import { formatNumber } from "../format";
 import { useClipboard, useToast } from "../hooks";
+import { OllamaInstall } from "./OllamaInstall";
 
 type Action = "start" | "stop" | "restart";
 export type Value = string | number | boolean;
@@ -43,6 +44,7 @@ const GROUP_NOTES: Record<string, string> = {
 /** Client-side mirror of the machine's warnings so edits warn before saving. */
 function warningsFor(config: OllamaConfig): string[] {
   const warnings: string[] = [];
+  if (config.vulkan) warnings.push("Vulkan is experimental. GPU detection does not verify correct inference; test a model's replies and switch to CPU if they are corrupted.");
   const context = Number(config.context_length) || 0;
   if (context < 8192) warnings.push("Context below 8K is likely too small for coding agents.");
   else if (context < 16384) warnings.push("Some coding agents may exhaust this context rapidly.");
@@ -94,6 +96,18 @@ function OllamaControls({ machine }: { machine: FleetMachine }) {
   const [tab, setTab] = useTabParam(TABS);
   const tabs = useId();
   const initialised = useRef(false);
+  const lastInstall = useRef<string | null>(null);
+
+  useEffect(() => {
+    const job = settings.data?.status?.install;
+    const key = job ? `${job.at}:${job.variant}:${job.state}` : null;
+    if (key !== lastInstall.current && job?.state && job.state !== "installing") {
+      if (job.state === "installed" && settings.data) setConfig(settings.data.config);
+      client.invalidateQueries({ queryKey: ["machines"] });
+      if (lastInstall.current) notify(job.state === "installed" ? "Ollama installation and settings saved. Start Ollama to use them." : `Ollama installation failed: ${job.error}`);
+    }
+    lastInstall.current = key;
+  }, [settings.data, client, notify]);
 
   // Seed the form once; polling updates status without clobbering edits in progress.
   useEffect(() => {
@@ -141,8 +155,8 @@ function OllamaControls({ machine }: { machine: FleetMachine }) {
 
   const info = settings.data as OllamaSettings;
   const status: OllamaServerState = info.status ?? machine.servers.ollama ?? { found: false, running: false, managed: false, version: null, bind: null };
-  const owner = machine.you.launch;
-  const busy = act.isPending;
+  const owner = Boolean(machine.you.servers);
+  const busy = act.isPending || status.install?.state === "installing";
   const changed = (key: string) => config != null && config[key] !== info.config[key];
   const changedGroups = info.schema.groups.filter((group) => info.schema.settings.some((setting) => setting.group === group && changed(setting.key)));
   const envChanged = changed("extra_env");
@@ -164,6 +178,8 @@ function OllamaControls({ machine }: { machine: FleetMachine }) {
         onStop={() => setConfirm("stop")}
       />
 
+      <OllamaInstall machine={machine} status={status} dirty={dirty} />
+
       <div className="tabbed">
         <TabBar
           label="Server sections"
@@ -179,10 +195,10 @@ function OllamaControls({ machine }: { machine: FleetMachine }) {
         />
 
         <TabPanel idPrefix={tabs} id="settings" active={tab === "settings"}>
-          {config && <SettingsTab info={info} config={config} warnings={warnings} changed={changed} onChange={update} />}
+          <div inert={busy}>{config && <SettingsTab info={info} config={config} warnings={warnings} changed={changed} onChange={update} />}</div>
         </TabPanel>
         <TabPanel idPrefix={tabs} id="environment" active={tab === "environment"}>
-          {config && <EnvironmentTab info={info} config={config} dirty={dirty} onChange={update} text={OLLAMA_ENV} />}
+          <div inert={busy}>{config && <EnvironmentTab info={info} config={config} dirty={dirty} onChange={update} text={OLLAMA_ENV} />}</div>
         </TabPanel>
         <TabPanel idPrefix={tabs} id="log" active={tab === "log"}>
           <LogPanel
@@ -214,7 +230,7 @@ function OllamaControls({ machine }: { machine: FleetMachine }) {
                 Revert
               </button>
             )}
-            <button type="button" className={canRestart ? undefined : "primary"} disabled={!owner || !dirty || save.isPending} onClick={() => save.mutate()}>
+            <button type="button" className={canRestart ? undefined : "primary"} disabled={!owner || !dirty || busy || save.isPending} onClick={() => save.mutate()}>
               {save.isPending && confirm !== "save-restart" ? "Saving…" : "Save"}
             </button>
             {canRestart && (
@@ -324,7 +340,7 @@ function StatusCard({
           <dd>{status.found ? "Yes" : "Not found on PATH"}</dd>
         </div>
       </dl>
-      {!status.found && (
+      {!status.found && !status.install_available && (
         <div className="callout">
           <p>
             Ollama isn't installed on {machine.name}, or isn't on its PATH. Install it from{" "}

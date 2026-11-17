@@ -795,6 +795,43 @@ def test_a_fleet_machine_manages_its_model_server_for_the_console(tmp_path, agen
         assert httpx.get(f"{base}/providers/ollama-{port}", headers=m.headers, timeout=30).json()["online"]
 
 
+def test_a_fleet_machine_installs_ollama_with_explicit_gpu_setup(tmp_path, agent_binary, machine_binary):
+    prefix = tmp_path / "termux-prefix"
+    prefix.mkdir()
+    env = {"PREFIX": str(prefix), "TERMUX_VERSION": "test", "AI_PROXY_OLLAMA_COMMAND": "[]",
+           "AI_PROXY_OLLAMA_APT": json.dumps([sys.executable, str(Path(__file__).with_name("fake_ollama_apt.py"))])}
+    with machine(tmp_path, agent_binary) as m, fleet_machine(m, machine_binary, tmp_path, ["servers", "on"], env=env) as fleet:
+        base = f"{m.server}/api/machines/{fleet.box['id']}/servers/ollama"
+        options = httpx.get(base + "/install", headers=m.headers, timeout=30)
+        assert options.status_code == 200, options.text
+        assert [item["id"] for item in options.json()["variants"]] == ["cpu", "vulkan", "vulkan-adreno"]
+        assert httpx.post(base + "/install", headers=m.headers, json={"variant": "; shell"}).status_code == 400
+        config = httpx.get(base, headers=m.headers, timeout=30).json()["config"]
+        saved = httpx.put(base, headers=m.headers, json={**config, "models_dir": "existing-models", "extra_env": "OLLAMA_VULKAN=0"}, timeout=30)
+        assert saved.status_code == 200, saved.text
+        for variant in ("vulkan-adreno", "cpu"):
+            started = httpx.post(base + "/install", headers=m.headers, json={"variant": variant}, timeout=30)
+            assert started.status_code == 200, started.text
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                info = httpx.get(base, headers=m.headers, timeout=30).json()
+                job = info["status"].get("install") or {}
+                if job.get("state") != "installing":
+                    break
+                time.sleep(.1)
+            assert job.get("state") == "installed", job
+            assert info["config"]["models_dir"] == "existing-models"
+            assert info["config"]["vulkan"] == (variant != "cpu")
+            assert info["env"]["OLLAMA_VULKAN"] == ("0" if variant == "cpu" else "1")
+            assert info["env"]["GGML_VK_VISIBLE_DEVICES"] == ("-1" if variant == "cpu" else None)
+            assert not info["status"]["running"]
+        calls = (prefix / "apt-calls.jsonl").read_text()
+        assert "mesa-vulkan-icd-freedreno" in calls and "vulkan-loader-generic" in calls
+        fleet.command("servers", "off")
+        refused = httpx.post(base + "/install", headers=m.headers, json={"variant": "cpu"}, timeout=30)
+        assert refused.status_code == 409 and "servers on" in refused.text
+
+
 def test_a_fleet_machine_runs_llamacpp_and_its_models_serve_agents_through_its_tunnel(tmp_path, agent_binary, machine_binary):
     port = free_port()
     fake = {

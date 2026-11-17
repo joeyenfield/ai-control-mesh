@@ -269,6 +269,9 @@ def test_the_owner_starts_and_stops_the_machines_ollama_and_strata(tmp_path):
         assert alice.get("/api/machines/m1").json()["servers"]["strata"]["profiles"][0]["id"] == "app-1"
         # Starting programs on a machine is for its owner, as with launches.
         assert dave.post("/api/machines/m1/servers/ollama/start").status_code == 403
+        assert dave.get("/api/machines/m1/servers/ollama/install").status_code == 403
+        assert dave.post("/api/machines/m1/servers/ollama/install", json={"variant": "cpu"}).status_code == 403
+        assert alice.get("/api/machines/m1/servers/strata/install").status_code == 404
         assert alice.post("/api/machines/m1/servers/vllm/start").status_code == 404
         assert alice.post("/api/machines/m1/servers/strata/start", json={}).status_code == 400
         answer: dict = {}
@@ -277,6 +280,18 @@ def test_the_owner_starts_and_stops_the_machines_ollama_and_strata(tmp_path):
             thread = threading.Thread(target=lambda: answer.update(response=alice.post(path, json=body or {})))
             thread.start()
             return thread
+
+        thread = call("/api/machines/m1/servers/ollama/install", {"variant": "vulkan-adreno"})
+        request = json.loads(socket.receive_text())
+        assert (request["type"], request["kind"], request["op"], request["variant"]) == ("server", "ollama", "install", "vulkan-adreno")
+        assert "bind" not in request
+        progress = {"state": "installing", "variant": "vulkan-adreno", "step": "apt-get install", "secret": "not forwarded"}
+        socket.send_text(json.dumps({"type": "server_result", "request": request["request"], "ok": True,
+                                    "servers": {**servers, "ollama": {"install_available": True, "install": progress}}}))
+        thread.join(timeout=10)
+        assert answer["response"].status_code == 200
+        state = answer["response"].json()["servers"]["ollama"]
+        assert state["install_available"] and state["install"]["variant"] == "vulkan-adreno" and "secret" not in state["install"]
 
         thread = call("/api/machines/m1/servers/ollama/start")
         request = json.loads(socket.receive_text())

@@ -509,16 +509,18 @@ def register(app: FastAPI, runtime: Runtime) -> None:
         """Save the settings the machine's llama-server starts with; they apply when it next starts."""
         return await configure_server(machine_id, request, "llamacpp")
 
-    @app.get("/api/machines/{machine_id}/servers/llamacpp/install")
-    async def llamacpp_install_options(machine_id: str, request: Request) -> dict[str, Any]:
-        """How llama.cpp can be installed on the machine: Termux's packages, or the builds of llama.cpp's
-        latest GitHub release for its platform (CPU, CUDA, Vulkan, ...), as the machine finds them."""
+    @app.get("/api/machines/{machine_id}/servers/{kind}/install")
+    async def model_server_install_options(machine_id: str, kind: str, request: Request) -> dict[str, Any]:
+        """Installation choices supplied by the machine: Ollama's Termux CPU/GPU packages,
+        or llama.cpp's Termux packages and platform-specific GitHub builds."""
         require_trusted(request)
+        if kind not in {"ollama", "llamacpp"}:
+            raise HTTPException(status_code=404, detail="Choose ollama or llamacpp")
         target = visible(machine_id, request)
         if not allowed(auth.request_identity(request), target, "servers"):
             raise HTTPException(status_code=403, detail="Only the machine's owner, or the teams it lets, can install model servers on it.")
-        answer = await ask(target, "install_options", timeout=45, channel="server", kind="llamacpp")
-        return answer.get("llamacpp_install") or {"variants": []}
+        answer = await ask(target, "install_options", timeout=45, channel="server", kind=kind)
+        return answer.get(f"{kind}_install") or {"variants": []}
 
     async def server_settings(machine_id: str, request: Request, kind: str) -> dict[str, Any]:
         require_trusted(request)
@@ -543,7 +545,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
 
     @app.post("/api/machines/{machine_id}/servers/{kind}/{action}")
     async def model_server(machine_id: str, kind: str, action: str, request: Request) -> dict[str, Any]:
-        """Start, stop or restart the Ollama installed on the machine; start, stop, restart, install or uninstall
+        """Start, stop, restart or install Ollama on the machine; start, stop, restart, install or uninstall
         its llama.cpp; start, stop or remove a Strata profile, remove every profile whose model is gone (prune),
         or clear Strata's leftovers (cleanup)."""
         require_trusted(request)
@@ -551,7 +553,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
             raise HTTPException(status_code=403, detail="Start model servers from the console's own page.")
         target = visible(machine_id, request)
         actions = {
-            "ollama": {"start", "stop", "restart"}, "llamacpp": {"start", "stop", "restart", "install", "uninstall"},
+            "ollama": {"start", "stop", "restart", "install"}, "llamacpp": {"start", "stop", "restart", "install", "uninstall"},
             "strata": {"start", "stop", "remove", "prune", "cleanup"},
         }
         if action not in actions.get(kind, set()):
@@ -567,13 +569,13 @@ def register(app: FastAPI, runtime: Runtime) -> None:
                 if not profile:
                     raise HTTPException(status_code=400, detail=f"Name the Strata profile to {action}")
                 fields["profile"] = profile
-        elif kind == "llamacpp":
+        elif kind == "llamacpp" or (kind == "ollama" and action == "install"):
             # It always listens on loopback, where the machine's tunnels reach it: no bind to say.
             if action == "install":
                 data = await request.json() if request.headers.get("content-length") not in (None, "0") else {}
                 variant = str((data or {}).get("variant") or "") if isinstance(data, dict) else ""
                 if not VARIANT.fullmatch(variant):
-                    raise HTTPException(status_code=400, detail="Pick how to install llama.cpp: one of the machine's install options (cpu, vulkan, cuda-12.8, opencl, ...)")
+                    raise HTTPException(status_code=400, detail="Pick one of the machine's install options")
                 fields["variant"] = variant
         else:
             # Ollama listens on loopback when the machine is this computer, else where the server can reach it.

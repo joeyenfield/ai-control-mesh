@@ -35,7 +35,7 @@ You can't add a local provider by URL: **Server settings** (and `PUT /api/config
 - pulling, deleting, loading and unloading models;
 - its logs;
 - the machine's CPU, memory and GPU load;
-- Ollama's and llama.cpp's settings, installing llama.cpp, and starting and stopping Ollama, llama.cpp and Strata;
+- Ollama's and llama.cpp's settings, installing Ollama in Termux or llama.cpp, and starting and stopping Ollama, llama.cpp and Strata;
 - searching ollama.com, Hugging Face and Docker Hub.
 
 In the console, all of it is on the machine's page, a tab per model server. A model server is named `<type>-<port>`, such as `ollama-11434`. A model server that isn't a provider yet is managed the same way, with **Add as a provider** at its top for admins. Each kind's tab is described below: [Ollama](#models-on-ollama), [Strata](#strata), [llama.cpp](#models-on-llamacpp) and [Docker Model Runner](#docker-model-runner).
