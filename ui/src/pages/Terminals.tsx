@@ -5,7 +5,8 @@ import { api, type TerminalSummary } from "../api";
 import { NotifyToggle } from "../components/Attention";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useToast } from "../hooks";
-import { PartTag } from "../components/PartTag";
+import { AgentBar } from "../components/AgentBar";
+import { SessionCostPill } from "../components/SessionCost";
 import { SharingBadge } from "../components/Sharing";
 import { formatNumber, formatRelative } from "../format";
 
@@ -114,45 +115,13 @@ export function TerminalsPage() {
   const counts = new Map<string, number>();
   for (const { state } of found) counts.set(state.tone, (counts.get(state.tone) ?? 0) + 1);
   const shown = show ? found.filter(({ state }) => state.tone === show) : found;
-  const tones = running.map((terminal) => terminalState(terminal, now).tone);
 
   return (
     <div className="page">
-      <header className="page-head">
-        <PartTag />
-        <h1>Running agents</h1>
-        <p className="lede">
-          The agents running now with a shared terminal: who started each, what it's doing and how much it has sent. Open one
-          to read its screen and type into it, from any device.
-        </p>
-      </header>
+      <AgentBar title="Running agents" terminals={trusted ? all : []} />
 
       {remote.isError && <p className="bad">{remote.error.message}</p>}
       {remote.data && !trusted && <PairPanel />}
-
-      {trusted && running.length > 0 && (
-        <dl className="stat-cards" aria-label="Running agents">
-          <div>
-            <dt>Running</dt>
-            <dd>{formatNumber(running.length)}</dd>
-          </div>
-          <div>
-            <dt>Need you</dt>
-            <dd>{formatNumber(tones.filter((tone) => tone === "ask").length)}</dd>
-          </div>
-          <div>
-            <dt>Working</dt>
-            <dd>{formatNumber(tones.filter((tone) => tone === "live").length)}</dd>
-          </div>
-          <div>
-            <dt>Requests</dt>
-            <dd>
-              {formatNumber(running.reduce((total, item) => total + item.request_count, 0))}{" "}
-              {running.some((item) => item.in_flight > 0) && <small>{running.reduce((total, item) => total + item.in_flight, 0)} in flight</small>}
-            </dd>
-          </div>
-        </dl>
-      )}
 
       {trusted && (
         <section className="section" aria-label="Running now">
@@ -266,6 +235,7 @@ function AgentRow({ terminal, state, onRemove }: { terminal: TerminalSummary; st
           )}
           <SharingBadge you={terminal.you} />
           <span className="agent-row-end">
+            <SessionCostPill sessionId={terminal.session_id} />
             <span className={`pill ${state.tone === "idle" ? "" : state.tone}`}>{state.label}</span>
           </span>
         </span>

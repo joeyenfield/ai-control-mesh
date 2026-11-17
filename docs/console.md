@@ -98,9 +98,9 @@ A machine's own page has the same launch form (see [its Agents tab](#summary-age
 
 `/terminals` lists the agents running now whose terminals are shared with the server (`--control`, or started from a machine's page). It's the active part of **Sessions**, one row per agent:
 
-- The cards at the top count the agents running, those that need you, those working, and their requests (with how many are in flight).
+- The bar at the top is the same as the Live agent view's. It counts the agents running, those that need you, those working, and their requests (point at the count for how many are in flight), with what their sessions have cost so far. **Open** drops down the running agents, each with its state and cost, to jump straight to one's terminal.
 - **Search** by agent, project, person, machine, model or session id. The chips under it filter by state, each with its count.
-- Each row shows the agent, its folder, who can see it and its state; one line on what it's doing (the question, when it asks one); then who started it, the machine, the model and provider, when it started, and its requests with how many are in flight and when the last one was.
+- Each row shows the agent, its folder, who can see it, its cost so far and its state; one line on what it's doing (the question, when it asks one); then who started it, the machine, the model and provider, when it started, and its requests with how many are in flight and when the last one was.
 - Press a row to open its terminal. **Session** opens its session, with its requests and recordings.
 
 The states:
@@ -120,11 +120,13 @@ A terminal that isn't connected (launcher closed, or agent exited) has **Remove*
 
 ### Live agent view
 
-**Live agent view** (`/live-agents`) is where the console opens (`/` goes there). It shows several terminals together. Old `/terminals-beta` links open it. The title and two dropdowns share one narrow bar, so the terminals take the rest of the screen.
+**Live agent view** (`/live-agents`) is where the console opens (`/` goes there). It shows several terminals together. Old `/terminals-beta` links open it. The title, the same counts and cost as Running agents, and three dropdowns share one narrow bar, so the terminals take the rest of the screen.
+
+- **Open** jumps to any running agent's full terminal page, as on Running agents; its back button returns here.
 
 - **Agents** (with the number in the grid) drops down a searchable list of shared sessions, each with its state, folder and machine. Tick up to 16. It opens by itself while the grid is empty; **Done**, Esc or a click elsewhere closes it.
 - The layout dropdown (**2 × 2**) sets **Rows** and **Columns** (1–4 each) and **Text size**. With more agents than fit, the arrows beside the page number (such as **1 / 2**) switch grid pages; only the visible page connects its terminals.
-- The button at the left of the bar hides the dropdowns, leaving one line of chrome: the grid grows into the room until you show them again. **Choose agents** in an empty grid or **Add an agent** in an empty tile shows the bar and opens the agent list.
+- The button at the right end of the bar hides the counts and dropdowns, leaving one line of chrome: the grid grows into the room until you show them again. **Choose agents** in an empty grid or **Add an agent** in an empty tile shows the bar and opens the agent list.
 
 ![Four terminals in the Live agent view](screenshots/terminal-grid.png)
 
@@ -231,7 +233,7 @@ Account agents' other calls (sign-in, telemetry, MCP) aren't shown here; they're
 
 `/sessions` lists every session, the most recently active first: agent, project, provider, model, who can see it, its state (**Streaming**, **Open** or **Ended**), its requests, the tokens it sent and got back, its estimated cost and when it last had traffic. On a wide screen these are columns with their names above, so the figures line up down the list, and a thin bar under each cost shows how it compares with the costliest session shown. The cards at the top count the sessions, the ones streaming now, the open ones, all their requests, their tokens and their cost. **Search** by agent, project, model or session id, filter by state with the chips, and **Sort by** **Latest**, **Cost**, **Tokens** or **Requests** to bring the sessions that used the most to the top. A cost with **≈** is a subscription's calls at API prices, which isn't billed; a dash means none of the session's model calls has a price yet (recompute them on **Costs and prices**). Expanding one shows its **Latest requests** and its actions:
 
-**Estimated cost.** A session's own page shows what its calls to paid providers cost, by the server's price table, and each request in its list and in the inspector shows its own. **Traffic** shows each request's cost in its row and the total of the requests shown in its cards. In the **Live agent view** each agent's header carries its session's cost so far, as does the bar of its full terminal page; point at it for the cost by model. An account agent's calls show what they'd cost at API prices, since a subscription doesn't bill them by the token. See [Cost estimates](providers.md#cost-estimates).
+**Estimated cost.** A session's own page shows what its calls to paid providers cost, by the server's price table, and each request in its list and in the inspector shows its own. **Traffic** shows each request's cost in its row and the total of the requests shown in its cards. In the **Live agent view** each agent's header carries its session's cost so far, as do its row on **Running agents**, the **Open** list and the bar of its full terminal page, and the bar on both pages shows the running agents' total; point at it for the cost by model. An account agent's calls show what they'd cost at API prices, since a subscription doesn't bill them by the token. See [Cost estimates](providers.md#cost-estimates).
 
 - **Capture full request and response payloads**: turn saving payloads on or off for the rest of the session.
 - **Review requests**, **Traffic**: open its requests on those pages.
