@@ -542,9 +542,167 @@ def file_size(path: str) -> Optional[int]:
     return total
 
 
+def llama_cache_dir() -> str:
+    """Where llama.cpp keeps the models it downloads (llamacpp.py owns its setting)."""
+    from . import llamacpp
+    return llamacpp.cache_dir()
+
+
+def llama_standard_cache() -> str:
+    """Where llama.cpp keeps its cache when nothing names it, the way it finds it itself."""
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA", "")
+    elif sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Caches")
+    else:
+        base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    return os.path.join(base, "llama.cpp") if base else ""
+
+
+def llama_model_folders() -> List[str]:
+    """The folders models live in here: the GGUF folder llama-server serves and agent-machine
+    downloads into, and the folder it downloads Hugging Face models into."""
+    folders = [llama_folder()]
+    cache = llama_cache_dir()
+    if cache:
+        return folders + [cache]
+    standard = llama_standard_cache()
+    return folders + [standard] if standard else folders
+
+
+_LLAMA_SHARD = re.compile(r"-\d+-of-\d+")
+LLAMA_SCAN_DEPTH = 4  # llama.cpp nests a model's folder and its quant folder at most
+LLAMA_SCAN_FILES = 400  # a status poll every few seconds must not walk a folder of any size
+
+
+def gguf_name(name: str) -> str:
+    """A model or folder name for matching: lower case, with the extension, a split model's part
+    numbers and every separator gone, so Qwen-GGUF, qwen.gguf and qwen_gguf are one name."""
+    trimmed = name.lower()
+    if trimmed.endswith(".gguf"):
+        trimmed = trimmed[: -len(".gguf")]
+    return "".join(char for char in _LLAMA_SHARD.sub("", trimmed) if "a" <= char <= "z" or "0" <= char <= "9")
+
+
+def _llama_add(files: List[Dict[str, Tuple[str, str]]], folders: Dict[str, int], models: Dict[str, int],
+               root: str, parts: List[str], size: int) -> None:
+    """Records one .gguf file, naming it by every run of the chain of names from the searched folder
+    down to the file: a folder's name means everything in it, and a name that reaches the file's own
+    means that model and its other parts, which are always in the same folder.
+
+    A group is a folder's whole size or one model's parts in one folder, so a model in several files
+    counts all of them and never another model's."""
+    chain = [gguf_name(part) for part in parts]
+    if not all(chain):
+        return
+    below = [os.path.join(root, *parts[:i + 1]) for i in range(len(parts) - 1)]
+    home = below[-1] if below else root
+    stem = chain[-1]
+    groups: Dict[str, Tuple[str, str]] = {}
+    for i in range(len(chain)):
+        group = (home, stem) if i == len(below) else (below[i], "")
+        name = ""
+        for j in range(i + 1):
+            name += chain[j]
+            groups[name] = group
+    files.append(groups)
+    models[home + "\x1f" + stem] = models.get(home + "\x1f" + stem, 0) + size
+    for folder in below:
+        folders[folder] = folders.get(folder, 0) + size
+
+
+def llama_model_files() -> Tuple[List[Dict[str, Tuple[str, str]]], Dict[str, int], Dict[str, int]]:
+    """llama.cpp's model files on this machine, and what the names in each folder and the parts of
+    each model add up to. Without following a folder deeper than its layout or reading more than
+    LLAMA_SCAN_FILES of them."""
+    files: List[Dict[str, Tuple[str, str]]] = []
+    folders: Dict[str, int] = {}
+    models: Dict[str, int] = {}
+    seen_roots = set()
+    for root in llama_model_folders():
+        if len(files) >= LLAMA_SCAN_FILES:
+            break
+        if not root or not os.path.isdir(root):
+            continue
+        root = os.path.realpath(root)
+        if root in seen_roots:
+            continue
+        seen_roots.add(root)
+        for folder, dirs, names in os.walk(root):
+            below = [] if folder == root else os.path.relpath(folder, root).split(os.sep)
+            dirs[:] = sorted(name for name in dirs if not name.startswith(".") and len(below) < LLAMA_SCAN_DEPTH)
+            for name in sorted(names):
+                if len(files) >= LLAMA_SCAN_FILES:
+                    break
+                lower = name.lower()
+                if not lower.endswith(".gguf") or "mmproj" in lower:
+                    continue  # a vision projector goes with a model but isn't part of its size
+                try:
+                    size = os.stat(os.path.join(folder, name)).st_size
+                except OSError:
+                    continue
+                parts = [*below, name]
+                if len(parts) - 1 > LLAMA_SCAN_DEPTH:
+                    continue
+                _llama_add(files, folders, models, root, parts, size)
+            if len(files) >= LLAMA_SCAN_FILES:
+                break
+    return files, folders, models
+
+
+def llama_model_keys(model_id: str) -> List[str]:
+    """The names a listed model goes by on disk: llama.cpp's cache names a file or folder after its
+    repo and quant, its models folder after the model alone. The quant is kept: a model listed with
+    one quant is not the same files as another quant of the same repo."""
+    repo, _, quant = model_id.partition(":")
+    parts = repo.split("/")
+    short = gguf_name(parts[-1])
+    org = gguf_name(parts[-2]) if len(parts) > 1 else ""
+    # A Hugging Face GGUF repo is usually named "<model>-GGUF" while its files and folders carry the
+    # model's name alone.
+    shorts = [short]
+    bare = short[:-len("gguf")] if short.endswith("gguf") else short
+    if bare and bare != short:
+        shorts.append(bare)
+    keys: List[str] = []
+    name = gguf_name(quant)
+    if name:
+        for model in shorts:
+            keys.append(model + name)
+            if org:
+                keys.append(org + model + name)
+        return keys
+    for model in shorts:
+        keys.append(model)
+        if org:
+            keys.append(org + model)
+    return keys
+
+
+def llama_size_for(model_id: str, files: List[Dict[str, Tuple[str, str]]], folders: Dict[str, int],
+                   models: Dict[str, int]) -> Optional[int]:
+    """A listed model's bytes as the files here: the largest group of files one of its names matches."""
+    for key in llama_model_keys(model_id):
+        if not key:
+            continue
+        best, seen = 0, set()
+        for groups in files:
+            group = groups.get(key)
+            if group is None or group in seen:
+                continue
+            seen.add(group)
+            folder, stem = group
+            total = models.get(folder + "\x1f" + stem, 0) if stem else folders.get(folder, 0)
+            best = max(best, total)
+        if best > 0:
+            return best
+    return None
+
+
 def llama_models(listed: Any) -> List[Dict[str, Any]]:
     """The router's models as the console shows them, loaded first, then by name."""
     models = []
+    found = None  # the model files here, read only for a model the router gives no size for
     for raw in items(obj(listed).get("data")) or []:
         item = obj(raw)
         model_id = text(item.get("id"))
@@ -568,6 +726,18 @@ def llama_models(listed: Any) -> List[Dict[str, Any]]:
             done = sum(number(obj(file).get("done")) for file in progress.values())
             total = sum(number(obj(file).get("total")) for file in progress.values())
             model["progress"] = {"completed": int(done), "total": int(total)}
+        # An older router gives the size of a model only once it has read its file, and names no file
+        # at all, so a model that sits in one of these folders has to be found here.
+        if model["size"] is None:
+            if found is None:
+                found = llama_model_files()
+            size = llama_size_for(model_id, *found)
+            if size is not None:
+                model["size"] = size
+        # A downloading model has no file to measure yet, so the total the router reports for its
+        # download stands in for its size.
+        if model["size"] is None and model["progress"] is not None:
+            model["size"] = model["progress"]["total"]
         models.append(model)
     models.sort(key=lambda model: (not model["loaded"], model["name"]))
     return models

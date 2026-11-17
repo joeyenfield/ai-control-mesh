@@ -20,10 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -83,9 +85,241 @@ func fileSize(path string) any {
 	return total
 }
 
+// LlamaCache is where llama.cpp keeps the models it downloads (LLAMA_CACHE). Package servers
+// points it at the machine's setting; alone here it reads this process's environment, which is
+// what llama.cpp itself uses when nothing is set.
+var LlamaCache = func() string { return strings.TrimSpace(os.Getenv("LLAMA_CACHE")) }
+
+// llamaModelFolders are the folders models live in here: the GGUF folder llama-server serves and
+// agent-machine downloads into, and the folder it downloads Hugging Face models into (its standard
+// cache when the machine names none).
+func llamaModelFolders() []string {
+	folders := []string{LlamaFolder()}
+	if cache := strings.TrimSpace(LlamaCache()); cache != "" {
+		folders = append(folders, cache)
+	} else if cache, err := os.UserCacheDir(); err == nil {
+		return append(folders, filepath.Join(cache, "llama.cpp"))
+	}
+	return folders
+}
+
+// ggufShard marks one part of a model llama.cpp split across files (name-00001-of-00003.gguf).
+var ggufShard = regexp.MustCompile(`-\d+-of-\d+`)
+
+// ggufName reduces a model or folder name for matching: lower case, with the extension, a split
+// model's part numbers and every separator gone, so Qwen-GGUF, qwen.gguf and qwen_gguf are one
+// name.
+func ggufName(name string) string {
+	trimmed := strings.ToLower(name)
+	if strings.HasSuffix(trimmed, ".gguf") {
+		trimmed = trimmed[:len(trimmed)-len(".gguf")]
+	}
+	trimmed = ggufShard.ReplaceAllString(trimmed, "")
+	joined := make([]rune, 0, len(trimmed))
+	for _, letter := range trimmed {
+		if letter >= 'a' && letter <= 'z' || letter >= '0' && letter <= '9' {
+			joined = append(joined, letter)
+		}
+	}
+	return string(joined)
+}
+
+const (
+	llamaScanDepth = 4   // llama.cpp nests a model's folder and its quant folder at most
+	llamaScanFiles = 400 // a status poll every few seconds must not walk a folder of any size
+)
+
+// ggufGroup is a name's share of the files on disk: everything in a folder (a model llama.cpp
+// keeps in several files, or its quant folders), or the parts one model in one folder is made of.
+type ggufGroup struct {
+	folder string
+	stem   string // empty = the whole folder
+}
+
+// llamaDisk is llama.cpp's model files on this machine, and what the names in each folder and the
+// parts of each model add up to.
+type llamaDisk struct {
+	files   []map[string]ggufGroup
+	folders map[string]int64
+	models  map[string]int64
+}
+
+// add records one .gguf file, naming it by every run of the chain of names from the searched
+// folder down to the file: a folder's name means everything in it, and a name that reaches the
+// file's own means that model and its other parts, which are always in the same folder. chain and
+// the folders that hold it come in step: chain[i] is what folders[i] is called, and the last name
+// is the file's own.
+func (d *llamaDisk) add(chain []string, folders []string, home string, size int64) {
+	stem := chain[len(chain)-1]
+	groups := map[string]ggufGroup{}
+	for i := range chain {
+		group := ggufGroup{folder: home, stem: stem}
+		if i < len(folders) {
+			group = ggufGroup{folder: folders[i]}
+		}
+		name := ""
+		for j := 0; j <= i; j++ {
+			name += chain[j]
+			groups[name] = group
+		}
+	}
+	d.files = append(d.files, groups)
+	d.models[home+"\x1f"+stem] += size
+	for _, folder := range folders {
+		d.folders[folder] += size
+	}
+}
+
+// llamaModelFiles reads every folder llama.cpp keeps models in, without following a folder deeper
+// than its layout or reading more than llamaScanFiles files.
+func llamaModelFiles() *llamaDisk {
+	disk := &llamaDisk{folders: map[string]int64{}, models: map[string]int64{}}
+	seenRoots := map[string]bool{}
+	for _, root := range llamaModelFolders() {
+		if len(disk.files) >= llamaScanFiles {
+			break
+		}
+		if root == "" {
+			continue
+		}
+		// A configured model/cache folder may be the same directory through another path.
+		resolved, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		root, err = filepath.Abs(resolved)
+		if err != nil || seenRoots[root] {
+			continue
+		}
+		seenRoots[root] = true
+		_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				if entry != nil && entry.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil || rel == "." {
+				return nil
+			}
+			parts := strings.Split(rel, string(filepath.Separator))
+			if len(parts)-1 > llamaScanDepth {
+				if entry.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			if entry.IsDir() {
+				if strings.HasPrefix(entry.Name(), ".") {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			name := strings.ToLower(entry.Name())
+			if !strings.HasSuffix(name, ".gguf") || strings.Contains(name, "mmproj") {
+				return nil // a vision projector goes with a model but isn't part of its size
+			}
+			info, err := os.Stat(path) // a GGUF symlink has the size of its target, not its link text
+			if err != nil || info.IsDir() {
+				return nil
+			}
+			chain := make([]string, 0, len(parts))
+			for _, part := range parts { // the last is the file's own name
+				name := ggufName(part)
+				if name == "" {
+					return nil // a name nothing can match
+				}
+				chain = append(chain, name)
+			}
+			folders := make([]string, 0, len(parts)-1)
+			for i := range parts[:len(parts)-1] {
+				folders = append(folders, filepath.Join(append([]string{root}, parts[:i+1]...)...))
+			}
+			home := root
+			if len(folders) > 0 {
+				home = folders[len(folders)-1]
+			}
+			disk.add(chain, folders, home, info.Size())
+			if len(disk.files) >= llamaScanFiles {
+				return fs.SkipAll
+			}
+			return nil
+		})
+	}
+	return disk
+}
+
+// llamaModelKeys are the names a listed model goes by on disk: llama.cpp's cache names a file or
+// folder after its repo and quant, its models folder after the model alone. The quant is kept: a
+// model listed with one quant is not the same files as another quant of the same repo.
+func llamaModelKeys(id string) []string {
+	repo, quant, _ := strings.Cut(id, ":")
+	parts := strings.Split(repo, "/")
+	short := ggufName(parts[len(parts)-1])
+	org := ""
+	if len(parts) > 1 {
+		org = ggufName(parts[len(parts)-2])
+	}
+	// A Hugging Face GGUF repo is usually named "<model>-GGUF" while its files and folders carry
+	// the model's name alone.
+	shorts := []string{short}
+	if bare := strings.TrimSuffix(short, "gguf"); bare != "" && bare != short {
+		shorts = append(shorts, bare)
+	}
+	keys := []string{}
+	if name := ggufName(quant); name != "" {
+		for _, model := range shorts {
+			keys = append(keys, model+name)
+			if org != "" {
+				keys = append(keys, org+model+name)
+			}
+		}
+		return keys
+	}
+	for _, model := range shorts {
+		keys = append(keys, model)
+		if org != "" {
+			keys = append(keys, org+model)
+		}
+	}
+	return keys
+}
+
+// sizeFor is a listed model's bytes as the files here: the largest group of files one of its names
+// matches, so a model in several files counts all of them and never another model's parts.
+func (d *llamaDisk) sizeFor(id string) (int64, bool) {
+	for _, key := range llamaModelKeys(id) {
+		if key == "" {
+			continue
+		}
+		best := int64(0)
+		seen := map[ggufGroup]bool{}
+		for _, groups := range d.files {
+			group, ok := groups[key]
+			if !ok || seen[group] {
+				continue
+			}
+			seen[group] = true
+			total := d.folders[group.folder]
+			if group.stem != "" {
+				total = d.models[group.folder+"\x1f"+group.stem]
+			}
+			if total > best {
+				best = total
+			}
+		}
+		if best > 0 {
+			return best, true
+		}
+	}
+	return 0, false
+}
+
 // llamaModels is the router's models as the console shows them, loaded first, then by name.
 func llamaModels(listed any) []map[string]any {
 	models := []map[string]any{}
+	var disk *llamaDisk // the model files here, read only for a model the router gives no size for
 	for _, raw := range list(object(listed)["data"]) {
 		item := object(raw)
 		id := str(item["id"])
@@ -116,6 +350,21 @@ func llamaModels(listed any) []map[string]any {
 				total += number(object(file)["total"])
 			}
 			model["progress"] = map[string]any{"completed": int64(done), "total": int64(total)}
+		}
+		// An older router gives the size of a model only once it has read its file, and names
+		// no file at all, so a model that sits in one of these folders has to be found here.
+		if model["size"] == nil {
+			if disk == nil {
+				disk = llamaModelFiles()
+			}
+			if total, ok := disk.sizeFor(id); ok {
+				model["size"] = total
+			}
+		}
+		// A downloading model has no file to measure yet, so the total the router reports for its
+		// download stands in for its size.
+		if model["size"] == nil && model["progress"] != nil {
+			model["size"] = model["progress"].(map[string]any)["total"]
 		}
 		models = append(models, model)
 	}

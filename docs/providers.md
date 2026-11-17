@@ -488,7 +488,7 @@ The settings are the machine's: agent-machine keeps them in `llamacpp.json` in i
 
 ### Models on llama.cpp
 
-Its model server tab lists what the router can serve, loaded ones first, with each one's size, state (loaded, loading, not loaded, asleep, downloading with its progress, a download not finished) and file, and:
+Its model server tab lists what the router can serve, loaded ones first, with each one's size, state (loaded, loading, not loaded, asleep, downloading with its progress, a download not finished) and file. An older llama.cpp names no file and no size for a model until it has read it, so agent-machine takes that model's size from its own `.gguf` files in the download cache and the GGUF folder: every part of a split model together, without its vision projector. A model still downloading shows how big its download will be, and one with no files in either folder shows no size. The tab has:
 
 - **Load** and **Unload**, through the router's `/models/load` and `/models/unload`;
 - **Delete**, which deletes a model from llama.cpp's cache (`DELETE /models`), or one agent-machine downloaded into its GGUF folder (it unloads it, deletes its subfolder and has the router read the folder again). Other models in a GGUF folder are removed there;
