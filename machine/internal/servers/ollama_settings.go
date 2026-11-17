@@ -101,6 +101,9 @@ func ollamaDataModels(config map[string]any) (string, bool) {
 // ConfigWarnings is what the console warns about in a config.
 func ConfigWarnings(config map[string]any) []string {
 	warnings := []string{}
+	if truthy(config["vulkan"]) {
+		warnings = append(warnings, "Vulkan is experimental. GPU detection does not verify correct inference; test a model's replies and switch to CPU if they are corrupted.")
+	}
 	context, _ := asInt(config["context_length"])
 	if context < 8192 {
 		warnings = append(warnings, "Context below 8K is likely too small for coding agents.")

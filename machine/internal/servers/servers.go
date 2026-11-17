@@ -48,7 +48,7 @@ var (
 )
 
 // Request is the server's {"type": "server", ...}: start, stop, restart or status of one
-// kind, Ollama's or llama.cpp's settings (settings, configure), or installing llama.cpp
+// kind, Ollama's or llama.cpp's settings (settings, configure), or installing either
 // (install_options, install, uninstall).
 type Request struct {
 	Type    string `json:"type"`
@@ -60,7 +60,7 @@ type Request struct {
 	Bind string `json:"bind"`
 	// Config is Ollama's or llama.cpp's settings, for configure.
 	Config map[string]any `json:"config"`
-	// Variant is how to install llama.cpp: one of the install_options' variants.
+	// Variant is how to install the server: one of the install_options' variants.
 	Variant string `json:"variant"`
 }
 
@@ -110,6 +110,9 @@ func (m *Manager) Handle(request Request) map[string]any {
 	if request.Kind == "ollama" && (request.Op == "settings" || request.Op == "configure") && m.machine().Servers {
 		answer["ollama_settings"] = m.ollamaSettings()
 	}
+	if request.Kind == "ollama" && request.Op == "install_options" && m.machine().Servers {
+		answer["ollama_install"] = ollamaInstallOptions()
+	}
 	if request.Kind == "llamacpp" && m.machine().Servers {
 		switch request.Op {
 		case "settings", "configure":
@@ -126,7 +129,14 @@ func (m *Manager) handle(request Request) error {
 	if !m.machine().Servers {
 		return errors.New("Starting model servers is off on this machine (agent-machine servers on)")
 	}
+	if request.Kind == "ollama" && ollamaInstalling() && request.Op != "settings" && request.Op != "status" && request.Op != "install_options" {
+		return errors.New("Ollama is being installed; wait before changing or starting it")
+	}
 	switch {
+	case request.Kind == "ollama" && request.Op == "install_options":
+		return nil
+	case request.Kind == "ollama" && request.Op == "install":
+		return m.startOllamaInstall(request.Variant)
 	case request.Op == "status":
 		return nil
 	case request.Kind == "ollama" && request.Op == "settings":
@@ -287,6 +297,7 @@ func (m *Manager) ollamaState() map[string]any {
 	version := m.ollamaVersion()
 	pid := managedPID()
 	result := map[string]any{"found": ollamaCommand() != nil, "running": version != "", "version": version, "managed": pid > 0, "port": m.port()}
+	result["install_available"], result["install"] = termuxPrefix() != "", ollamaInstallProgress()
 	if pid > 0 {
 		result["bind"] = loadState().OllamaBind
 	}

@@ -102,6 +102,8 @@ Authentication lives in the common `agent-proxy/credentials.json` (or `AI_PROXY_
 
 ## Extending and testing
 
+`servers/ollama_install.go` handles Ollama `install_options` and `install`: Termux-only fixed package lists for CPU, Android Vulkan or Mesa Turnip. `install_available` and a bounded install job travel in Ollama's state. A running Ollama must be stopped first; changing/starting/configuring Ollama is refused during installation. `ollama-install.log` records apt output privately. Settings are merged over the saved config only after packages and required backend files succeed, and server management is checked again before saving. CPU disables GPU devices; Vulkan uses F16, no Flash Attention, 8K context and one slot. Profile-related extra variables are removed so they cannot defeat the choice. Installation never claims verified GPU inference. Python mirrors this in `machine/ollama_install.py`. Shared fake apt and fleet contracts cover both implementations without touching real packages.
+
 Ollama startup uses `process.Command()` so Android executes the native Termux binary through its system linker rather than a raw exec syscall into app storage. Python's `subprocess.Popen` already goes through libc and Termux's execution hook. `servers/native_test.go` starts the test executable as a native Ollama stand-in, checks its HTTP readiness and saved process id, then stops it; this also runs as a compiled Android test on the emulator.
 
 - **Provider kind**: a case in `providers.handle` (status, model operations, log), a probe in presence, Go tests, then the server and console sides (the checklist in `server.md`, Extending).

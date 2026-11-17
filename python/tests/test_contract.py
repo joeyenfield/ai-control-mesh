@@ -18,6 +18,7 @@ from test_client import (  # noqa: F401  (the tests are collected from here, wit
     test_a_fleet_machine_shows_its_files_only_when_files_are_on,
     test_the_status_agent_tray_reads_is_the_same_from_either_program,
     test_a_fleet_machine_manages_its_model_server_for_the_console,
+    test_a_fleet_machine_installs_ollama_with_explicit_gpu_setup,
     test_a_fleet_machine_runs_an_agent_the_console_starts,
     test_a_fleet_machine_runs_an_account_agent_with_a_managed_token_it_gets_once,
     test_a_fleet_machine_runs_the_containers_the_server_asks_for,

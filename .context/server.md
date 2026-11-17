@@ -25,6 +25,8 @@ Agent session resolution checks control permission and ended state. Unscoped for
 
 ## Composition
 
+Ollama installation is a fleet operation: `GET /api/machines/{id}/servers/ollama/install` asks for `install_options`, and `POST` with a chosen variant asks for `install`. Both require the `servers` grant; mutations also require same origin. `fleet._servers` retains Ollama `install_available` and the shared bounded `_install_job` progress fields. The server never runs package managers. Go and Python contract tests cover the operation through a real machine connection.
+
 ```mermaid
 flowchart LR
   main["app.main()"] --> sup["Supervisor.serve loop<br/>Settings.load (database) · ui_build · ensure_first_user"]

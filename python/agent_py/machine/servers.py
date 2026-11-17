@@ -306,6 +306,8 @@ def ollama_data_models(config: Dict[str, Any]) -> Optional[str]:
 
 def config_warnings(config: Dict[str, Any]) -> List[str]:
     warnings = []
+    if truthy(config.get("vulkan")):
+        warnings.append("Vulkan is experimental. GPU detection does not verify correct inference; test a model's replies and switch to CPU if they are corrupted.")
     context = as_int(config.get("context_length")) or 0
     if context < 8192:
         warnings.append("Context below 8K is likely too small for coding agents.")
@@ -929,6 +931,9 @@ class Manager:
                 answer.update(ok=False, error=f"{type(error).__name__}: {error}")
             if request.get("kind") == "ollama" and request.get("op") in ("settings", "configure") and self.machine().servers:
                 answer["ollama_settings"] = self.ollama_settings()
+            if request.get("kind") == "ollama" and request.get("op") == "install_options" and self.machine().servers:
+                from . import ollama_install
+                answer["ollama_install"] = ollama_install.install_options()
             if request.get("kind") == "llamacpp" and self.machine().servers:
                 from . import llamacpp
                 if request.get("op") in ("settings", "configure"):
@@ -942,6 +947,14 @@ class Manager:
         if not self.machine().servers:
             raise Refused("Starting model servers is off on this machine (agent-machine servers on)")
         op, kind = request.get("op"), request.get("kind")
+        from . import ollama_install
+        if kind == "ollama" and ollama_install.installing() and op not in ("settings", "status", "install_options"):
+            raise Refused("Ollama is being installed; wait before changing or starting it")
+        if kind == "ollama" and op == "install_options":
+            return
+        if kind == "ollama" and op == "install":
+            ollama_install.start(self, request.get("variant") or "")
+            return
         if op == "status" or (kind == "ollama" and op == "settings"):
             return
         if kind == "ollama" and op == "configure":
@@ -990,6 +1003,8 @@ class Manager:
         version = self.ollama_version()
         pid = managed_pid()
         result: Dict[str, Any] = {"found": ollama_command() is not None, "running": bool(version), "version": version, "managed": pid > 0, "port": self.port}
+        from . import ollama_install
+        result.update(install_available=bool(ollama_install.llamacpp.termux_prefix()), install=ollama_install.progress())
         if pid:
             result["bind"] = load_state().get("ollama_bind") or ""
         # A systemd service is agent-machine's to start and stop once it's allowed to.

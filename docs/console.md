@@ -506,6 +506,12 @@ When the machine doesn't report an Ollama, llama.cpp or Strata running, its tab 
 
 **Ollama → Server settings**, for the Ollama installed on the machine: **Start**, **Stop** or **Restart** it (with `servers on`), **Settings** (the `OLLAMA_*` settings agent-machine starts it with, such as context length, parallel requests, flash attention and KV cache type, with warnings), **Environment** (what Ollama starts with, plus **Extra variables**) and **Log**.
 
+In Termux, **Install Ollama** is available even before Ollama is installed. **Choose CPU / GPU setup** also lets you configure an existing installation. Stop Ollama first, save or revert any settings edits, choose **CPU only**, **Vulkan (Android driver)** or **Vulkan (Adreno / Turnip)**, then **Install and configure**. The machine installs Termux's packages, reports progress and saves the hardware settings. Start Ollama when it finishes. This needs the machine's `servers` permission; terminal access is not required.
+
+CPU is suggested for compatibility. The Vulkan options replace the Vulkan loader with the selected one; this can affect other Vulkan programs in Termux. They enable Vulkan with F16 cache, Flash Attention off, an 8K context, one parallel request and one loaded model. Existing models, the models directory and unrelated settings stay in place. Installation checks that the binary, Vulkan backend and loader exist, but does **not** verify GPU inference. Test a model's replies after starting it: some Adreno driver/model combinations detect the GPU yet produce corrupted output. Choose CPU if that happens. On other platforms install Ollama from its official download page, then manage its settings here.
+
+![Choosing an Ollama CPU or GPU installation in Termux](screenshots/ollama-install.png)
+
 **llama.cpp → Server settings**, for llama.cpp on the machine (with `servers on`): its state, build and where it came from; **Install llama.cpp** (or **Update or change build**), which lists the builds that fit the machine, suggests one, and shows the install's progress; **Remove** for builds installed from here; **Start**, **Stop** and **Restart**; **Settings** (the `LLAMA_ARG_*` settings agent-machine starts it with: context, KV cache, GPU layers, devices, models loaded at once, thinking budget, download folder and more, with warnings), **Environment** (what llama-server starts with, plus **Extra variables**) and **Log**. See [llama.cpp](providers.md#llamacpp).
 
 ![Containers a machine runs](screenshots/containers.png)

@@ -1082,7 +1082,7 @@ FLEET = [
     {"id": "pocket", "name": "pocket", "os": "linux", "arch": "arm64", "version": SERVER_VERSION, "address": "127.0.0.1",
      "agents": ["codex"], "providers": [{"type": "llamacpp", "port": 9931, "models": 2}],
      "containers": {"enabled": False, "cli": "docker", "found": False, "online": False, "version": "", "error": "", "engines": []},
-     "servers": {"enabled": True, "ollama": {"found": False, "running": False, "managed": False, "version": None},
+     "servers": {"enabled": True, "ollama": {"found": False, "running": False, "managed": False, "version": None, "install_available": True},
                  "strata": {"found": False, "profiles": []}, "llamacpp": LLAMA_STATE},
      "launches": False, "roots": []},
 ]
@@ -1497,6 +1497,19 @@ def join_fleet() -> None:
                 continue
             if request.get("type") == "server" and request.get("kind") == "llamacpp":
                 send({"type": "server_result", "request": request["request"], "ok": True, "servers": servers, **llama_server(request, servers, providers)})
+                continue
+            if request.get("type") == "server" and request.get("kind") == "ollama" and request.get("op") in {"install_options", "install"}:
+                options = {"source": "termux", "variants": [
+                    {"id": "cpu", "label": "CPU only", "help": "Most compatible. Disables GPU backends.", "recommended": True},
+                    {"id": "vulkan", "label": "Vulkan (Android driver)", "help": "Experimental phone GPU support using Android's driver. Replaces an existing generic Vulkan loader.", "recommended": False},
+                    {"id": "vulkan-adreno", "label": "Vulkan (Adreno / Turnip)", "help": "Experimental Snapdragon GPU support using Mesa Turnip. Some devices or models produce incorrect replies; test before relying on it.", "recommended": False}]}
+                if request["op"] == "install":
+                    variant = request.get("variant")
+                    providers.ollama_config.update(vulkan=variant != "cpu", gpus="-1" if variant == "cpu" else "", llm_library="cpu" if variant == "cpu" else "")
+                    if variant != "cpu":
+                        providers.ollama_config.update(kv_cache_type="f16", flash_attention=False, context_length=8192)
+                    servers["ollama"].update(found=True, install={"state": "installed", "variant": variant, "step": "Configured. Start Ollama to use these settings; GPU inference has not been verified.", "done": 0, "total": 0})
+                send({"type": "server_result", "request": request["request"], "ok": True, "servers": servers, "ollama_install": options})
                 continue
             if request.get("type") == "server" and request.get("op") in {"settings", "configure"}:
                 send({"type": "server_result", "request": request["request"], "ok": True, "servers": servers,

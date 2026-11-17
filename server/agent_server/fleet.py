@@ -1156,6 +1156,7 @@ def _servers(item: dict[str, Any]) -> dict[str, Any]:
             "version": str(ollama.get("version") or "")[:40] or None, "bind": str(ollama.get("bind") or "")[:40] or None,
             # An Ollama run by systemd, and whether agent-machine may restart it (sudo agent-machine servers service).
             "service": "systemd" if ollama.get("service") == "systemd" else None, "service_allowed": bool(ollama.get("service_allowed")),
+            "install_available": bool(ollama.get("install_available")), "install": _install_job(ollama.get("install")),
         },
         "strata": {"found": bool(strata.get("found")), "profiles": profiles[:20], "error": str(strata.get("error") or "")[:300] or None},
         "llamacpp": _llamacpp(item.get("llamacpp")),
@@ -1171,18 +1172,24 @@ def _llamacpp(item: Any) -> dict[str, Any]:
     """The llama.cpp a machine can start (and install), kept to known fields; an older machine says nothing."""
     if not isinstance(item, dict):
         return {"found": False, "running": False, "managed": False, "known": False}
-    install = item.get("install") if isinstance(item.get("install"), dict) else None
     return {
         "known": True, "found": bool(item.get("found")), "running": bool(item.get("running")), "managed": bool(item.get("managed")),
         "port": item.get("port") if isinstance(item.get("port"), int) else 9931, "version": _text(item.get("version"), 40),
         # Where it came from: the console's install (github or termux, which build), or found on the machine.
         "source": _text(item.get("source"), 20), "variant": _text(item.get("variant"), 40), "release": _text(item.get("release"), 40),
         "platform": _text(item.get("platform"), 40),
-        "install": {
-            "state": _text(install.get("state"), 20), "variant": _text(install.get("variant"), 40), "release": _text(install.get("release"), 40),
-            "step": _text(install.get("step"), 200), "done": install.get("done") if isinstance(install.get("done"), int) else 0,
-            "total": install.get("total") if isinstance(install.get("total"), int) else 0, "error": _text(install.get("error"), 500), "at": _text(install.get("at"), 40),
-        } if install else None,
+        "install": _install_job(item.get("install")),
+    }
+
+
+def _install_job(install: Any) -> dict[str, Any] | None:
+    """Bounded, known install progress fields from an untrusted machine."""
+    if not isinstance(install, dict):
+        return None
+    return {
+        "state": _text(install.get("state"), 20), "variant": _text(install.get("variant"), 40), "release": _text(install.get("release"), 40),
+        "step": _text(install.get("step"), 200), "done": install.get("done") if isinstance(install.get("done"), int) else 0,
+        "total": install.get("total") if isinstance(install.get("total"), int) else 0, "error": _text(install.get("error"), 500), "at": _text(install.get("at"), 40),
     }
 
 

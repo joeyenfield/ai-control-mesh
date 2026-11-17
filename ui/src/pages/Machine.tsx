@@ -690,7 +690,7 @@ const KIND_ORDER = ["ollama", "llamacpp", "strata", "docker", "api"];
 /** The kinds of provider the machine has: those it runs, and those installed there (managed from the kind's server tab). */
 function providerKinds(machine: FleetMachine, providers: MachineProvider[]): string[] {
   const kinds = new Set(providers.map((item) => item.kind));
-  if (machine.servers.ollama?.found) kinds.add("ollama");
+  if (machine.servers.ollama?.found || machine.servers.ollama?.install_available) kinds.add("ollama");
   // llama.cpp can be installed from here, so its tab is there whenever the machine knows about it.
   if (machine.servers.enabled && machine.servers.llamacpp?.known) kinds.add("llamacpp");
   if (machine.servers.strata?.found) kinds.add("strata");
@@ -700,7 +700,11 @@ function providerKinds(machine: FleetMachine, providers: MachineProvider[]): str
 
 /** What a kind's machine-wide page is called (installing, starting and configuring it there), or null when it has none. */
 function serverEntry(machine: FleetMachine, kind: string): { label: string; note: string } | null {
-  if (kind === "ollama" && machine.servers.ollama?.found) return { label: "Server settings", note: "Start, stop, settings and log" };
+  if (kind === "ollama" && (machine.servers.ollama?.found || machine.servers.ollama?.install_available)) {
+    return machine.servers.ollama.found
+      ? { label: "Server settings", note: "Install, CPU / GPU setup, settings and log" }
+      : { label: "Install Ollama", note: "Choose CPU or GPU setup" };
+  }
   if (kind === "llamacpp" && machine.servers.enabled && machine.servers.llamacpp?.known) {
     return machine.servers.llamacpp.found
       ? { label: "Server settings", note: "Start, stop, settings and log" }
@@ -1227,9 +1231,9 @@ function InstalledServers({ machine }: { machine: FleetMachine }) {
           <span className="state-text">
             {ollama?.found && !ollama.running && button({ kind: "ollama", action: "start" }, "Start", true)}
             {ollama?.managed && button({ kind: "ollama", action: "stop" }, "Stop")}
-            {ollama?.found && (
+            {(ollama?.found || ollama?.install_available) && (
               <Link className="button small" to={providersPath(machine.id, "ollama", "server")}>
-                Settings
+                {ollama.found ? "Settings" : "Install"}
               </Link>
             )}
           </span>

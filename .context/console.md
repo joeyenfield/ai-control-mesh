@@ -41,6 +41,8 @@ flowchart TB
 
 ## Data layer
 
+`OllamaInstall.tsx` shows a machine's install options on the Ollama server page, including when it is missing (`install_available`). The user explicitly chooses CPU, Android Vulkan or Adreno/Turnip; CPU is suggested. The page polls Ollama settings for job progress, prevents installation while running or with unsaved settings, and replaces its draft with the installed profile on completion. Management uses `you.servers`, including delegated server grants. GPU setup is visibly unverified until the user tests model replies. The demo phone supplies these options; `docs/screenshots/ollama-install.png` shows the chooser.
+
 `Costs.tsx` exposes `?tab=missing` (Missing prices), filtering the existing `org-costs` report's model rows by `unpriced > 0`, sorted by unpriced calls. It includes unnamed models, supports name search, and follows the same organization/date scope and server permissions as Summary. It does not match price patterns or infer missing prices from zero cost; recompute refreshes the report after prices change.
 
 Session review model rows can have a null `tier` when none of their calls used tokens. `SessionReview` shows these as No token usage without indexing the tier labels; they are distinct from paid models with no price. The server's aggregated `traffic.tiers` contains only classified calls.

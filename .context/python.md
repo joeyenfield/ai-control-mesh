@@ -33,6 +33,8 @@ It mirrors the Go programs behaviour for behaviour, and the Go code is the refer
 
 ## What's different
 
+`machine/ollama_install.py` mirrors Go's Ollama Termux install job, fixed CPU/Vulkan/Turnip package lists, file checks, hardware config merge and concurrency guards. `tests/test_ollama_install.py` and the imported `test_a_fleet_machine_installs_ollama_with_explicit_gpu_setup` contract exercise it. Jenkins's Ollama setup parity stage runs both.
+
 The Go client and machine route all child commands through their Android-aware `process.Command` / `CommandContext` helpers, including the machine-to-agent launch and the client's PTY shell. Python's subprocess and exec calls already use libc and Termux's execution hook, so this syscall adaptation needs no Python command-line or protocol change. The shared `test_a_fleet_machine_lists_its_folders_and_opens_a_shell_when_commands_are_on` and launcher contract test cover the mirrored terminal and agent behavior.
 
 Ollama startup already uses libc-backed `subprocess.Popen`, so Termux's execution hook handles native model-server binaries. Go uses its explicit Android linker helper for the same behavior. `test_servers.py::test_ollama_starts_serves_and_stops` covers the mirrored lifecycle.
