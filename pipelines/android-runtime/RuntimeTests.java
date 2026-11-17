@@ -16,7 +16,7 @@ public class RuntimeTests extends Activity {
                 {"machine-process", "TestCommand|TestAndroid"},
                 {"terminal", "TestPTYStartsShellInAppStorage"},
                 {"presence", "TestShellLaunchStartsNativeAgent"},
-                {"ollama", "TestOllamaStartsNativeBinaryAndStopsIt"}
+                {"ollama", "TestOllamaStartsNativeBinaryAndStopsIt|TestLlamaStartsNativeBinaryWithCorrectExecutableIdentity"}
             };
             for (String[] test : tests) {
                 String name = test[0];
