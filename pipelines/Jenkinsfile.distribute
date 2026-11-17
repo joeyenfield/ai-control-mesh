@@ -6,11 +6,18 @@ pipeline {
         timeout(time: 60, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '20'))
     }
-    parameters {
-        string(name: 'VERSION', defaultValue: '', description: 'Exact built and tested version to release.')
-        choice(name: 'TARGET', choices: ['pi', 'github', 'both'], description: 'Distribution destination.')
-    }
+    // Parameters are maintained by configure.groovy and refresh-versions.py.
+    // Declaring static parameters here would overwrite the available-version dropdown.
     stages {
+        stage('Validate selection') {
+            steps {
+                script {
+                    if (!params.VERSION || params.VERSION == 'Select a tested distribution') {
+                        error('Choose a VERSION from Build with Parameters.')
+                    }
+                }
+            }
+        }
         stage('Release tested distribution') {
             steps {
                 sh 'python3 -u "$MESH_CI_HOME/release_distribution.py" "$VERSION" --target "$TARGET"'
@@ -19,8 +26,12 @@ pipeline {
     }
     post {
         always {
-            sh 'python3 "$MESH_CI_HOME/jenkins/collect-results.py" release "$VERSION" .'
-            archiveArtifacts artifacts: 'results/**', allowEmptyArchive: true
+            script {
+                if (params.VERSION && params.VERSION != 'Select a tested distribution') {
+                    sh 'python3 "$MESH_CI_HOME/jenkins/collect-results.py" release "$VERSION" .'
+                    archiveArtifacts artifacts: 'results/**', allowEmptyArchive: true
+                }
+            }
         }
     }
 }
