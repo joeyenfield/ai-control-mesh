@@ -140,6 +140,8 @@ If it went anyway, `agent-machine start` starts it again. The server's [Access l
 - **`name`** is the name on **Machines**. The default is the hostname.
 - **`address`** is the host the server uses to reach this machine's model servers, when the address it sees isn't right (behind NAT or a reverse proxy). Without it, the server uses the address the machine connected from. When the address changes, the machine's backends move with it, on the same ports. Most machines don't need it, as agents' traffic goes through the machine itself (see [Tunnels](#tunnels)).
 
+**Ollama in Termux.** The machine starts the native Ollama binary through Android's system linker, so console startup works with Android's restrictions on executing files in app storage. Install the native Termux build of Ollama; a Linux binary needs a Linux environment instead. Running `ollama serve` directly in Termux also works, and the machine detects it automatically.
+
 **Ollama's systemd service.** `sudo agent-machine servers service` is for an Ollama installed as the systemd service `ollama.service`, which Ollama's Linux installer sets up and which belongs to root. Run it once, with sudo, as the user agent-machine runs as. It:
 
 - adds a sudoers rule (`/etc/sudoers.d/agent-machine-ollama`) that lets only that user run `systemctl start|stop|restart ollama` without a password;

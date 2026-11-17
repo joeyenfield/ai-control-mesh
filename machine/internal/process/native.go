@@ -5,7 +5,7 @@ import (
 	"runtime"
 )
 
-// NativeCommand starts one of our native binaries. Go executes children with raw
+// NativeCommand starts a native binary. Go executes children with raw
 // syscalls, bypassing Termux's libc exec hook, so invoke Android's linker explicitly.
 func NativeCommand(binary string, args ...string) *exec.Cmd {
 	return nativeCommand(binary, args, runtime.GOOS, runtime.GOARCH)
