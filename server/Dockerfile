@@ -16,10 +16,6 @@ COPY ui/ ./
 RUN npm run build
 
 FROM docker.io/library/python:3.13-slim
-# The build's version (VERSION, below; there's no git here): --build-arg AI_PROXY_VERSION=...
-# names it exactly, such as the dist/<version>/ mounted for downloads.
-ARG AI_PROXY_VERSION=
-ENV AI_PROXY_VERSION=${AI_PROXY_VERSION}
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -41,6 +37,9 @@ COPY deploy/compose/quickstart/start.py server/docker/postgres-init.sh /quicksta
 RUN useradd --system --uid 10001 --home-dir /app agent \
     && mkdir -p /app/config /app/logs /app/certs /app/auth-state \
     && chown -R agent:agent /app/config /app/logs /app/certs /app/auth-state
+# Stamp the runtime version after dependency installation so snapshots reuse that layer.
+ARG AI_PROXY_VERSION=
+ENV AI_PROXY_VERSION=${AI_PROXY_VERSION}
 USER agent
 # Everything the server keeps is in its database (AI_PROXY_DATABASE_URL; deploy/compose/server runs
 # PostgreSQL). Without one it's a SQLite file in logs/. logs/ also holds the server's own log,

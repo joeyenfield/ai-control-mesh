@@ -257,6 +257,12 @@ The summary; `auth.md` has the whole of it (credentials, the middleware's order,
 
 ## Tests (`server/tests/`)
 
+The Go contract fixtures install a native stub on PATH when testing provider CLI
+detection, so they do not depend on developer-installed Copilot. Copies used by
+executable-update tests preserve the binary's executable permissions on POSIX.
+Fleet fixtures reap their child while update tests wait for restart, so a POSIX
+zombie cannot be mistaken for a still-running machine.
+
 - `make_app(tmp_path, handler)`/`close_app`: `Settings(...)` built in code (which writes its values into the test's database), `create_app`, a `TestClient` (signed in: `oidc_helpers.authenticated_client`, with introspection mocked), and `runtime.client` swapped for an `httpx.MockTransport`. Assert on what upstream received too.
 - `oidc_helpers.py` plays the issuer's introspection for API tests (`access_token(app, user)`, `issuer(app).revoke`); `test_oidc_issuer.py`, `test_oidc_api.py` and `test_oidc_browser.py` cover the real issuer, the API's mandatory auth and the browser sign-in; `test_quickstart.py` the quickstart stack's credentials and layout. See `auth.md`.
 - Starlette's TestClient sends WebSockets to `ws://testserver`: pass `headers={"host": "127.0.0.1:8181"}` and `client=("127.0.0.1", ...)` to look local (`ws_connect` in `test_terminals.py`). A refused WebSocket left open inside a `with TestClient(...)` block hangs the test on exit instead of failing it; use context managers for sockets. The one pytest warning (Starlette's httpx deprecation) is expected.

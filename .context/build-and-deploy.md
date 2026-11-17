@@ -28,6 +28,9 @@ the full distribution archive.
 
 ## Versions
 
+The server Dockerfile applies `AI_PROXY_VERSION` after installing dependencies.
+Changing a CI snapshot version therefore preserves the dependency build cache.
+
 - `VERSION` = `X.Y.Z`. The build version is `X.Y.Z` on its tag, else `X.Y.Z+<commit>[.dirty]`. `.dirty` means uncommitted changes to any tracked file (no exclusions: the server's settings used to be saved in `config/`, which was exempt, but they live in its database now); there's no `.git` → `+unknown`. `AI_PROXY_VERSION` overrides it.
 - It is computed in three places that must agree: `tools/dist/version.go` (`BuildVersion`), `server/agent_server/version.py` (`build_version`) and `python/agent_py/common.py` (`checkout_version`).
 - `PROTOCOL`/`MIN_PROTOCOL` live in `version.py`, `settings.Protocol` in client/ and machine/, and `common.PROTOCOL`; `test_client.py` checks they agree. Raise `PROTOCOL` for changes older programs can't follow, and `MIN_PROTOCOL` only when dropping the old one. Outside the range the server answers 426 (WebSocket close 4426).
