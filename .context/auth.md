@@ -13,6 +13,8 @@ Read this before changing credentials, permissions or routes. Authentication is 
 
 ## Credentials
 
+Directory usernames use `valid_username`: the existing 40-character slug or a common ASCII email address (dot-separated local parts with letters, digits, `_`, `+`, `-`; up to 64 locally and 254 overall). All are trimmed and lowercased; organization/team ids still use `valid_name`. Optional contact `email` is metadata in `user_profiles`, read and written atomically with the directory; it defaults to an email-form username on creation, an empty string clears it on update, and omission keeps it. It is unverified and grants no alternate login. Changing it does not change the account version. The issuer's read-only role includes this profile table. API step 11 adds profiles and widens every SQL username reference; sharing lists, guest names and legal-hold targets preserve email-length names too.
+
 Managed API clients extend issuer `client` records with `management` metadata (tenant, pinned role, label, creation time, bootstrap, revoked). `Issuer.provision(..., management=True)` explicitly permits administrator accounts; its default remains member-only. `--bootstrap` on `agent-auth client add` requires a root administrator and implies management. Secrets are hashed, shown once and never exported. Managed tokens are always opaque, even in JWT mode: `client_account_active` checks current role/tenant, account version and revocation on every introspection. Rotation changes the secret hash, so previous tokens fail their `client_version` check. No API schema migration is needed. State transactions serialize creation, rotation and revocation across issuer processes.
 
 `routes/auth.py` relays `/api/orgs/{org}/api-credentials` (GET/POST), `/{id}/regenerate` (POST) and `/{id}` (DELETE) to issuer `POST /api-credentials` through `Auth.api_credentials`. Both boundaries require an administrator console token and tenant administration; automation and device tokens cannot manage credentials. Bootstrap metadata in root's listing drives the site administrator banner until revoked (including credentials disabled by an account change). Revoked rows remain for the console; regeneration requires an active credential. CLI removal deletes the record. Lifecycle, tenant isolation and real API data setup are tested in `test_oidc_issuer.py`.
@@ -83,10 +85,13 @@ Someone of the other server is a `bridges.Guest` (the peer's per-user id `user_u
 
 ## Authorization invariants
 
+Directory account creation and password resets use `auth._checked_password(password, name)`: at least eight characters, never the username ignoring case and surrounding whitespace. This is shared by the API and server CLI; existing password verification is unchanged.
+
 `Runtime.resolve_session` enforces open-session control permission for every explicit agent session, including unscoped native `/api/*` headers. Do not rely only on middleware prefixes. Unscoped GET forwarding does not allocate a session. Issuer password checks share a normalized-account counter (hashed name, 30/600 seconds) across browser and device forms, in addition to the source-address counter (10/600 seconds).
 
 - Nothing crosses tenants except for site admins, who see and control every tenant's sessions, machines and providers. Every new route that returns or changes a session, machine, backend or container checks the tenant (through the helpers above), and lists filter by it.
 - Private sessions remain private from organization admins (not site admins); owners and `launched_by` control their sessions. Shared viewers control only with explicit control access.
+- Terminal hosting returns the same `4404` and reason for missing and invisible sessions; visible sessions without control permission close `4401`.
 - Clients cannot set server-owned tags. Narrowing sharing disconnects viewers. Shell sessions stay private.
 - Machine owner always has its features; its tenant's admins implicitly have view/models/update only (`ADMIN_FEATURES`). Launch, terminal (shells) and MCP require their specific grants (site admins have them all) and the machine's toggles, which bind site admins too. Roots are checked server-side and again after resolving paths on the machine.
 - The API owns account/directory mutations; the issuer is read-only (by `UserStore(readonly=True)`, and on PostgreSQL by its role's grants). Adding or removing all users never disables authentication.

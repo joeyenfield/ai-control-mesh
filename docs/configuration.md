@@ -305,10 +305,11 @@ agent-server user list
 
 | Command | What it does |
 |---|---|
-| `user add NAME [--admin] [--org ORG] [--team TEAM]...` | Adds a user to one organization and asks for a password. Without `--org`, the organization of their teams; with neither, only `--admin` works, and makes a site admin (the root). The first user is always a site admin. `--team` repeats; a team is `<org>/<team>`, or just `<team>` with `--org`. Organizations and teams that don't exist yet are created. |
+| `user add NAME [--email EMAIL] [--admin] [--org ORG] [--team TEAM]...` | Adds a user to one organization and asks for a password. `NAME` can be an email address; `--email` sets an optional contact email, defaulting to the username when it is an email address. Without `--org`, the organization of their teams; with neither, only `--admin` works, and makes a site admin (the root). The first user is always a site admin. `--team` repeats; a team is `<org>/<team>`, or just `<team>` with `--org`. Organizations and teams that don't exist yet are created. |
 | `user passwd NAME` | Sets a user's password and signs them out everywhere. |
+| `user email NAME EMAIL` | Sets the contact email without changing sign-in. An empty `EMAIL` clears it. |
 | `user remove NAME` | Removes a user. Their tokens stop working. An organization's last admin can't be removed while other users remain in it. |
-| `user list` | Users with their role, organization and teams. |
+| `user list` | Users with their role, organization, teams and contact email when set. |
 | `org add ID [--name NAME]` | Adds an organization (a tenant, under the root). |
 | `org rename ID NAME` | Changes its display name. |
 | `org remove ID` | Removes an organization with no users left, and its teams. The root can't be removed. |

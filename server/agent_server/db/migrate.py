@@ -193,7 +193,22 @@ def _request_costs(connection: Connection) -> None:
             connection.execute(requests.update().where(requests.c.session_id == session_id, requests.c.request_id == request_id).values(**columns))
 
 
-API_STEPS: list[Step] = [_create(schema.api), _tenants, _provider_accounts, _access_log, _usage_limits, _scaling, _request_log, _api_providers, _peering, _request_costs]
+def _user_profiles(connection: Connection) -> None:
+    """Step 11: optional contact emails and room for email-form usernames everywhere they are stored."""
+    schema.user_profiles.create(connection, checkfirst=True)
+    if connection.dialect.name != "sqlite":
+        # SQLite does not enforce VARCHAR lengths. PostgreSQL must widen both
+        # the account key and its references, including audit and usage records.
+        for table, column in (
+            (schema.users, "name"), (schema.provider_accounts, "owner"), (schema.request_log, "user"),
+            (schema.provider_usage, "user"), (schema.usage_limits, "user"), (schema.usage_limits, "set_by"),
+            (schema.retention_policies, "set_by"), (schema.legal_holds, "target"), (schema.legal_holds, "set_by"),
+            (schema.audit_events, "actor"), (schema.peer_codes, "created_by"),
+        ):
+            connection.execute(text(f'ALTER TABLE "{API_SCHEMA}"."{table.name}" ALTER COLUMN "{column}" TYPE VARCHAR(254)'))
+
+
+API_STEPS: list[Step] = [_create(schema.api), _tenants, _provider_accounts, _access_log, _usage_limits, _scaling, _request_log, _api_providers, _peering, _request_costs, _user_profiles]
 AUTH_STEPS: list[Step] = [_create(schema.auth)]
 
 # One lock id per component, so two processes starting at once don't both migrate.
@@ -224,7 +239,7 @@ def migrate(db: Database, component: str = "api") -> int:
 
 
 # What agent-auth reads of the API's tables: accounts and the counter that says they changed.
-ISSUER_READS = ("users", "orgs", "meta")
+ISSUER_READS = ("users", "user_profiles", "orgs", "meta")
 
 
 def grant_issuer(connection: Connection, role: str = "mesh_auth") -> None:

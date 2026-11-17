@@ -45,6 +45,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from sqlalchemy import and_, func, or_, select, text
 
+from .auth import same_tenant
 from .db import Database, kv, schema
 
 
@@ -224,6 +225,17 @@ class Audit:
         with self.db.read() as connection:
             tenants = [tenant] if tenant else [row[0] for row in connection.execute(select(schema.audit_chains.c.tenant))]
             checkpoints = connection.execute(select(schema.audit_checkpoints).order_by(schema.audit_checkpoints.c.time)).mappings().all()
+            if tenant is not None:
+                # Every checkpoint repeats all heads. Other tenants' activity must not
+                # change this tenant's count or surface unrelated signature failures.
+                scoped = []
+                previous_head = None
+                for checkpoint in checkpoints:
+                    head = (checkpoint["heads"] or {}).get(tenant)
+                    if head is not None and head != previous_head:
+                        scoped.append(checkpoint)
+                        previous_head = head
+                checkpoints = scoped
             chains = {row[0]: (int(row[1]), str(row[2])) for row in connection.execute(select(schema.audit_chains.c.tenant, schema.audit_chains.c.seq, schema.audit_chains.c.head))}
             for name in tenants:
                 previous: str | None = None
@@ -546,7 +558,9 @@ class AuditMiddleware:
             if isinstance(sent, dict):
                 changes = {"fields": sorted(str(key) for key in sent)[:50], **{key: sent[key] for key in sent if key in SAFE_FIELDS}}
         tenant = getattr(identity, "tenant", None)
-        if target.get("kind") == "orgs" and target.get("id"):
+        # A caller-chosen foreign path must not put their identity and network
+        # details in another tenant's feed. Site-admin actions still belong there.
+        if target.get("kind") == "orgs" and target.get("id") and same_tenant(identity, target["id"]):
             tenant = target["id"]
         outcome = "success" if code < 400 else "refused" if refused or code in (404, 409, 429) else "failure"
         return self.runtime.audit.event(

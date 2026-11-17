@@ -742,7 +742,7 @@ class Bridges:
             if kind in ("provider", "mcp") and (item.get("scope") or None) != scope:
                 continue
             guest = Guest(
-                user=str(assertion.get("user") or ""), name=str(assertion.get("name") or "")[:40], org=str(assertion.get("org")), server=peer.link.peer,
+                user=str(assertion.get("user") or ""), name=str(assertion.get("name") or "")[:254], org=str(assertion.get("org")), server=peer.link.peer,
                 link=peer.link.id, bridge=bridge.id, teams=tuple(str(team) for team in assertion.get("teams") or [])[:50],
             )
             if not guest.user:

@@ -544,11 +544,15 @@ def account_command(kind: str, argv: list[str]) -> int:
     if kind == "user":
         add = commands.add_parser("add", help="Add a user (the first one is an admin)")
         add.add_argument("name")
+        add.add_argument("--email", help="Contact email (defaults to the username when it is an email address)")
         add.add_argument("--admin", action="store_true", help="An admin of their organization; without --org, a site admin (the root organization), who runs the server and its organizations")
         add.add_argument("--org", action="append", default=[], help="The one organization (tenant) they belong to, for good (created if new); members need one")
         add.add_argument("--team", action="append", default=[], help="A team of their organization to join, as <org>/<team> or just <team> (created if new); repeat for more")
         passwd = commands.add_parser("passwd", help="Set a user's password (signs them out everywhere)")
         passwd.add_argument("name")
+        email = commands.add_parser("email", help="Set a user's contact email (an empty address clears it)")
+        email.add_argument("name")
+        email.add_argument("address")
         remove = commands.add_parser("remove", help="Remove a user")
         remove.add_argument("name")
         commands.add_parser("list", help="List users")
@@ -597,7 +601,10 @@ def account_command(kind: str, argv: list[str]) -> int:
             print(f"Removed team {args.org}/{args.id}.")
         elif args.action == "list":
             users = store.user_list()
-            print("\n".join(f"{user['name']} ({user['role']}) {' '.join(user['orgs'] + user['teams'])}".rstrip() for user in users) if users else "No users yet: the server makes an admin on its first start, or add one.")
+            print("\n".join(f"{user['name']} ({user['role']}) {' '.join(user['orgs'] + user['teams'])}".rstrip() + (f" <{user['email']}>" if user.get("email") else "") for user in users) if users else "No users yet: the server makes an admin on its first start, or add one.")
+        elif args.action == "email":
+            store.update_user(args.name, email=args.address)
+            print(f"Changed the contact email for {args.name}.")
         elif args.action == "remove":
             record = store.user(args.name)
             if record is None or not store.remove_user(args.name):
@@ -630,7 +637,7 @@ def account_command(kind: str, argv: list[str]) -> int:
                     if team not in known:
                         store.add_team(*team.split("/", 1))
                 first = not store.users()
-                user = store.add_user(args.name, password, "admin" if args.admin else None, teams, args.org)
+                user = store.add_user(args.name, password, "admin" if args.admin else None, teams, args.org, email=args.email)
                 print(f"Added {user['name']} ({user['role']})." + (" As the first user, they're an admin." if first else ""))
     except (KeyError, ValueError) as exc:
         print(str(exc).strip("'"), file=sys.stderr)

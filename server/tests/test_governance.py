@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -126,6 +128,71 @@ def test_audit_events_go_to_their_exports_once(tmp_path):
     with pytest.raises(ValueError):
         validate_config({"exports": [{"name": "x", "kind": "otlp", "url": "ftp://nope"}]})
     assert otlp([])["resourceLogs"][0]["scopeLogs"][0]["logRecords"] == []
+
+
+def test_audit_verification_ignores_checkpoints_from_other_tenants(tmp_path):
+    db = database(tmp_path)
+    audit = Audit(db)
+    checkpoints = []
+    for tenant in ("globex", "acme", "globex", "acme"):
+        audit.record(audit.event("accounts.create", tenant=tenant, actor="admin"), now=True)
+        checkpoints.append(audit.checkpoint())
+    assert audit.verify()["checkpoints"] == 4
+    assert audit.verify("acme")["checkpoints"] == 2
+    assert audit.verify("empty")["checkpoints"] == 0
+    # Unrelated checkpoint failures must not disclose their existence or timestamps.
+    with db.write() as connection:
+        connection.execute(schema.audit_checkpoints.update().where(
+            schema.audit_checkpoints.c.id.in_([checkpoints[index]["id"] for index in (0, 2)])
+        ).values(signature="invalid"))
+    assert not audit.verify()["ok"]
+    assert audit.verify("acme")["ok"]
+    with db.write() as connection:
+        connection.execute(schema.audit_checkpoints.update().where(
+            schema.audit_checkpoints.c.id == checkpoints[1]["id"]
+        ).values(signature="invalid"))
+    assert not audit.verify("acme")["ok"]
+
+
+def test_foreign_paths_cannot_put_actor_details_in_another_tenants_audit(tmp_path):
+    from test_auth import org_settings
+
+    app = create_app(org_settings(tmp_path))
+    with TestClient(app, base_url=BASE) as client:
+        dave = {**HOST, "x-ai-proxy-token": access_token(app, "dave")}
+        alice = {**HOST, "x-ai-proxy-token": access_token(app, "alice")}
+        site = {**HOST, "x-ai-proxy-token": access_token(app, "sally")}
+        path = "/api/orgs/globex/retention"
+        assert client.put(path, json={}, headers=dave).status_code == 404
+        assert client.put(path, json={}, headers=alice).status_code == 403
+        assert client.put(path, json={}).status_code == 401
+        assert client.put(path, json={}, headers=site).status_code == 200
+        audit = app.state.runtime.audit
+        assert {event["actor"] for event in audit.query("globex")} == {"sally"}
+        assert {event["actor"] for event in audit.query("acme")} == {"dave", "alice"}
+        assert any(event["actor"] is None for event in audit.query("root"))
+        assert all(event["data"]["target"]["id"] == "globex" for event in audit.query("acme"))
+        assert audit.verify()["ok"]
+
+
+@pytest.mark.parametrize("payload", ["=1+1", "+SUM(1)", "-1+2", "@SUM(1)", " =1+1", "\tformula", "\rformula", "\nformula", '=HYPERLINK("https://example.invalid","x")\nsecond line'])
+def test_audit_csv_neutralizes_formulas_without_changing_json_or_the_chain(tmp_path, payload):
+    from test_auth import org_settings
+
+    app = create_app(org_settings(tmp_path))
+    with TestClient(app, base_url=BASE) as client:
+        headers = {**HOST, "x-ai-proxy-token": access_token(app, "dave")}
+        audit = app.state.runtime.audit
+        audit.record(audit.event("data.refused", tenant="acme", actor="dave", reason=payload), now=True)
+        response = client.get("/api/audit/export?format=csv", headers=headers)
+        assert response.status_code == 200
+        rows = list(csv.DictReader(io.StringIO(response.text)))
+        assert len(rows) == 1 and rows[0]["reason"] == "'" + payload
+        raw = client.get("/api/audit", headers=headers).json()["events"]
+        assert raw[0]["data"]["reason"] == payload
+        ndjson = client.get("/api/audit/export", headers=headers).text
+        assert json.loads(ndjson)["data"]["reason"] == payload
+        assert audit.verify("acme")["ok"]
 
 
 def test_changes_through_the_api_are_audited_and_read_per_organization(tmp_path):

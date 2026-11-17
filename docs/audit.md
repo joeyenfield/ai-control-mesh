@@ -34,6 +34,8 @@ Each event is a [CloudEvent](https://cloudevents.io) with an OCSF-like body:
 
 A change is written to the log before it's answered, so a change someone saw succeed is always in it. Refusals and looks at recordings are written straight after.
 
+An organization's administrators can read actor names, source IPs and user agents in its events, including site administrators acting on that organization. A request naming another organization does not put the caller's details in that organization's log: it stays in the caller's tenant (or the root for an unauthenticated caller). Site administrators' organization operations are recorded in the target organization. Existing events keep their original contents and tenant so their hash chains remain verifiable.
+
 ## Integrity
 
 - Each organization's events are a **hash chain**: every event has a `seq` and the hash of the one before it (`prev`), and its own `hash` covers both. Removing, reordering or changing one breaks the chain from there.
@@ -41,10 +43,14 @@ A change is written to the log before it's answered, so a change someone saw suc
 - Every hour (Server settings › Audit, `checkpoint_minutes`) the worker **signs a checkpoint**: every chain's head, signed with the server's audit key (Ed25519, kept in the database's secrets). With blob storage, checkpoints are also written to `audit/checkpoints/`; with S3 Object Lock as the bucket's default, they can't be changed or deleted even by an administrator of the server.
 - `agent-server audit verify` (or **Verify** on the Audit log page, `GET /api/audit/verify`) recomputes every chain and checks it against the checkpoints and their signatures. It exits 1 and lists each problem when anything doesn't match. `agent-server audit key` prints the public key, to check checkpoints somewhere else; `agent-server audit checkpoint` signs one now.
 
+Verification scoped to one organization checks and counts only checkpoints that advance or change its head. Checkpoints caused solely by another organization's activity do not affect its count or verification result. Verification across all organizations checks every checkpoint.
+
 ## Reading it
 
 - **Audit log** in the console (Server): admins see their organization's events, site admins everyone's. Filter by type, person and outcome, open an event for its whole record, download CSV or NDJSON.
 - `GET /api/audit`, `/api/audit/export?format=csv|ndjson`; see [API](api.md#retention-and-the-audit-log).
+
+CSV downloads prefix cells that could be interpreted as spreadsheet formulas with an apostrophe. JSON and NDJSON retain the original values for integrity checks.
 
 ## Exports
 

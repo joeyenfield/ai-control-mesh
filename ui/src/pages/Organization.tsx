@@ -631,7 +631,7 @@ function Users({ orgs, users, identity }: { orgs: Org[]; users: User[]; identity
   const [query, setQuery] = useState("");
   const [org, setOrg] = useState("");
   const names = useMemo(() => new Map(orgs.map((item) => [item.id, orgLabel(item, item.id)])), [orgs]);
-  const shown = users.filter((user) => (!org || user.tenant === org) && matches(query, user.name, user.tenant, names.get(user.tenant) ?? "", ...user.teams));
+  const shown = users.filter((user) => (!org || user.tenant === org) && matches(query, user.name, user.email ?? "", user.tenant, names.get(user.tenant) ?? "", ...user.teams));
   // Site admins add users to any organization; an organization's admins to their own.
   const addable = orgs.filter((item) => manages(identity, item.id));
   return (
@@ -666,7 +666,7 @@ function Users({ orgs, users, identity }: { orgs: Org[]; users: User[]; identity
 function UserTable({ users, orgs, identity, showOrg }: { users: User[]; orgs: Org[]; identity: Identity; showOrg: boolean }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<User | null>(null);
-  const update = useDirectoryChange(({ name, ...body }: { name: string; role?: string; teams?: string[]; password?: string }) => api.updateUser(name, body));
+  const update = useDirectoryChange(({ name, ...body }: { name: string; email?: string; role?: string; teams?: string[]; password?: string }) => api.updateUser(name, body));
   const remove = useDirectoryChange(api.removeUser);
   const anyManaged = users.some((user) => manages(identity, user.tenant));
   const columns = 3 + (showOrg ? 1 : 0) + (anyManaged ? 1 : 0);
@@ -727,7 +727,7 @@ function UserTable({ users, orgs, identity, showOrg }: { users: User[]; orgs: Or
 /** A new user in one organization: fixed names it, else the creator picks one of orgs (those they manage). */
 function CreateUser({ orgs, fixed, team, admin = false }: { orgs: Org[]; fixed?: string; team?: string; admin?: boolean }) {
   const initial = fixed ?? orgs.find((org) => !org.root)?.id ?? orgs[0]?.id ?? "";
-  const blank = { name: "", password: "", role: admin ? "admin" : "member", tenant: initial, teams: team ? [team] : ([] as string[]) };
+  const blank = { name: "", email: "", password: "", role: admin ? "admin" : "member", tenant: initial, teams: team ? [team] : ([] as string[]) };
   const [draft, setDraft] = useState(blank);
   const add = useDirectoryChange(api.addUser);
   const org = orgs.find((item) => item.id === draft.tenant);
@@ -739,11 +739,15 @@ function CreateUser({ orgs, fixed, team, admin = false }: { orgs: Org[]; fixed?:
       <summary>{team ? "Create a user in this team" : fixed ? (root ? "Add a site admin" : "Add a person to this organization") : "Add a person"}</summary>
       <form className="directory-user-form" onSubmit={(event: FormEvent) => {
         event.preventDefault();
-        add.mutate({ ...draft, role, teams: root ? [] : draft.teams }, { onSuccess: () => setDraft(blank) });
+        add.mutate({ ...draft, email: draft.email || undefined, role, teams: root ? [] : draft.teams }, { onSuccess: () => setDraft(blank) });
       }}>
         <div className="form-grid two">
           <label className="field">Username
-            <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} pattern={NAME_PATTERN} maxLength={40} autoCapitalize="none" autoComplete="off" required />
+            <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} maxLength={254} autoCapitalize="none" autoComplete="off" spellCheck={false} required />
+            <span className="field-hint">A username or email address.</span>
+          </label>
+          <label className="field">Email (optional)
+            <input type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} maxLength={254} autoComplete="email" placeholder={draft.name.includes("@") ? draft.name : "name@example.com"} />
           </label>
           <label className="field">Temporary password
             <input type="password" value={draft.password} onChange={(event) => setDraft({ ...draft, password: event.target.value })} minLength={8} autoComplete="new-password" required />
@@ -803,7 +807,7 @@ function UserRow({
   editing: boolean;
   onEdit: () => void;
   busy: boolean;
-  onChange: (body: { role?: string; teams?: string[]; password?: string }) => void;
+  onChange: (body: { email?: string; role?: string; teams?: string[]; password?: string }) => void;
   onRemove: () => void;
 }) {
   // The environment account is the operator's: it lives outside the database, so the console can't change it.
@@ -812,6 +816,7 @@ function UserRow({
   const [teams, setTeams] = useState(user.teams);
   const [role, setRole] = useState(user.role);
   const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(user.email ?? "");
   return (
     <>
       <tr className={`user-row${editing ? " selected" : ""}`}>
@@ -819,6 +824,7 @@ function UserRow({
           <strong>{user.name}</strong>
           {user.name === identity.user && <span className="subtle"> (you)</span>}
           {user.environment && <span className="subtle"> (from the environment)</span>}
+          {user.email && user.email !== user.name && <div className="subtle">{user.email}</div>}
         </td>
         <td>{roleLabel(user)}</td>
         {showOrg && (
@@ -850,6 +856,7 @@ function UserRow({
                     setTeams(user.teams);
                     setRole(user.role);
                     setPassword("");
+                    setEmail(user.email ?? "");
                     onEdit();
                   }}
                 >
@@ -870,9 +877,12 @@ function UserRow({
           <td colSpan={columns}>
             <form className="membership-edit" onSubmit={(event: FormEvent) => {
               event.preventDefault();
-              onChange({ ...(root ? {} : { role, teams }), ...(password ? { password } : {}) });
+              onChange({ email, ...(root ? {} : { role, teams }), ...(password ? { password } : {}) });
             }}>
               <div className="form-grid two">
+                <label className="field">Email (optional)
+                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} autoComplete="email" />
+                </label>
                 <label className="field">Role
                   <select value={root ? "admin" : role} disabled={root} onChange={(event) => setRole(event.target.value === "admin" ? "admin" : "member")}>
                     {root ? <option value="admin">Site admin</option> : (

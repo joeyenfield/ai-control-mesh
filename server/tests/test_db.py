@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from sqlalchemy import inspect, select, text
 
 from agent_server import config_io, defaults
 from agent_server.agents import stored_agents
@@ -37,6 +38,35 @@ def test_migrations_run_once_and_record_their_version(tmp_path):
     db = database(tmp_path)
     assert migrate.version(db) == migrate.latest() == migrate.migrate(db)
     assert migrate.migrate(db, "auth") == migrate.latest("auth")
+    db.close()
+
+
+def test_user_email_migration_keeps_existing_accounts_and_widens_username_references(tmp_path):
+    db = database(tmp_path)
+    store = UserStore(db)
+    store.add_user("existing", "existing-password")
+    version = store.account_version("existing")
+    # Recreate the previous schema's profile boundary and username length.
+    with db.write() as connection:
+        schema.user_profiles.drop(connection)
+        connection.execute(schema.api_versions.update().where(schema.api_versions.c.component == "api").values(version=10))
+        if not db.sqlite:
+            connection.execute(text('ALTER TABLE mesh.users ALTER COLUMN name TYPE VARCHAR(40)'))
+    assert migrate.migrate(db) == migrate.latest()
+    assert migrate.migrate(db) == migrate.latest()
+    fresh = UserStore(db)
+    assert fresh.user("existing")["email"] is None
+    assert fresh.account_version("existing") == version
+    assert fresh.verify("existing", "existing-password")
+    name = "person+" + "x" * 50 + "@example.com"
+    fresh.add_user(name, "a-different-password", role="admin")
+    assert UserStore(db).user(name)["email"] == name
+    with db.read() as connection:
+        assert connection.execute(select(schema.user_profiles.c.email).where(schema.user_profiles.c.name == name)).scalar() == name
+        if not db.sqlite:
+            for table, column in ((schema.users, "name"), (schema.provider_accounts, "owner"), (schema.audit_events, "actor"), (schema.usage_limits, "user")):
+                columns = {item["name"]: item for item in inspect(connection).get_columns(table.name, schema="mesh")}
+                assert columns[column]["type"].length == 254
     db.close()
 
 

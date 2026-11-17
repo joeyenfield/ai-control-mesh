@@ -1657,9 +1657,9 @@ def main() -> None:
     users.add_user("demo-admin", DEMO_ADMIN_PASSWORD, role="admin")  # a site admin, in the root organization
     # The demo's user, machines and sessions are one organization's (tenant's).
     users.add_org(DEMO_ORG, "Demo team")
-    users.add_user(DEMO_USER, DEMO_PASSWORD, role="member", tenant=DEMO_ORG)
+    users.add_user(DEMO_USER, DEMO_PASSWORD, role="member", tenant=DEMO_ORG, email="demo@example.com")
     for name in TEAMMATES:
-        users.add_user(name, secrets.token_urlsafe(24), role="member", tenant=DEMO_ORG)
+        users.add_user(name, secrets.token_urlsafe(24), role="member", tenant=DEMO_ORG, email=f"{name}@example.com")
     issuer = Issuer(settings)
     try:
         with issuer.state.transaction():

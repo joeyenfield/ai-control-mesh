@@ -54,7 +54,7 @@ agents = Table(
 
 users = Table(
     "users", api,
-    Column("name", String(40), primary_key=True),
+    Column("name", String(254), primary_key=True),
     # scrypt$n$r$p$salt$hash. With created_at it makes the account version every token is bound to (auth.account_version).
     Column("password", Text, nullable=False),
     Column("role", String(20), nullable=False),
@@ -64,6 +64,12 @@ users = Table(
     Column("tenant", String(40)),
     Column("orgs", JSON, nullable=False),
     Column("teams", JSON, nullable=False),
+)
+
+user_profiles = Table(
+    "user_profiles", api,
+    Column("name", String(254), primary_key=True),
+    Column("email", String(254), nullable=False),
 )
 
 orgs = Table(
@@ -150,7 +156,7 @@ provider_accounts = Table(
     "provider_accounts", api,
     Column("id", String(64), primary_key=True),
     Column("tenant", String(40), nullable=False),
-    Column("owner", String(40), nullable=False),
+    Column("owner", String(254), nullable=False),
     Column("provider", String(40), nullable=False),
     # Metadata only (names, plan, mode, priority, declared limits, cooldowns): never a credential.
     Column("data", JSON, nullable=False),
@@ -225,7 +231,7 @@ request_log = Table(
     # The HTTP status, or the WebSocket handshake's (101 when accepted); null if none was sent.
     Column("status", Integer),
     Column("outcome", String(10), nullable=False),
-    Column("user", String(200)),
+    Column("user", String(254)),
     Column("search", Text, nullable=False),
     Column("entry", JSON, nullable=False),
     # Whether request_log_payloads has its bodies (debug mode was on).
@@ -247,7 +253,7 @@ request_log_payloads = Table(
 provider_usage = Table(
     "provider_usage", api,
     Column("tenant", String(40), primary_key=True),
-    Column("user", String(100), primary_key=True),
+    Column("user", String(254), primary_key=True),
     Column("provider", String(200), primary_key=True),
     Column("bucket", BigInteger, primary_key=True, autoincrement=False),
     Column("requests", BigInteger, nullable=False, default=0),
@@ -260,11 +266,11 @@ provider_usage = Table(
 usage_limits = Table(
     "usage_limits", api,
     Column("tenant", String(40), primary_key=True),
-    Column("user", String(100), primary_key=True),
+    Column("user", String(254), primary_key=True),
     Column("provider", String(200), primary_key=True),
     Column("window", String(8), primary_key=True),
     Column("tokens", BigInteger, nullable=False),
-    Column("set_by", String(100)),
+    Column("set_by", String(254)),
     Column("set_at", Float),
 )
 
@@ -273,7 +279,7 @@ retention_policies = Table(
     "retention_policies", api,
     Column("tenant", String(40), primary_key=True),
     Column("policy", JSON, nullable=False),
-    Column("set_by", String(100)),
+    Column("set_by", String(254)),
     Column("set_at", Float),
 )
 
@@ -284,9 +290,9 @@ legal_holds = Table(
     Column("tenant", String(40), nullable=False),
     # org, user or session; target is the organization, the user's name or the session id.
     Column("scope", String(10), nullable=False),
-    Column("target", String(200), nullable=False),
+    Column("target", String(254), nullable=False),
     Column("reason", Text),
-    Column("set_by", String(100)),
+    Column("set_by", String(254)),
     Column("set_at", Float, nullable=False),
     Index("legal_holds_target", "scope", "target"),
 )
@@ -300,7 +306,7 @@ audit_events = Table(
     Column("id", String(36), nullable=False, unique=True),
     Column("time", Float, nullable=False),
     Column("type", String(80), nullable=False),
-    Column("actor", String(100)),
+    Column("actor", String(254)),
     Column("outcome", String(20), nullable=False),
     Column("event", JSON, nullable=False),
     Column("prev", String(64), nullable=False),
@@ -348,7 +354,7 @@ peer_codes = Table(
     Column("org", String(40)),
     Column("link", String(64)),
     Column("exp", Float, nullable=False),
-    Column("created_by", String(100)),
+    Column("created_by", String(254)),
     Column("used_at", Float),
 )
 bridges = Table(

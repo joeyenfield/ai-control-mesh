@@ -516,7 +516,7 @@ class ProviderAccounts:
                 raise AccountError(400, "priority is a whole number (lower is tried first)") from exc
         if "users" in data:
             users = data["users"] if isinstance(data["users"], list) else []
-            account.users = sorted({str(user)[:40] for user in users if str(user) and str(user) != account.owner})[:50]
+            account.users = sorted({str(user)[:254] for user in users if str(user) and str(user) != account.owner})[:50]
         if "limit" in data:
             account.limit = _limit(data["limit"])
         for key in ("warning_percent", "stop_percent"):

@@ -612,7 +612,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
             administered(request, tenant)
         return change(request, lambda: accounts.store.add_user(
             str(data.get("name") or ""), str(data.get("password") or ""), data.get("role") or "member",
-            list(data.get("teams") or []), tenant=tenant,
+            list(data.get("teams") or []), tenant=tenant, email=data.get("email"),
         ), "")
 
     @app.put("/api/users/{name}")
@@ -624,6 +624,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
             accounts.store.update_user(
                 name, role=data.get("role"), teams=data.get("teams"), orgs=data.get("orgs"),
                 password=str(data["password"]) if data.get("password") else None,
+                email=data.get("email"),
             )
 
         return change(request, update, "No such user")

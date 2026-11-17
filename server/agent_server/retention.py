@@ -304,7 +304,7 @@ class Retention:
     def add_hold(self, tenant: str, scope: str, target: str, reason: str | None, by: str | None) -> dict[str, Any]:
         if scope not in HOLD_SCOPES:
             raise RetentionError(f"scope is one of {', '.join(HOLD_SCOPES)}")
-        target = str(target or "").strip()[:200]
+        target = str(target or "").strip()[:254]
         if not target:
             raise RetentionError("Name what's held: the organization, the person or the session")
         if scope == "org" and target != tenant:

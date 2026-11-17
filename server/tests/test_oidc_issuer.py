@@ -99,6 +99,21 @@ def test_password_limit_follows_account_across_source_addresses(issuer):
             assert response.status_code == (401 if attempt < 30 else 429)
 
 
+def test_email_username_signs_in_through_real_oidc_and_contact_changes_keep_tokens(issuer):
+    client, service, store = issuer
+    name = "first.last+agent@engineering.example.com"
+    store.add_user(name, "a-different-password", tenant="acme")
+    code, verifier, params = browser_code(client, service, username=name.upper(), password="a-different-password")
+    response = exchange(client, service, code, verifier, params)
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    assert introspect(client, service, token).json()["username"] == name
+    assert service.auth.store.user(name)["email"] == name
+    store.update_user(name, email="contact@example.com")
+    assert service.auth.store.user(name)["email"] == "contact@example.com"
+    assert introspect(client, service, token).json()["active"]
+
+
 def test_browser_pkce_discovery_jwks_and_no_secret_storage(issuer, caplog):
     client, service, store = issuer
     before = stored_rows(store.db, schema.users)
