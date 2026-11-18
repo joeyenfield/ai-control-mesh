@@ -441,7 +441,7 @@ export function TerminalView({ sessionId, compact = false, gridFontSize = 9, fro
         <p className="subtle">
           {state.detail}
           {state.detail && " · "}
-          <Link to={`/sessions/${encodeURIComponent(sessionId)}`}>Session traffic</Link>
+          <b>Session</b> <Link className="mono" to={`/sessions/${encodeURIComponent(sessionId)}`} title="Open the session view: its requests and traffic">{sessionId}</Link>
         </p>
         <SharingControl sessionId={sessionId} you={summary?.you} />
         {!touch && <p className="subtle term-hint">
