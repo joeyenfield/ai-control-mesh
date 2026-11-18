@@ -264,6 +264,8 @@ export interface ReviewFinding {
   suggestion: string;
   /** About how many tokens it cost over the session, where the server can say. */
   impact_tokens: number | null;
+  /** The points it took off the score: less than its severity's when a related finding already counted, 0 when it was the provider's doing. */
+  penalty: number;
 }
 
 /** A model's tier by its list price for input, as the server sorts it; local is a machine's own model, unpriced a paid one with no price. */
@@ -306,6 +308,10 @@ export interface SessionReview {
   /** 100 less a penalty for each finding; null for a session with no model calls. */
   score: number | null;
   grade: string | null;
+  /** Where the points went, the costliest first: a group of related checks (group set) or one finding. */
+  score_breakdown: { group: string | null; label: string; checks: string[]; points: number }[];
+  /** Each area scored like the whole, from its own findings; empty with no model calls. */
+  area_scores: { area: ReviewFinding["area"]; score: number; findings: number }[];
   traffic: {
     requests: number;
     model_calls: number;

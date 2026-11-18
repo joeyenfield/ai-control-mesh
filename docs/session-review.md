@@ -10,7 +10,7 @@ A session's **Review** tab looks at what one agent session spent its tokens, tim
 
 Open a session from **Sessions** and choose **Review**. The checks run when the tab opens; **Check again** runs them once more on a session that is still going.
 
-The top of the tab says it in short: the score, how many of the checks found something at each level, and about how many tokens the findings add up to. The buttons under it jump to **Checks**, **What was measured** and **AI review**.
+The top of the tab says it in short: the score, how many of the checks found something at each level, about how many tokens the findings add up to, where most of the points went, and a score for each area (**Context**, **Tools**, **How it went**, **Reliability**, **Cost**); choose an area's score to see only its checks. The buttons under it jump to **Checks**, **What was measured** and **AI review**.
 
 ## What the checks need
 
@@ -24,7 +24,13 @@ Each finding has a level (**High**, **Medium**, **Low**, or a **Note**), what wa
 
 Findings are listed worst first, and within a level the one that cost most first. High findings start open; choose any other to open it, or **Expand all**. With findings in more than one area, the buttons above the list show one area at a time: **Context**, **Tools**, **How it went**, **Reliability** or **Cost**.
 
-**The score** starts at 100 and loses 18 for each high finding, 9 for each medium and 3 for each low: **Efficient** from 85, **Some waste** from 65, **Wasteful** from 40, **Very wasteful** below. It compares sessions roughly; the findings say what to do.
+**The score** starts at 100 and loses 18 for each high finding, 9 for each medium and 3 for each low: **Efficient** from 85, **Some waste** from 65, **Wasteful** from 40, **Very wasteful** below. It compares sessions roughly; the findings say what to do. Each finding shows the points it took off.
+
+- **One cause counts once.** Some checks see the same cause from different sides, and in each group the worst finding costs its full points and the others a third of theirs: **context size** (`peak-context`, `context-growth`, `long-session`, `compactions`), **tool loops** (`tool-errors`, `repeated-calls`, `rereads`) and **caching** (`caching`, `idle-cache`).
+- **The provider's doing doesn't count.** `slow` and a `failed-calls` finding whose failures were mostly the provider's own (5xx) are shown, and go to the AI review, but take no points. Rate limits still count: they're often the session's own doing (too many agents at once, or the organization's limit).
+- **Each area has a score** worked out the same way from its own findings, so a session can be tidy on tools and wasteful on context.
+
+The AI review is told where the points went, the main cause first, and each area's score, so it starts with what cost most.
 
 | Check | It says something when | What to try |
 | --- | --- | --- |
@@ -131,7 +137,7 @@ prompts:
 
 | `data` name | What it sends |
 | --- | --- |
-| `session` | The agent, model, length, requests and the score |
+| `session` | The agent, model, length, requests and the score, with where its points went and each area's score |
 | `tokens` | Tokens read and written, the cached share, the largest call, idle cache rewrites |
 | `cost` | Estimated cost, and calls, tokens and cost by model and by model tier |
 | `reliability` | Failed, rate-limited and cut-off calls, the wait for the first token |
