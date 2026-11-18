@@ -25,7 +25,7 @@ ALL = "all"
 
 # What a prompt can be sent: the name it's listed by, and what the console calls it.
 DATA = {
-    "session": "The agent, model and length",
+    "session": "The agent, model, length and score, with where its points went",
     "tokens": "Tokens, cache and the largest call",
     "cost": "Estimated cost, calls and tokens by model and tier",
     "reliability": "Failures and waiting times",

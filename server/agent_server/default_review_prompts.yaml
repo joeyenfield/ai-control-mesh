@@ -9,7 +9,7 @@
 #                shares (work only from the data, be specific, the answer's form) are added around it.
 #   summary      how the answer's Summary should read (optional)
 #   data         the parts of the session the model is sent, in this order, or "all". The names:
-#                  session        the agent, model, how long it ran, how many requests
+#                  session        the agent, model, how long it ran, how many requests, the score, where its points went and each area's score
 #                  tokens         tokens read and written, the cache, the largest call, idle rewrites
 #                  cost           estimated cost, and calls and tokens by model and by model tier
 #                  reliability    failed, rate-limited and cut-off calls, the wait for the first token

@@ -35,6 +35,9 @@ const TIER: Record<ModelTier, { label: string; pill: string; color: string }> = 
 
 const GRADE_CLASS: Record<string, string> = { Efficient: "good", "Some waste": "fair", Wasteful: "poor", "Very wasteful": "bad" };
 
+/** An area's score in the same bands as the grades (85, 65, 40). */
+const scoreClass = (value: number) => (value >= 85 ? "good" : value >= 65 ? "fair" : value >= 40 ? "poor" : "bad");
+
 const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 /**
@@ -91,7 +94,7 @@ export function SessionReview({ session }: { session: Session }) {
 
   if (review.isError) return <p className="bad">{review.error.message}</p>;
   if (!review.data) return <p className="empty">Checking the session…</p>;
-  const { traffic, prompt: sent, tools, findings, reviews, prompts, score, grade, checks } = review.data;
+  const { traffic, prompt: sent, tools, findings, reviews, prompts, score, grade, checks, score_breakdown: breakdown, area_scores: areaScores } = review.data;
   if (!traffic.model_calls) return <p className="empty">No model calls yet. A review needs some: come back once the agent has talked to its model.</p>;
   const value = choice ? `${choice.backend}\n${choice.model}` : "";
   // A note (payloads not captured) isn't a finding against the session.
@@ -109,7 +112,7 @@ export function SessionReview({ session }: { session: Session }) {
     <div className="review">
       <section className={`review-verdict grade-${GRADE_CLASS[grade ?? ""] ?? "none"}`} aria-label="The review in short">
         {score != null && (
-          <div className="review-score" title="100, less 18 for each high finding, 9 for each medium and 3 for each low">
+          <div className="review-score" title="100, less 18 for each high finding, 9 for each medium and 3 for each low. Related findings (one cause seen by several checks) count in full once, the rest a third. The provider's own failures and slowness don't count.">
             <strong>{score}</strong>
             <span>of 100</span>
           </div>
@@ -125,7 +128,28 @@ export function SessionReview({ session }: { session: Session }) {
             ) : (
               `None of the ${checks} checks found anything to change.`
             )}
+            {breakdown.length > 0 && ` Most points went to ${breakdown.slice(0, 3).map((item) => `${item.label.toLowerCase()} (${item.points})`).join(", ")}.`}
           </p>
+          {areaScores.length > 0 && (
+            <div className="review-areas" role="group" aria-label="Scores by area">
+              {areaScores.map((item) => (
+                <button
+                  key={item.area}
+                  type="button"
+                  className={`review-area grade-${scoreClass(item.score)}`}
+                  aria-pressed={area === item.area}
+                  title={`${AREA[item.area]}: 100 less its findings' penalties. Show only its checks.`}
+                  onClick={() => {
+                    setArea(area === item.area ? "all" : item.area);
+                    jump("review-checks");
+                  }}
+                >
+                  <span>{AREA[item.area]}</span>
+                  <strong>{item.score}</strong>
+                </button>
+              ))}
+            </div>
+          )}
           <nav className="chip-bar" aria-label="Parts of the review">
             <button type="button" onClick={() => jump("review-checks")}>
               Checks{findings.length ? ` (${findings.length})` : ""}
@@ -238,6 +262,7 @@ export function SessionReview({ session }: { session: Session }) {
                     <span className={SEVERITY[finding.severity].pill}>{SEVERITY[finding.severity].label}</span>
                     <strong>{finding.title}</strong>
                     <span className="subtle">
+                      {finding.severity !== "info" && (finding.penalty ? `−${finding.penalty} points · ` : "no points off · ")}
                       {finding.impact_tokens ? `about ${formatCompact(finding.impact_tokens)} tokens · ` : ""}
                       {AREA[finding.area]}
                     </span>

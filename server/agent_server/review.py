@@ -43,6 +43,19 @@ SEVERITIES = ("high", "medium", "low", "info")
 # What a finding of each severity takes off a session's score of 100.
 PENALTIES = {"high": 18, "medium": 9, "low": 3, "info": 0}
 GRADES = ((85, "Efficient"), (65, "Some waste"), (40, "Wasteful"), (0, "Very wasteful"))
+# Checks that see one cause from different sides: a context that grew too big shows as a long session, a
+# large peak, steep growth and compactions. In a group the worst finding costs its full penalty and each of
+# the others GROUP_SHARE of its own, so one cause doesn't empty the score.
+GROUPS = {
+    "context-size": ("Context size", ("peak-context", "context-growth", "long-session", "compactions")),
+    "tool-loops": ("Tool loops", ("tool-errors", "repeated-calls", "rereads")),
+    "caching": ("Caching", ("caching", "idle-cache")),
+}
+GROUP_SHARE = 1 / 3
+# The areas a finding is in, each scored like the whole (100 less its findings' penalties), in this order.
+AREAS = ("context", "tools", "flow", "reliability", "cost")
+# Findings that are the provider's doing, not the session's: shown, and passed to the AI review, but not scored.
+UNSCORED = {"slow"}
 
 # Where a check starts to say something, and where it says it louder. Tokens in payloads are
 # estimated at four characters each: close enough to tell 2,000 from 20,000.
@@ -145,11 +158,40 @@ def report(sessions: SessionStore, chats: Any, session: Session, records: list[d
     found = [finding for check in CHECKS for finding in [check(measured)] if finding]
     # Worst first, and within a level the one that cost most.
     found.sort(key=lambda item: (SEVERITIES.index(item["severity"]), -(item["impact_tokens"] or 0)))
-    score = max(0, 100 - sum(PENALTIES[item["severity"]] for item in found)) if calls else None
+    breakdown = _score(found)
+    score = max(0, 100 - sum(item["points"] for item in breakdown)) if calls else None
     return {
         "session_id": session.session_id, **measured, "findings": found, "checks": len(CHECKS), "score": score,
         "grade": next(label for floor, label in GRADES if score >= floor) if score is not None else None,
+        "score_breakdown": breakdown if calls else [],
+        "area_scores": [
+            {"area": area, "score": max(0, 100 - sum(item["penalty"] for item in found if item["area"] == area)),
+             "findings": sum(1 for item in found if item["area"] == area and item["severity"] != "info")}
+            for area in AREAS
+        ] if calls else [],
     }
+
+
+def _score(found: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sets each finding's penalty, and returns where the points went: one entry per group of related checks
+    (GROUPS) or lone finding that cost any, the costliest first."""
+    group_of = {check: name for name, (_, checks) in GROUPS.items() for check in checks}
+    lost: dict[str, dict[str, Any]] = {}
+    # found is worst first, so a group's first finding is the one that costs in full.
+    for finding in found:
+        full = 0 if finding["id"] in UNSCORED else PENALTIES[finding["severity"]]
+        if finding.pop("provider_side", False):
+            full = 0
+        group = group_of.get(finding["id"])
+        key = group or finding["id"]
+        entry = lost.setdefault(key, {"group": group, "label": GROUPS[group][0] if group else finding["title"], "checks": [], "points": 0})
+        finding["penalty"] = full if not entry["checks"] else round(full * GROUP_SHARE)
+        if finding["penalty"]:
+            entry["checks"].append(finding["id"])
+            entry["points"] += finding["penalty"]
+        elif not entry["checks"] and group is None:
+            del lost[key]
+    return sorted((item for item in lost.values() if item["points"]), key=lambda item: -item["points"])
 
 
 def _tier(record: dict[str, Any], prices: list[dict[str, Any]]) -> str:
@@ -221,6 +263,8 @@ def _traffic(records: list[dict[str, Any]], calls: list[dict[str, Any]], prices:
         "peak_context_tokens": max(contexts, default=0),
         "context_window": max(windows, default=None),
         "failed_calls": sum(1 for record in calls if int(record.get("status") or 0) >= 400 and int(record.get("status") or 0) != 429),
+        # The provider's own failures (and the server's 502 when it couldn't reach it), not the request's.
+        "provider_errors": sum(1 for record in calls if int(record.get("status") or 0) >= 500),
         "rate_limited_calls": sum(1 for record in calls if int(record.get("status") or 0) == 429),
         "incomplete_calls": sum(1 for record in calls if record.get("error_type") == "incomplete_stream"),
         "median_first_token_ms": round(statistics.median(first_tokens)) if first_tokens else None,
@@ -678,11 +722,16 @@ def _failed_calls(m: dict[str, Any]) -> dict[str, str] | None:
     traffic = m["traffic"]
     if traffic["failed_calls"] < FAILED_CALLS[0] or traffic["failed_calls"] / traffic["model_calls"] < FAILED_CALLS[1]:
         return None
-    return _finding(
+    provider = traffic.get("provider_errors", 0)
+    finding = _finding(
         "failed-calls", "reliability", "medium", "Model calls failed",
-        f"{_n(traffic['failed_calls'])} of {_n(traffic['model_calls'])} model calls ended in an error. Agents retry them, so the session waits and may pay twice.",
+        f"{_n(traffic['failed_calls'])} of {_n(traffic['model_calls'])} model calls ended in an error"
+        + (f", {_n(provider)} of them the provider's own (5xx)" if provider else "") + ". Agents retry them, so the session waits and may pay twice.",
         "Open the failed requests on the Requests tab to see why: a provider that was down, a model that isn't there, or a request the provider refused as too large.",
     )
+    # Mostly the provider's failures: not something the session did, so they don't cost it points.
+    finding["provider_side"] = provider * 2 >= traffic["failed_calls"]
+    return finding
 
 
 def _rate_limited(m: dict[str, Any]) -> dict[str, str] | None:
@@ -820,7 +869,19 @@ def _session_lines(session: Session, found: dict[str, Any]) -> list[str]:
         f"Agent: {session.client}. Model: {session.model or 'chosen by the agent'}. " + ("Ended." if session.ended_at else "Still open."),
         f"Lasted {traffic['duration_seconds'] // 60} minutes. {traffic['requests']} requests, {traffic['model_calls']} of them model calls.",
         f"Score from the automatic checks: {found['score']} of 100 ({found['grade']})." if found.get("score") is not None else "",
+        _breakdown_line(found),
+        ("Scores by area: " + ", ".join(f"{item['area']} {item['score']}" for item in found["area_scores"]) + ".") if found.get("area_scores") else "",
     ]
+
+
+def _breakdown_line(found: dict[str, Any]) -> str:
+    """Where the score's points went, so a review starts with the cause that cost most."""
+    breakdown = found.get("score_breakdown") or []
+    lost = sum(item["points"] for item in breakdown)
+    if not lost:
+        return ""
+    parts = [f"{item['label']} ({', '.join(item['checks'])}): {item['points']} points, {item['points'] / lost:.0%}" for item in breakdown]
+    return f"Where the {lost} points were lost, the main cause first: " + "; ".join(parts) + "."
 
 
 def _token_lines(session: Session, found: dict[str, Any]) -> list[str]:

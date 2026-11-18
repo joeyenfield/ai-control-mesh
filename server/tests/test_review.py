@@ -117,7 +117,13 @@ def test_review_reads_the_prompt_and_tools_from_captured_payloads(tmp_path):
         # A finding says what it cost where that can be worked out, and the findings leave a score.
         assert findings["large-results"]["impact_tokens"] == 12_500 and findings["rereads"]["impact_tokens"] is None
         assert findings["system-prompt"]["impact_tokens"] == found["prompt"]["system_tokens"] - 8_000
-        assert found["score"] == 100 - sum(review.PENALTIES[item["severity"]] for item in found["findings"]) and found["grade"]
+        assert found["score"] == 100 - sum(item["penalty"] for item in found["findings"]) and found["grade"]
+        assert sum(item["points"] for item in found["score_breakdown"]) == 100 - found["score"]
+        # Each area is scored the same way, from its own findings.
+        areas = {item["area"]: item for item in found["area_scores"]}
+        assert list(areas) == list(review.AREAS)
+        for area, item in areas.items():
+            assert item["score"] == 100 - sum(finding["penalty"] for finding in found["findings"] if finding["area"] == area)
     finally:
         close_app(app, client, old)
 
@@ -135,11 +141,15 @@ def test_review_without_payloads_checks_only_the_numbers(tmp_path):
         assert found["traced_calls"] == 0 and found["prompt"] is None and found["tools"] is None and found["conversation"] is None
         assert found["traffic"]["model_calls"] == found["traffic"]["failed_calls"] == 3
         assert [item["id"] for item in found["findings"]] == ["failed-calls", "untraced"]
-        assert found["score"] == 91 and found["grade"] == "Efficient" and found["context"] is None
+        # Every failure was the provider's own (500): shown, but the session isn't scored down for it.
+        assert "3 of them the provider's own" in found["findings"][0]["detail"] and "provider_side" not in found["findings"][0]
+        assert found["findings"][0]["penalty"] == 0 and found["score_breakdown"] == []
+        assert found["score"] == 100 and found["grade"] == "Efficient" and found["context"] is None
 
         empty = client.post("/api/sessions", json={"client": "test", "backend": "test"}).json()
         nothing = client.get(f"/api/sessions/{empty['session_id']}/review").json()
         assert nothing["findings"] == [] and nothing["score"] is None and nothing["timeline"]["points"] == []
+        assert nothing["score_breakdown"] == [] and nothing["area_scores"] == []
     finally:
         close_app(app, client, old)
 
@@ -259,6 +269,32 @@ def test_each_prompt_sends_its_own_data_and_findings():
     assert review_prompts.named(review_prompts.DEFAULT_PROMPTS, "cost").title == "Cost and caching"
 
 
+def test_one_cause_seen_by_several_checks_costs_once():
+    def finding(check: str, area: str, severity: str) -> dict:
+        return {"id": check, "area": area, "severity": severity, "title": check, "detail": "", "suggestion": "", "impact_tokens": None}
+
+    # A context that grew too big: four checks, which alone would cost 18 + 18 + 9 + 9 = 54 points.
+    found = [finding("peak-context", "context", "high"), finding("long-session", "flow", "high"),
+             finding("context-growth", "context", "medium"), finding("compactions", "flow", "medium"),
+             finding("rate-limited", "reliability", "medium"), finding("slow", "reliability", "low")]
+    breakdown = review._score(found)
+    # The worst costs in full, the rest a third of theirs; slowness is the provider's, so it costs nothing.
+    assert [item["penalty"] for item in found] == [18, 6, 3, 3, 9, 0]
+    assert breakdown == [
+        {"group": "context-size", "label": "Context size", "checks": ["peak-context", "long-session", "context-growth", "compactions"], "points": 30},
+        {"group": None, "label": "rate-limited", "checks": ["rate-limited"], "points": 9},
+    ]
+    # The AI review is told where the points went, the main cause first, and each area's score.
+    from agent_server.sessions import Session
+
+    session = Session("s", "claude-account", None, "m", "direct")
+    traffic = {"requests": 1, "model_calls": 1, "duration_seconds": 0}
+    lines = review._session_lines(session, {"traffic": traffic, "score": 61, "grade": "Wasteful", "score_breakdown": breakdown,
+                                            "area_scores": [{"area": "context", "score": 79, "findings": 2}]})
+    assert "Where the 39 points were lost, the main cause first: Context size (peak-context, long-session, context-growth, compactions): 30 points, 77%" in lines[3]
+    assert lines[4] == "Scores by area: context 79."
+
+
 def test_review_prompts_are_a_setting_site_admins_change(tmp_path):
     from agent_server import config_io
 
@@ -296,7 +332,7 @@ prompts:
         base = f"/api/sessions/{session['session_id']}"
         offered = client.get(f"{base}/review").json()["prompts"]
         assert [item["title"] for item in offered] == ["Secrets and risky commands", "Everything"]
-        assert offered[0]["data"] == ["The agent, model and length", "Shell commands run", "Failed tool calls and their errors"]
+        assert offered[0]["data"] == ["The agent, model, length and score, with where its points went", "Shell commands run", "Failed tool calls and their errors"]
         made = client.post(f"{base}/reviews", json={"backend": "test", "model": "m", "question": "Anything destructive?"}).json()
         assert made["prompt"] == "security" and "which could have changed something outside the project" in made["messages"][0]["content"]
         assert "rm -rf build" in made["messages"][1]["content"] and "Up to 3 numbered" in made["messages"][0]["content"]

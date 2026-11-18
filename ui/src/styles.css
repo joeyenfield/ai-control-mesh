@@ -410,6 +410,14 @@ h3 { font-weight: 650; }
 .review-verdict-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .review-verdict-text h2, .review-verdict-text p { margin: 0; }
 .review-verdict-text p { color: var(--steel); line-height: 1.5; }
+/* Each area's score: a button that shows that area's checks. */
+.review-areas { display: flex; flex-wrap: wrap; gap: 6px; }
+.review-area { display: inline-flex; align-items: baseline; gap: 6px; min-height: 30px; padding: 3px 10px; font-size: 12.5px; font-weight: 500; }
+.review-area strong { font-variant-numeric: tabular-nums; }
+.review-area.grade-good strong { color: var(--good); }
+.review-area.grade-fair strong { color: var(--accent-ink); }
+.review-area.grade-poor strong, .review-area.grade-bad strong { color: var(--bad); }
+.review-area[aria-pressed="true"] { border-color: var(--accent); }
 .review-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .review-part { scroll-margin-top: 16px; }
 .review-run { border-left: 3px solid var(--line-strong); }
