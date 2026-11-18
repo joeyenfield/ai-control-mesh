@@ -48,13 +48,29 @@ func TestKillEndsTheAgentAndItsProcessGroup(t *testing.T) {
 		t.Fatal("Kill didn't end the agent")
 	}
 	deadline := time.Now().Add(5 * time.Second)
-	for syscall.Kill(sleeper, 0) == nil {
+	for alive(sleeper) {
 		if time.Now().After(deadline) {
 			_ = syscall.Kill(sleeper, syscall.SIGKILL)
 			t.Fatal("Kill left the agent's child running")
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
+}
+
+// alive is whether pid still runs. A killed child whose parent died is re-parented to PID 1, and in a
+// container that's often the test runner itself, which never reaps it: it stays a zombie, which
+// kill(pid, 0) still finds, so read its state where Linux shows it.
+func alive(pid int) bool {
+	if syscall.Kill(pid, 0) != nil {
+		return false
+	}
+	stat, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return true
+	}
+	// The state follows the command, which is in parentheses and may contain spaces.
+	fields := strings.Fields(string(stat[strings.LastIndexByte(string(stat), ')')+1:]))
+	return len(fields) == 0 || fields[0] != "Z"
 }
 
 type readerFunc func([]byte) (int, error)
