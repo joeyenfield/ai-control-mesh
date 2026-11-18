@@ -271,6 +271,7 @@ A shared terminal has one host (the launcher) and any number of viewers (console
 | launcher → server | text `{"type": "exit", "status": n}` | The agent exited |
 | agent-proxy → server | text `{"type": "token", "token": "…"}` | Its new access token, before the one the socket opened with expires (also every minute) |
 | server → launcher | text `{"type": "input", "parts": ["text", "\r"]}` | A viewer's input, typed in as separate writes a short gap apart |
+| server → launcher | text `{"type": "kill"}` | A viewer pressed **Kill**: the launcher kills the agent's process group at once (TerminateProcess on Windows), then sends its `exit` as usual. Older launchers ignore it |
 
 **Viewer: `WS /api/terminals/<id>/view`**:
 
@@ -284,6 +285,7 @@ A shared terminal has one host (the launcher) and any number of viewers (console
 | server → viewer | text `{"type": "replayed"}` | The history is all sent |
 | server → viewer | text `{"type": "resize", …}`, `{"type": "error", "message"}` | Size changes, refused input |
 | viewer → server | text `{"type": "input", "keys": "…"}` or `{"type": "input", "text": "…", "enter": true}` | Keys, or a message and Enter; checked against the session's sharing on every message |
+| viewer → server | text `{"type": "kill"}` | Kill the agent; needs control of the session, like typing |
 
 **Reconnecting.**
 

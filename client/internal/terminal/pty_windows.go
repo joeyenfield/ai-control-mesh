@@ -35,6 +35,9 @@ type windowsChild struct {
 	input   *os.File
 	output  *os.File
 	closing sync.Once
+	// killing guards the process handle: Kill comes from the share's goroutine, and Close frees the handle.
+	killing sync.Mutex
+	closed  bool
 }
 
 func startChild(command []string, dir string, env []string, cols, rows int) (child, error) {
@@ -154,6 +157,15 @@ func (c *windowsChild) Wait() int {
 	return int(code)
 }
 
+// Kill ends the agent. Closing the pseudo console afterwards (Close) ends what else it had attached.
+func (c *windowsChild) Kill() {
+	c.killing.Lock()
+	defer c.killing.Unlock()
+	if c.process != 0 && !c.closed {
+		_ = windows.TerminateProcess(c.process, 1)
+	}
+}
+
 // Close ends the pseudo console. Its output pipe stays open until then, even after the
 // agent exits; closing it in the background lets the reader drain what's left meanwhile
 // (on older Windows, ClosePseudoConsole waits for that).
@@ -163,9 +175,12 @@ func (c *windowsChild) Close() {
 			time.Sleep(100 * time.Millisecond)
 			windows.ClosePseudoConsole(c.console)
 			_ = c.input.Close()
+			c.killing.Lock()
 			if c.process != 0 {
 				windows.CloseHandle(c.process)
 			}
+			c.closed = true
+			c.killing.Unlock()
 		}()
 	})
 }

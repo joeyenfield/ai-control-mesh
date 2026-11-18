@@ -301,6 +301,21 @@ class TerminalHub:
             return "The agent's terminal isn't connected."
         return None
 
+    async def kill(self, terminal: Terminal) -> str | None:
+        """Ask the launcher to kill the agent (the console's Kill button). Returns why it couldn't, or None.
+
+        The launcher kills the agent's process group and then reports its exit as usual; an older
+        launcher ignores the message, so the agent keeps running there.
+        """
+        if terminal.host is None:
+            return "The agent's terminal isn't connected." if terminal.ended_at is None else "The agent has exited."
+        try:
+            async with terminal.host_lock:
+                await terminal.host.send_text(json.dumps({"type": "kill"}))
+        except Exception:  # noqa: BLE001 - the host's handler notices the dead connection and detaches it
+            return "The agent's terminal isn't connected."
+        return None
+
     async def close_all(self) -> None:
         """Before a restart: launchers reconnect and resend what's missing, viewers reconnect too."""
         for terminal in self.terminals.values():

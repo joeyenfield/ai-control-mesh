@@ -18,6 +18,8 @@ type child interface {
 	Wait() int
 	// Close ends the pseudo-terminal, so Read reports the end once the output is drained.
 	Close()
+	// Kill ends the agent and everything it started at once: the console's Kill button.
+	Kill()
 }
 
 // console is the user's own terminal, in raw mode while the agent runs.
@@ -87,6 +89,7 @@ func Run(command []string, dir string, env []string, share *Share) (int, error) 
 	history := NewHistory(HistoryLimit)
 	if share != nil {
 		history = share.History()
+		share.Kill = agent.Kill
 		share.Start(history, agent.Write, cols, rows)
 	}
 	screen := newConsole()
@@ -169,6 +172,7 @@ func RunHeadless(command []string, dir string, env []string, share *Share) (int,
 		return 127, err
 	}
 	history := share.History()
+	share.Kill = agent.Kill
 	share.Start(history, agent.Write, HeadlessCols, HeadlessRows)
 	output := make(chan struct{})
 	go func() {

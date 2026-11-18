@@ -210,14 +210,19 @@ def register(app: FastAPI, runtime: Runtime) -> None:
                     if await auth.renew_socket(runtime, websocket, message.get("token")):
                         checked["at"] = 0.0
                     continue
-                if isinstance(message, dict) and message.get("type") == "input":
+                if isinstance(message, dict) and message.get("type") in ("input", "kill"):
                     denied = await permitted()
                     if denied:
                         await websocket.close(code=denied, reason="Renew your sign-in or check terminal access")
                         return
                     # Sharing can change while someone watches, so check on every keystroke.
                     allowed = await permitted(control=True) == 0
-                    error = await hub.send_input(terminal, message) if allowed else "This session is shared with you to watch, not to type into."
+                    if not allowed:
+                        error = "This session is shared with you to watch, not to type into or end."
+                    elif message["type"] == "kill":
+                        error = await hub.kill(terminal)
+                    else:
+                        error = await hub.send_input(terminal, message)
                     if error:
                         try:
                             queue.put_nowait({"type": "error", "message": error})
@@ -330,11 +335,16 @@ async def serve_guest_viewer(
                 message = json.loads(await websocket.receive_text())
             except ValueError:
                 continue
-            if isinstance(message, dict) and message.get("type") == "input":
+            if isinstance(message, dict) and message.get("type") in ("input", "kill"):
                 if await permitted():
                     await websocket.close(code=4403, reason="The bridge no longer lets this out")
                     return
-                error = await hub.send_input(terminal, message) if await permitted(control=True) == 0 else "This machine's terminals aren't shared to type into over this bridge."
+                if await permitted(control=True):
+                    error = "This machine's terminals aren't shared to type into over this bridge."
+                elif message["type"] == "kill":
+                    error = await hub.kill(terminal)
+                else:
+                    error = await hub.send_input(terminal, message)
                 if error:
                     try:
                         queue.put_nowait({"type": "error", "message": error})

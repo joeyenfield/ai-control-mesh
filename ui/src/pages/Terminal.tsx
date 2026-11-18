@@ -7,6 +7,7 @@ import "@xterm/xterm/css/xterm.css";
 import { api, onRenewed, renewSignIn, terminalSocketUrl, type TerminalInfo } from "../api";
 import { Icon } from "../components/Icon";
 import { SharingControl } from "../components/Sharing";
+import { KillButton, ended } from "../components/KillButton";
 import { remember, remembered, useClipboard, useToast } from "../hooks";
 import { PairPanel, terminalState } from "./Terminals";
 
@@ -58,6 +59,8 @@ const scroll = (term: Terminal | null, up: boolean) => {
 export type KeySender = {
   keys: (keys: (term: Terminal | null) => string) => boolean;
   text: (text: string) => boolean;
+  /** Kills the agent and what it started; its exit then shows as usual. */
+  kill: () => boolean;
 };
 
 export const KEYS: { label: string; title: string; keys: (term: Terminal | null) => string }[] = [
@@ -174,17 +177,18 @@ export function TerminalView({ sessionId, compact = false, gridFontSize = 9, fro
   watchOnlyRef.current = watchOnly;
 
   const send = useCallback(
-    (message: { keys?: string; text?: string; enter?: boolean }) => {
+    (message: { keys?: string; text?: string; enter?: boolean }, type: "input" | "kill" = "input") => {
       if (watchOnlyRef.current) return false;
       if (socket.current?.readyState !== WebSocket.OPEN) {
         notify("Not connected to the terminal yet.");
         return false;
       }
-      socket.current.send(JSON.stringify({ type: "input", ...message }));
+      socket.current.send(JSON.stringify({ type, ...message }));
       return true;
     },
     [notify],
   );
+  const kill = useCallback(() => send({}, "kill"), [send]);
 
   useEffect(() => {
     const terminal = new Terminal({
@@ -337,9 +341,9 @@ export function TerminalView({ sessionId, compact = false, gridFontSize = 9, fro
 
   useEffect(() => {
     if (!onSender) return;
-    onSender({ keys: (keys) => send({ keys: keys(term.current) }), text: (text) => send({ text, enter: true }) });
+    onSender({ keys: (keys) => send({ keys: keys(term.current) }), text: (text) => send({ text, enter: true }), kill });
     return () => onSender(null);
-  }, [onSender, send]);
+  }, [onSender, send, kill]);
 
   useEffect(() => {
     if (term.current) term.current.options.fontSize = compact ? gridFontSize : fontSize;
@@ -398,6 +402,7 @@ export function TerminalView({ sessionId, compact = false, gridFontSize = 9, fro
         </button>
         <span className={`pill ${state.tone === "idle" ? "" : state.tone}`}>{state.label}</span>
         <SessionCostPill sessionId={sessionId} />
+        <KillButton name={name} kill={kill} available={live && !ended(merged)} />
         <div className="terminal-toolbar">
           <div className="row" role="group" aria-label="Text size">
             <button type="button" onClick={() => resize(-1)} aria-label="Smaller text" disabled={fontSize <= SIZES.min}>

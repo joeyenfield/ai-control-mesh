@@ -132,7 +132,7 @@ A terminal that isn't connected (launcher closed, or agent exited) has **Remove*
 
 Click inside a terminal to type into that session; the focused tile has a highlighted border, and sessions shared for viewing remain watch-only.
 
-- Each tile is headed by one short line: its state as a coloured dot and the agent's name. Press that title for the details underneath — its type, machine, folder, status, model and session id — and again to hide them. The session id is a link to the session's page, with its requests and chat; on a phone the model is left out.
+- Each tile is headed by one short line: its state as a coloured dot and the agent's name, then its cost, **Kill** (the power icon), fullscreen and remove. Press that title for the details underneath — its type, machine, folder, status, model and session id — and again to hide them. The session id is a link to the session's page, with its requests and chat; on a phone the model is left out.
 - **Text size** changes the grid's text from 6px to 16px without changing the agent's terminal dimensions; scroll inside a tile to see output that doesn't fit. A tile's open details shrink only what you see: the agent's terminal keeps its own size.
 - On a phone the tiles stack in one column. Tap a tile to bring up the keyboard in the message box above the quick keys; **Send** types the message into that tile's agent, with Enter.
 
@@ -142,13 +142,14 @@ Click inside a terminal to type into that session; the focused tile has a highli
 
 ![A shared terminal](screenshots/terminal.png)
 
-**A terminal.** Opening one (`/terminals/<session>`) shows the agent's live terminal (xterm.js) with its history. One line sits above it: a back button (to Running agents, or the Live agent view when you came from there), its state as a coloured dot, its name and folder, and the text controls. Press the name for the details underneath (the state's detail, the session id, sharing and hints), again to hide them; on narrow screens the text controls move there too.
+**A terminal.** Opening one (`/terminals/<session>`) shows the agent's live terminal (xterm.js) with its history. One line sits above it: a back button (to Running agents, or the Live agent view when you came from there), its state as a coloured dot, its name and folder, **Kill** (the power icon) and the text controls. Press the name for the details underneath (the state's detail, the session id, sharing and hints), again to hide them; on narrow screens the text controls move there too.
 
 - **Type into it** in the message box and **Send**. On a phone, tapping the terminal brings up the keyboard in the message box. Text and Enter go as separate keystrokes, and multi-line text is sent as a paste, so agents read it as if typed.
 - **Keys** for phones: Esc, Enter, arrows, Scroll ↑/↓, PgUp/PgDn, Tab, ⇧Tab, Ctrl+C, and 1, 2, 3, y, n for answering prompts. Scroll ↑/↓ scroll a full-screen agent's own history (Claude Code, OpenCode, Qwen Code), else the terminal's.
 - **A−/A+** change the font size; **Fit width** sizes it to the window; **Light** switches the terminal's colours; **Latest** jumps to the bottom.
 - **Copying**: drag over the terminal to select text, then Ctrl+C (or Ctrl+Shift+C, or Cmd+C on a Mac) copies it; with nothing selected, Ctrl+C still goes to the agent. Full-screen agents that use the mouse (Claude Code, OpenCode, Qwen Code) take a plain drag themselves: hold Shift while dragging (Option on a Mac). **Copy** copies the selection, or else what's on the screen, and **Copy all** the whole terminal with its history (both work on phones).
 - The **Session** id opens the session's page, with its requests and chat.
+- **Kill** ends the agent at once, with everything it started (a shell's commands, an agent's tools), after you confirm; work it hasn't saved is lost. Its session and recording stay, and it shows as exited. Only people who can type into the terminal see it, and only while the agent runs. A launcher older than this server ignores it.
 - If the session is shared with you to watch only, the input is off.
 - If the connection drops (a phone changing networks, the server restarting, the sign-in renewing), the page reconnects by itself and carries on from the last output it showed (an older server redraws the history). If the sign-in has run out, the page renews it once before asking you to sign in again.
 

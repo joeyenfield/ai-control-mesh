@@ -442,6 +442,8 @@ def test_a_controlled_terminal_is_relayed_to_the_server(tmp_path, agent_binary):
                 assert replay == b"hello from the agent machine\r\n"
                 viewer.send(json.dumps({"type": "input", "text": "go", "enter": True}))
                 assert json.loads(host.recv(timeout=5)) == {"type": "input", "parts": ["go", "\r"]}
+                viewer.send(json.dumps({"type": "kill"}))
+                assert json.loads(host.recv(timeout=5)) == {"type": "kill"}
                 host.send(json.dumps({"type": "exit", "status": 0}))
                 assert json.loads(viewer.recv(timeout=5))["terminal"]["exit_status"] == 0
         # The server's refusal reaches the launcher as its close code.
@@ -1187,6 +1189,23 @@ def test_a_fleet_machine_lists_its_folders_and_opens_a_shell_when_commands_are_o
         assert m.runtime.sessions.get(session_id).ended_at is not None
         [record] = httpx.get(base, headers=m.headers).json()["history"]
         assert record["agent"] == "shell" and record["session_id"] == session_id
+
+        # Kill: the console's button ends a shell that would otherwise wait for input forever.
+        opened = httpx.post(f"{base}/shell", headers=m.headers, json={"project": str(work)}, timeout=90)
+        assert opened.status_code == 201, opened.text
+        killed_id = opened.json()["session_id"]
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline and not any(item["session_id"] == killed_id for item in httpx.get(f"{m.server}/api/terminals?open=1", headers=m.headers).json()["terminals"]):
+            time.sleep(0.2)
+        with connect(m.server.replace("http", "ws") + f"/api/terminals/{killed_id}/view", proxy=None, additional_headers=m.headers) as viewer:
+            viewer.recv(timeout=10)
+            time.sleep(2)
+            assert m.runtime.sessions.get(killed_id).ended_at is None
+            viewer.send(json.dumps({"type": "kill"}))
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline and m.runtime.sessions.get(killed_id).ended_at is None:
+                time.sleep(0.2)
+        assert m.runtime.sessions.get(killed_id).ended_at is not None, "the kill didn't end the shell"
 
 
 def test_a_fleet_machine_shows_its_files_only_when_files_are_on(tmp_path, agent_binary, machine_binary):

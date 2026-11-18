@@ -115,6 +115,8 @@ class Share:
         # Called after a lost or failed connection, before the next try: the launcher starts the
         # agent-proxy again there if it has gone away (`agent update` stops it).
         self.revive: Optional[Callable[[], None]] = None
+        # Ends the agent when a viewer with control asks (a {"type": "kill"} from the server).
+        self.kill: Optional[Callable[[], None]] = None
 
     def start(self, write: Callable[[bytes], None], cols: int, rows: int) -> None:
         self.write, self.cols, self.rows = write, cols, rows
@@ -223,6 +225,11 @@ class Share:
                     data = json.loads(message)
                 except ValueError:
                     continue
+                if isinstance(data, dict) and data.get("type") == "kill":
+                    # The server checked the viewer may control this terminal; the exit status follows as usual.
+                    if self.kill is not None:
+                        self.kill()
+                    continue
                 if not isinstance(data, dict) or data.get("type") != "input":
                     continue
                 for index, part in enumerate(data.get("parts") or []):
@@ -257,6 +264,10 @@ class Child:
         raise NotImplementedError
 
     def close(self) -> None:
+        raise NotImplementedError
+
+    def kill(self) -> None:
+        """Ends the agent and everything it started at once: the console's Kill button."""
         raise NotImplementedError
 
 
@@ -336,6 +347,18 @@ class PosixChild(Child):
         except OSError:
             pass
 
+    def kill(self) -> None:
+        # setsid made the agent a session leader: its pid is its process group's, so what it started goes too.
+        import signal
+
+        try:
+            os.killpg(self.process.pid, signal.SIGKILL)
+        except OSError:
+            try:
+                self.process.kill()
+            except OSError:
+                pass
+
 
 def windows_command(command: List[str]) -> Tuple[str, str]:
     """The program and the arguments after it for a ConPTY. A ConPTY can't start a .cmd or .bat (npm installs
@@ -393,6 +416,15 @@ class WindowsChild(Child):
     def close(self) -> None:
         # pywinpty closes the pseudo console when the PTY is collected; the reader thread ends with it.
         pass
+
+    def kill(self) -> None:
+        # On Windows os.kill is TerminateProcess; closing the pseudo console then ends what else it had attached.
+        import signal
+
+        try:
+            os.kill(self.pty.pid, signal.SIGTERM)
+        except (OSError, AttributeError):
+            pass
 
 
 def unavailable() -> str:
@@ -526,6 +558,7 @@ def run(command: List[str], cwd: str, env: Dict[str, str], share: Optional[Share
     agent = start_child(command, cwd, env, cols, rows)
     history = share.history if share else History()
     if share:
+        share.kill = agent.kill
         share.start(agent.write, cols, rows)
     try:
         screen: Console = WindowsConsole() if sys.platform == "win32" else PosixConsole()
@@ -594,6 +627,7 @@ def run_headless(command: List[str], cwd: str, env: Dict[str, str], share: Share
     """Runs command with no local window: what it prints goes only to the server through share,
     and only the server's viewers type into it. How an agent started from the console runs."""
     agent = start_child(command, cwd, env, HEADLESS_COLS, HEADLESS_ROWS)
+    share.kill = agent.kill
     share.start(agent.write, HEADLESS_COLS, HEADLESS_ROWS)
 
     def output() -> None:
