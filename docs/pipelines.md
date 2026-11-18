@@ -108,8 +108,11 @@ image archives. The Jenkins build archives its receipt and download link.
 The deployment test loads the archived AMD64 image and starts an isolated
 PostgreSQL, issuer and server stack. The versioned framework in
 `pipelines/integration/` is copied into the distribution and covered by its
-manifest. Seven checks cover service health, the exact version and downloads,
-unauthenticated access rejection, real OAuth device sign-in, the packaged Go
+manifest. Ten checks cover service health, the exact version and downloads,
+the console and its assets, a docs page and its screenshot, that every file the
+image ships (docs, console, `VERSION`, benchmarks, quickstart helpers) is readable
+by the server's own user (`COPY` keeps the checkout's modes, and the agent runs
+with `UMask=0077`), unauthenticated access rejection, real OAuth device sign-in, the packaged Go
 machine joining the fleet, a folders RPC reaching that machine, and rejection
 of paths outside its configured roots. These checks use disposable credentials
 and private container networking. Logs and results are archived in the test job;

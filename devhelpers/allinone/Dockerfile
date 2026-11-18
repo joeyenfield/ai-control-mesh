@@ -98,7 +98,10 @@ COPY deploy/compose/quickstart/machine.py /opt/mesh/quickstart_machine.py
 COPY devhelpers/allinone/entrypoint.py /opt/mesh/entrypoint.py
 # ping wherever the runtime allows it, as in agent-sandbox (sandbox/ping).
 COPY sandbox/ping /usr/local/bin/ping
+# COPY keeps the checkout's modes; one made with umask 077 (a CI workspace) leaves /opt/mesh, the server's
+# code and docs among it, readable only by root, and everything here runs as agent.
 RUN sed -i 's/\r$//' /usr/local/bin/ping && chmod 755 /usr/local/bin/ping \
+    && chmod -R a+rX /opt/mesh \
     && cp /usr/bin/ping /usr/local/lib/ping-socket \
     && echo "${AI_PROXY_VERSION:-$(cat /opt/mesh/VERSION)+unknown}" > /opt/mesh/BUILD \
     && python3 -m venv /opt/mesh/venv \

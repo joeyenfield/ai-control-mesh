@@ -101,6 +101,7 @@ COPY deploy/compose/quickstart/start.py deploy/compose/quickstart/machine.py /qu
 # user 1000 (ubuntu); the agents run as it, renamed agent.
 RUN sed -i 's/\r$//' /usr/local/bin/agent-sandbox-entrypoint /usr/local/bin/ping \
     && chmod 755 /usr/local/bin/agent-sandbox-entrypoint /usr/local/bin/ping \
+    && chmod -R a+rX /quickstart \
     && cp /usr/bin/ping /usr/local/lib/ping-socket \
     && usermod --login agent --home /home/agent --move-home --shell /bin/bash ubuntu \
     && groupmod --new-name agent ubuntu \
