@@ -71,8 +71,15 @@ def venv(tmp_path_factory) -> Path:
     return folder / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
+def outside_checkout(python: Path) -> dict:
+    """pip as the installed copy sees it: conftest puts the checkout's python/ on PYTHONPATH, and an egg-info
+    there (which any pip install of python/ leaves) would answer for what's installed."""
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    return {"env": env, "cwd": python.parent}
+
+
 def installed(python: Path) -> str:
-    shown = subprocess.run([str(python), "-m", "pip", "show", "ai-proxy-agent-py"], capture_output=True, text=True)
+    shown = subprocess.run([str(python), "-m", "pip", "show", "ai-proxy-agent-py"], capture_output=True, text=True, **outside_checkout(python))
     return next((line.split(":", 1)[1].strip() for line in shown.stdout.splitlines() if line.startswith("Version:")), "")
 
 
@@ -90,7 +97,7 @@ def test_the_programs_update_from_the_servers_python_build(tmp_path, agent_binar
         assert "Stopped the running agent-proxy" in done.stdout
         # A wheel that doesn't match the server's SHA-256 installs nothing.
         served_build.write_text(f"{'0' * 64}  python/{NAME}\n")
-        subprocess.run([str(venv), "-m", "pip", "uninstall", "-y", "ai-proxy-agent-py"], capture_output=True, timeout=120)
+        subprocess.run([str(venv), "-m", "pip", "uninstall", "-y", "ai-proxy-agent-py"], capture_output=True, timeout=120, **outside_checkout(venv))
         refused = subprocess.run([str(venv), "-m", "agent_py.machine", "update", "--server", m.server, "--force"], env=env, capture_output=True, text=True, timeout=300)
         assert refused.returncode == 1 and "SHA-256" in refused.stderr, refused.stdout + refused.stderr
         assert installed(venv) == ""
@@ -101,7 +108,7 @@ def test_an_update_cleans_up_a_second_copy_and_refuses_one_that_wont_import(tmp_
     site = Path(subprocess.run([str(venv), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"], capture_output=True, text=True).stdout.strip())
     old = tmp_path / NAME.replace("9.9.9", "1.0.0")
     old.write_bytes(stand_in_wheel("1.0.0"))
-    subprocess.run([str(venv), "-m", "pip", "install", "--force-reinstall", str(old)], check=True, capture_output=True, timeout=300)
+    subprocess.run([str(venv), "-m", "pip", "install", "--force-reinstall", str(old)], check=True, capture_output=True, timeout=300, **outside_checkout(venv))
     # A second, stale copy of the metadata beside it, as pip left on the Pi.
     stale = site / "ai_proxy_agent_py-0.9.0+old.dist-info"
     stale.mkdir()
@@ -118,7 +125,7 @@ def test_an_update_cleans_up_a_second_copy_and_refuses_one_that_wont_import(tmp_
         broken = stand_in_wheel("9.9.9", package=False)
         (tmp_path / "dist" / "9.9.9" / "python" / NAME).write_bytes(broken)
         served_build.write_text(f"{hashlib.sha256(broken).hexdigest()}  python/{NAME}\n")
-        subprocess.run([str(venv), "-m", "pip", "uninstall", "-y", "ai-proxy-agent-py"], capture_output=True, timeout=120)
+        subprocess.run([str(venv), "-m", "pip", "uninstall", "-y", "ai-proxy-agent-py"], capture_output=True, timeout=120, **outside_checkout(venv))
         refused = subprocess.run([str(venv), "-m", "agent_py.machine", "update", "--server", m.server, "--force"], env=env, capture_output=True, text=True, timeout=300)
         assert refused.returncode == 1 and "left alone" in refused.stderr, refused.stdout + refused.stderr
 
