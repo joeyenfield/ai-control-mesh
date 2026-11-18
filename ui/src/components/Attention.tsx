@@ -17,26 +17,84 @@ export function waitingAgents(terminals: TerminalSummary[] | undefined): Termina
     .sort((a, b) => Number(b.attention?.kind === "question") - Number(a.attention?.kind === "question"));
 }
 
+/**
+ * The Android app's notifications. Its WebView has no Notification API, so the app gives the page this
+ * object instead (android/…/AgentNotifications.kt), and fires APP_PERMISSION_EVENT when its permission
+ * may have changed.
+ */
+type AppNotifications = {
+  permission(): string;
+  requestPermission(): void;
+  show(title: string, body: string, tag: string, path: string): boolean;
+};
+const APP_PERMISSION_EVENT = "agentproxy-notifications";
+
+function appNotifications(): AppNotifications | undefined {
+  return typeof window === "undefined" ? undefined : (window as { AgentProxyNotifications?: AppNotifications }).AgentProxyNotifications;
+}
+
+/** Whether this is the Android app, whose console keeps polling in the background so it can notify. */
+export const inAndroidApp = () => appNotifications() !== undefined;
+
 export function notificationsSupported() {
-  return typeof window !== "undefined" && "Notification" in window;
+  return typeof window !== "undefined" && ("Notification" in window || inAndroidApp());
+}
+
+function permission(): string {
+  const app = appNotifications();
+  if (app) return app.permission();
+  return "Notification" in window ? Notification.permission : "denied";
+}
+
+function requestPermission(): Promise<string> {
+  const app = appNotifications();
+  if (!app) return Notification.requestPermission();
+  return new Promise((resolve) => {
+    const answered = () => {
+      window.removeEventListener(APP_PERMISSION_EVENT, answered);
+      resolve(permission());
+    };
+    window.addEventListener(APP_PERMISSION_EVENT, answered);
+    app.requestPermission();
+  });
+}
+
+function showNotification(title: string, body: string, tag: string, path: string, open: () => void) {
+  const app = appNotifications();
+  if (app) {
+    app.show(title, body, tag, path);
+    return;
+  }
+  const shown = new Notification(title, { body, tag });
+  shown.onclick = () => {
+    window.focus();
+    open();
+    shown.close();
+  };
 }
 
 const notifyStored = () => remembered(NOTIFY_KEY) === "1";
+const notifyOn = () => notificationsSupported() && permission() === "granted" && notifyStored();
 
 export function useNotifyChoice(): [boolean, (on: boolean) => Promise<void>] {
-  const [on, setOn] = useState(() => notificationsSupported() && Notification.permission === "granted" && notifyStored());
+  const [on, setOn] = useState(notifyOn);
   const choose = async (value: boolean) => {
-    if (value && notificationsSupported() && Notification.permission !== "granted") {
-      if ((await Notification.requestPermission()) !== "granted") value = false;
+    if (value && notificationsSupported() && permission() !== "granted") {
+      if ((await requestPermission()) !== "granted") value = false;
     }
     remember(NOTIFY_KEY, value ? "1" : "0");
     setOn(value);
     window.dispatchEvent(new Event(NOTIFY_KEY));
   };
   useEffect(() => {
-    const changed = () => setOn(notificationsSupported() && Notification.permission === "granted" && notifyStored());
+    const changed = () => setOn(notifyOn());
     window.addEventListener(NOTIFY_KEY, changed);
-    return () => window.removeEventListener(NOTIFY_KEY, changed);
+    // The app's permission can change in Android's settings, away from the page.
+    window.addEventListener(APP_PERMISSION_EVENT, changed);
+    return () => {
+      window.removeEventListener(NOTIFY_KEY, changed);
+      window.removeEventListener(APP_PERMISSION_EVENT, changed);
+    };
   }, []);
   return [on, choose];
 }
@@ -50,7 +108,7 @@ export function AttentionAlerts({ terminals }: { terminals: TerminalSummary[] | 
   const notify = useToast();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const [notifyOn] = useNotifyChoice();
+  const [notifying] = useNotifyChoice();
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   // What each agent was doing at the last poll; undefined before the first, so agents already waiting when the page opens don't all alert.
   const seen = useRef<Map<string, string> | undefined>(undefined);
@@ -71,13 +129,9 @@ export function AttentionAlerts({ terminals }: { terminals: TerminalSummary[] | 
       if (pathname === terminalPath(terminal.session_id) && document.visibilityState === "visible") continue;
       const body = kind === "question" ? terminal.attention!.question ?? "It's asking you something." : "It's done for now and waiting for you.";
       notify(`${nameOf(terminal)}: ${kind === "question" ? "needs you" : "waiting"}`);
-      if (notifyOn && notificationsSupported()) {
-        const shown = new Notification(`${nameOf(terminal)} ${kind === "question" ? "needs you" : "is waiting"}`, { body, tag: terminal.session_id });
-        shown.onclick = () => {
-          window.focus();
-          navigate(terminalPath(terminal.session_id));
-          shown.close();
-        };
+      if (notifying) {
+        const path = terminalPath(terminal.session_id);
+        showNotification(`${nameOf(terminal)} ${kind === "question" ? "needs you" : "is waiting"}`, body, terminal.session_id, path, () => navigate(path));
       }
     }
   }, [terminals]);
@@ -125,7 +179,9 @@ export function AttentionAlerts({ terminals }: { terminals: TerminalSummary[] | 
 export function NotifyToggle() {
   const [on, choose] = useNotifyChoice();
   if (!notificationsSupported()) return null;
-  const blocked = Notification.permission === "denied";
+  const app = inAndroidApp();
+  // The app opens Android's notification settings instead, so its switch stays usable.
+  const blocked = !app && permission() === "denied";
   return (
     <label className="check" title={blocked ? "This browser blocks notifications from this site; allow them in its site settings." : undefined}>
       <input type="checkbox" checked={on} disabled={blocked} onChange={(event) => void choose(event.target.checked)} />

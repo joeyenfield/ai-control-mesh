@@ -283,7 +283,7 @@ function TerminalTile({ id, terminal, fontSize, loading, active, onActivate, sen
       {terminal?.project && <span title={terminal.project_path ?? undefined}><b>Folder</b> {terminal.project}</span>}
       <span><b>Status</b> {state.label}{state.detail ? ` — ${state.detail}` : ""}</span>
       {terminal?.model && <span className="meta-model"><b>Model</b> {terminal.model}</span>}
-      <span className="meta-session"><b>Session</b> <span className="mono">{id}</span></span>
+      <span className="meta-session"><b>Session</b> <Link className="mono" to={`/sessions/${encodeURIComponent(id)}`} title="Open the session view: its requests and traffic">{id}</Link></span>
       {terminal && !terminal.you?.control && <span>Watch only: you cannot type in this terminal.</span>}
     </p>}
     {terminal ? <TerminalView sessionId={id} compact gridFontSize={fontSize} onSender={onSender} onTapToType={onTapToType} /> : <p className="grid-unavailable subtle">{loading ? "Loading terminal…" : "This session is no longer available. Remove it from the grid to choose another."}</p>}

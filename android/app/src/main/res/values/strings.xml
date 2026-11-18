@@ -30,4 +30,6 @@
     <string name="update_available">Update available: the server is %1$s</string>
     <string name="update">Update</string>
     <string name="plain_http">Not encrypted: use Tailscale or HTTPS on networks you don\'t trust.</string>
+    <string name="notify_channel">Agents waiting for you</string>
+    <string name="notify_channel_description">When an agent asks you something or is done for now. Turn it on in the console, on Running agents.</string>
 </resources>

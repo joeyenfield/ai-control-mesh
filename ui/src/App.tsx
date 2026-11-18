@@ -35,7 +35,7 @@ import { DownloadsPage } from "./pages/Downloads";
 import { DocsPage } from "./pages/Docs";
 import { Icon } from "./components/Icon";
 import { RestartButton } from "./components/Restart";
-import { AttentionAlerts, waitingAgents } from "./components/Attention";
+import { AttentionAlerts, inAndroidApp, useNotifyChoice, waitingAgents } from "./components/Attention";
 import { CommandMenu, useCommandShortcut } from "./components/CommandMenu";
 import { HELP_LINKS, linkActive, visibleSections, type NavLinkItem } from "./navigation";
 
@@ -94,6 +94,7 @@ function Shell({ identity }: { identity: Identity | null }) {
   const openSearch = useCallback(() => setSearching(true), []);
   useCommandShortcut(openSearch);
   const inFlight = status.data?.current_requests.length ?? 0;
+  const [notifying] = useNotifyChoice();
   // After an error (a lapsed sign-in, a dropped network) these keep asking, more slowly, so the
   // counts come back by themselves; only a 403 stops them.
   const terminals = useQuery({
@@ -101,6 +102,9 @@ function Shell({ identity }: { identity: Identity | null }) {
     queryFn: () => api.terminals(true),
     retry: false,
     refetchInterval: pollEvery(5000),
+    // In the Android app with notifications on, keep watching while the app is in the background, so a
+    // waiting agent can still notify until Android stops the app.
+    refetchIntervalInBackground: notifying && inAndroidApp(),
   });
   const machines = useQuery({
     queryKey: ["machines"],

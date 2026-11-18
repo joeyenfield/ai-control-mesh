@@ -41,6 +41,9 @@ class ConsoleActivity : Activity() {
     /** Set by a main-frame error; the page that follows (the WebView's error page) keeps the offline view up. */
     private var failed = false
     private var network: ConnectivityManager.NetworkCallback? = null
+    /** Whether the main frame shows the console (not the issuer's sign-in): only then may the page post notifications. */
+    @Volatile private var onConsole = false
+    private var notifications: AgentNotifications? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,6 +82,10 @@ class ConsoleActivity : Activity() {
             textZoom = 100
             userAgentString = "$userAgentString AgentProxyAndroid/${BuildConfig.VERSION_NAME}"
         }
+        // The one object the page can call: it posts the console's agent alerts as notifications.
+        notifications = AgentNotifications(this, url, serverName, { onConsole }, ::notificationsChanged).also {
+            webView.addJavascriptInterface(it, "AgentProxyNotifications")
+        }
         // A WebView doesn't download: hand files (the app's own APK on Downloads) to the system,
         // which saves them and offers to install. Downloads need no sign-in.
         webView.setDownloadListener { downloadUrl, _, _, _, _ ->
@@ -110,6 +117,7 @@ class ConsoleActivity : Activity() {
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                onConsole = isInternalConsoleUrl(base.toString(), url, false)
                 // An error can be reported before its error page starts; that one stays offline.
                 if (!failed) offline.visibility = View.GONE
             }
@@ -181,6 +189,34 @@ class ConsoleActivity : Activity() {
     override fun onResume() {
         super.onResume()
         web?.onResume()
+        // Back from the app's notification settings, perhaps with them changed.
+        notificationsChanged()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        notifications?.answered(requestCode)
+    }
+
+    /** A tapped notification: open its page here, or this server's console afresh if this activity shows another. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val path = intent.getStringExtra(EXTRA_PATH)
+        val current = web
+        if (intent.getStringExtra(EXTRA_URL) != url || current == null || path == null || !isConsolePath(path)) {
+            startActivity(Intent(this, ConsoleActivity::class.java).putExtras(intent))
+            finish()
+            return
+        }
+        // The console's router follows popstate, so the page moves without reloading.
+        val target = org.json.JSONObject.quote(path)
+        current.evaluateJavascript("history.pushState(null, '', $target); window.dispatchEvent(new PopStateEvent('popstate'))", null)
+    }
+
+    private fun notificationsChanged() {
+        runOnUiThread {
+            web?.evaluateJavascript("window.dispatchEvent(new Event('${AgentNotifications.PERMISSION_EVENT}'))", null)
+        }
     }
 
     override fun onDestroy() {
