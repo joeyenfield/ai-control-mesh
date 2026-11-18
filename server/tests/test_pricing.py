@@ -141,6 +141,12 @@ def test_shipped_prices_know_openai_and_deepseek_models_by_version():
     ("claude-fable-5", (10, 50, 1)),
     ("deepseek-v4.1-flash-1017", (0.15, 0.6, 0.003)),
     ("deepseek-v4-flash-vision-exp", (0.15, 0.6, 0.003)),
+    # The Antigravity CLI's names carry an effort after the Gemini model's.
+    ("gemini-3.8-flash-medium", (0.75, 3.75, 0.075)),
+    ("gemini-3.5-flash-lite", (0.3, 2.5, 0.03)),
+    ("google/gemini-2.5-flash-lite", (0.1, 0.4, 0.01)),
+    ("gemini-2.5-flash", (0.3, 2.5, 0.03)),
+    ("gemini-3.1-pro-preview", (2, 12, 0.2)),
 ])
 def test_shipped_chat_and_reasoning_prices(model, rates):
     # A million of each kind checks cached tokens through the estimator too.

@@ -63,6 +63,7 @@ class RequestTelemetry:
             or obj.get("type") in {"response.completed", "message_stop"}
             or obj.get("usage")
             or any(isinstance(choice, dict) and choice.get("finish_reason") for choice in obj.get("choices") or [])
+            or any(isinstance(candidate, dict) and candidate.get("finishReason") for candidate in _gemini(obj).get("candidates") or [])
         ):
             self.completed = True
         self.input_tokens = int(obj.get("prompt_eval_count") or self.input_tokens or 0)
@@ -88,6 +89,16 @@ class RequestTelemetry:
         if cached and not usage.get("cache_read_input_tokens"):
             self.cached_in_input = True
         self.cache_creation_tokens = int(usage.get("cache_creation_input_tokens") or self.cache_creation_tokens)
+        # Gemini (its API, and the Code Assist API the Antigravity CLI calls) counts each chunk's usage so far.
+        # Its prompt count includes the cached tokens, and thinking is billed as output beside the candidates.
+        gemini = _mapping(_gemini(obj).get("usageMetadata"))
+        if gemini:
+            self.input_tokens = int(gemini.get("promptTokenCount") or self.input_tokens)
+            output = int(gemini.get("candidatesTokenCount") or 0) + int(gemini.get("thoughtsTokenCount") or 0)
+            self.output_tokens = output or self.output_tokens
+            if gemini.get("cachedContentTokenCount"):
+                self.cache_read_tokens = int(gemini["cachedContentTokenCount"])
+                self.cached_in_input = True
 
     def finish(self) -> dict[str, Any]:
         total_ms = (time.perf_counter() - self.started) * 1000
@@ -176,6 +187,16 @@ def stream_deltas(obj: dict[str, Any]) -> list[tuple[str, str]]:
     OpenAI and Anthropic responses.
     """
     deltas: list[tuple[str, str]] = []
+    gemini = _gemini(obj)
+    if gemini:
+        for candidate in gemini.get("candidates") or []:
+            for part in _mapping(_mapping(candidate).get("content")).get("parts") or []:
+                part = _mapping(part)
+                _add(deltas, "reasoning" if part.get("thought") else "content", part.get("text"))
+                call = _mapping(part.get("functionCall"))
+                if call:
+                    deltas.append(("tool", f"{call.get('name', '')}({json.dumps(call.get('args', {}), ensure_ascii=False)})\n"))
+        return deltas
     if obj.get("type") == "content_block_delta":
         delta = obj.get("delta") or {}
         _add(deltas, "content", delta.get("text"))
@@ -234,6 +255,15 @@ def has_content(obj: dict[str, Any]) -> bool:
 def _add(deltas: list[tuple[str, str]], kind: str, value: Any) -> None:
     if isinstance(value, str) and value:
         deltas.append((kind, value))
+
+
+def _gemini(obj: dict[str, Any]) -> dict[str, Any]:
+    """A Gemini generateContent response or chunk: the object itself, or the Code Assist API's wrapper's
+    "response". Empty for anything else (Ollama's generate also has a "response", but a string)."""
+    for candidate in (_mapping(obj.get("response")), obj):
+        if "candidates" in candidate or "usageMetadata" in candidate:
+            return candidate
+    return {}
 
 
 def _mapping(value: Any) -> dict[str, Any]:

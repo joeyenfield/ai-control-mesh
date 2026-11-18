@@ -242,6 +242,39 @@ def test_stream_deltas_read_complete_responses():
     assert stream_deltas(anthropic) == [("content", "hi"), ("tool", 'Read({"p": 1})' + chr(10))]
 
 
+def test_gemini_streams_are_read_for_tokens_text_and_their_end():
+    from agent_server.telemetry import stream_deltas
+
+    # The Code Assist API (what the Antigravity CLI calls) wraps each generateContent chunk in "response",
+    # and every chunk's usage is the total so far: the last one counts.
+    chunks = [
+        {"response": {"candidates": [{"content": {"role": "model", "parts": [{"text": "plan", "thought": True}]}}],
+                      "usageMetadata": {"promptTokenCount": 70432, "candidatesTokenCount": 16, "thoughtsTokenCount": 30}}},
+        {"response": {"candidates": [{"content": {"role": "model", "parts": [{"text": "Done."}, {"functionCall": {"name": "view_file", "args": {"path": "a"}}}]}}],
+                      "usageMetadata": {"promptTokenCount": 75578, "candidatesTokenCount": 581, "thoughtsTokenCount": 30}}},
+        {"response": {"candidates": [{"content": {"role": "model", "parts": [{"text": ""}]}, "finishReason": "STOP"}],
+                      "usageMetadata": {"promptTokenCount": 75578, "candidatesTokenCount": 581, "thoughtsTokenCount": 30, "cachedContentTokenCount": 73361}}},
+    ]
+    assert stream_deltas(chunks[0]) == [("reasoning", "plan")]
+    assert stream_deltas(chunks[1]) == [("content", "Done."), ("tool", 'view_file({"path": "a"})' + chr(10))]
+    item = RequestTelemetry("s", "000001", "antigravity-account", "gemini-3.8-flash-medium", "daily-cloudcode-pa.googleapis.com", "/v1internal:streamGenerateContent", 10)
+    item.streaming = True
+    for chunk in chunks:
+        item.apply_ollama_stats(chunk)
+    record = item.finish()
+    assert item.completed and record["error_type"] is None and not record["tokens_estimated"]
+    # The prompt count includes the cached tokens; thinking is billed as output.
+    assert (record["input_tokens"], record["output_tokens"], record["cache_read_tokens"]) == (75578, 611, 73361)
+    assert record["cached_in_input"] is True
+    # The Gemini API's own (unwrapped) responses read the same way.
+    plain = RequestTelemetry("s", "000002", "c", "gemini-3.5-flash-lite", "b", "/v1beta/models/x:generateContent", 10)
+    plain.apply_ollama_stats({"candidates": [{"content": {"parts": [{"text": "hi"}]}, "finishReason": "STOP"}],
+                              "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 3}})
+    assert (plain.input_tokens, plain.output_tokens, plain.completed) == (12, 3, True)
+    # Ollama's generate also has "response", as a string: still Ollama's.
+    assert stream_deltas({"response": "x"}) == [("content", "x")]
+
+
 def test_cut_off_stream_estimates_tokens_and_is_flagged():
     item = RequestTelemetry("s", "000001", "claude", "m", "b", "/anthropic/v1/messages", 10, estimated_input_tokens=900)
     item.streaming = True
