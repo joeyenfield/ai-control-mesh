@@ -125,6 +125,8 @@ func TestShareStreamsHistoryTakesInputAndReportsExit(t *testing.T) {
 	history := NewHistory(HistoryLimit)
 	history.Append([]byte("started before the connection\r\n"))
 	share := NewShare(HostURL(server.URL, "s1"), "claude")
+	killed := make(chan struct{}, 1)
+	share.Kill = func() { killed <- struct{}{} }
 	share.Start(history, func(data []byte) {
 		typedMu.Lock()
 		typed = append(typed, string(data))
@@ -161,6 +163,15 @@ func TestShareStreamsHistoryTakesInputAndReportsExit(t *testing.T) {
 		t.Fatalf("typed %q in %s", typed, time.Since(began))
 	}
 	typedMu.Unlock()
+	// Kill: the console's button, which the server sends only for a viewer who may control the terminal.
+	host.mu.Lock()
+	_ = host.conn.WriteMessage(websocket.TextMessage, []byte(`{"type":"kill"}`))
+	host.mu.Unlock()
+	select {
+	case <-killed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("kill not passed to the agent")
+	}
 	share.Resize(100, 30)
 	if !host.has(func() bool { return len(host.messages) > 0 && host.messages[len(host.messages)-1]["type"] == "resize" }) {
 		t.Fatal("resize not sent")

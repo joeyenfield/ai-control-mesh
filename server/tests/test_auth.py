@@ -667,6 +667,9 @@ def test_shared_terminals_follow_the_session_sharing(tmp_path):
                 assert json.loads(viewer.receive_text())["type"] == "replayed"
                 viewer.send_text(json.dumps({"type": "input", "text": "rm -rf /", "enter": True}))
                 assert json.loads(viewer.receive_text())["message"].startswith("This session is shared with you to watch")
+                # Nor may a watcher kill it.
+                viewer.send_text(json.dumps({"type": "kill"}))
+                assert "not to type into or end" in json.loads(viewer.receive_text())["message"]
                 # Making it private again disconnects Bob straight away.
                 alice.patch(f"/api/sessions/{session}", json={"visibility": "private"})
                 message = viewer.receive()

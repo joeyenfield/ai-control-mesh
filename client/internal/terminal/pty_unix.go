@@ -63,6 +63,16 @@ func (c *posixChild) Wait() int {
 
 func (c *posixChild) Close() { c.closing.Do(func() { _ = c.pty.Close() }) }
 
+// Kill signals the agent's whole process group: the pty made it a session leader, so its
+// pid is the group's, and what it started (a shell's commands, an agent's tools) goes too.
+func (c *posixChild) Kill() {
+	if process := c.command.Process; process != nil {
+		if syscall.Kill(-process.Pid, syscall.SIGKILL) != nil {
+			_ = process.Kill()
+		}
+	}
+}
+
 type posixConsole struct {
 	saved *term.State
 }

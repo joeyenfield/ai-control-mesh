@@ -75,6 +75,8 @@ type Share struct {
 	// Revive, when set, is called after a lost or failed connection, before the next try:
 	// the launcher starts the agent-proxy again there if it has gone away (`agent update` stops it).
 	Revive func()
+	// Kill, when set, ends the agent when a viewer with control asks (a {"type": "kill"} from the server).
+	Kill func()
 
 	history  *History
 	write    func([]byte)
@@ -283,7 +285,17 @@ func (s *Share) receive(conn *websocket.Conn, lost chan struct{}) {
 			Type  string `json:"type"`
 			Parts []any  `json:"parts"`
 		}
-		if json.Unmarshal(message, &data) != nil || data.Type != "input" {
+		if json.Unmarshal(message, &data) != nil {
+			continue
+		}
+		if data.Type == "kill" {
+			// The server checked the viewer may control this terminal; the exit status follows as usual.
+			if s.Kill != nil {
+				s.Kill()
+			}
+			continue
+		}
+		if data.Type != "input" {
 			continue
 		}
 		for index, item := range data.Parts {
