@@ -51,6 +51,51 @@ class DeploymentSmoke(unittest.TestCase):
                 self.assertEqual(answer.exception.code, 401)
 
 
+def get(path: str) -> tuple[int, str, bytes]:
+    with CLIENT.open(API + path, timeout=15) as response:
+        return response.status, response.headers.get("Content-Type", ""), response.read()
+
+
+class ConsoleAndDocs(unittest.TestCase):
+    """The public files the image ships: a 200 with an empty body is how an unreadable file shows."""
+
+    # What the server reads from the image at runtime. This probe runs inside the server container
+    # as its user, so it sees what the server sees.
+    SHIPPED = ("/app/VERSION", "/app/docs", "/app/ui/dist", "/app/benchmarks/tests", "/quickstart")
+
+    def test_shipped_files_are_readable_by_the_server_user(self) -> None:
+        unreadable = []
+        for top in map(Path, self.SHIPPED):
+            paths = [top] if top.is_file() else [top, *top.rglob("*")]
+            for path in paths:
+                wanted = os.R_OK | (os.X_OK if path.is_dir() else 0)
+                if not os.access(path, wanted):
+                    unreadable.append(str(path))
+        self.assertEqual(unreadable[:20], [], f"{len(unreadable)} shipped files the server's user can't read")
+
+    def test_console_and_its_assets(self) -> None:
+        status, kind, body = get("/")
+        self.assertEqual(status, 200)
+        self.assertIn("text/html", kind)
+        asset = re.search(rb'src="(/assets/[^"]+\.js)"', body)
+        self.assertIsNotNone(asset, "The console's index.html names no script")
+        status, _, script = get(asset.group(1).decode())
+        self.assertEqual(status, 200)
+        self.assertGreater(len(script), 1000)
+
+    def test_docs_pages_and_pictures(self) -> None:
+        status, kind, page = get("/help-files/index.md")
+        self.assertEqual(status, 200)
+        self.assertIn("text/markdown", kind)
+        self.assertTrue(page.startswith(b"# "), "The docs index is empty or not Markdown")
+        picture = re.search(rb"\(((?:\./)?screenshots/[^)\s]+\.png)\)", page)
+        self.assertIsNotNone(picture, "The docs index shows no screenshot")
+        status, kind, data = get("/help-files/" + picture.group(1).decode().removeprefix("./"))
+        self.assertEqual(status, 200)
+        self.assertEqual(kind, "image/png")
+        self.assertTrue(data.startswith(b"\x89PNG"), "The docs screenshot is empty or not a PNG")
+
+
 class ControlMeshIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
