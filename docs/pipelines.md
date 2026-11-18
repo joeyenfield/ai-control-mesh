@@ -9,7 +9,7 @@ discovered branch has its own workspace, history and status. Both use
 
 | Job | Behavior |
 | --- | --- |
-| `ai-control-mesh-verify` | Discovers branches and open PRs, including forks; runs Go unit tests, server tests, UI typechecking and the UI build. Reports `jenkins/branch-verification` on GitHub. |
+| `ai-control-mesh-verify` | Discovers branches and open PRs, including forks; runs every check `AGENTS.md` asks of a change: Go unit tests, gofmt and `go vet` (Linux, Windows and macOS), the server tests on SQLite and on PostgreSQL, the whole Python programs suite (with the client contract run against them), `helm lint --strict` and kubeconform for each of the chart's CI values, UI typechecking and the UI build. Reports `jenkins/branch-verification` on GitHub. |
 | `ai-control-mesh` | Discovers repository branches and builds a complete versioned distribution. Only `master` builds automatically; use Build Now for another branch. PRs use verification instead. |
 | `ai-control-mesh-test` | Deploys one exact distribution with Compose and runs smoke tests. Successful branch builds queue this job when `RUN_DEPLOYMENT_TESTS` is enabled. |
 | `ai-control-mesh-distribute` | Explicitly promotes one tested distribution to `pi`, `github`, or `both`. No automatic release trigger. |
@@ -84,7 +84,13 @@ The required checks cover native commands, scripts, literal arguments, environme
 and working directory, cancellation, PTY input/output, the machine launching the
 agent for a console shell, Ollama and llama.cpp startup/shutdown, correct child executable identity despite a stale Termux parent override, and ARM64 loader/DNS linkage.
 
-Branch/PR verification includes **Ollama setup Python parity**. It runs the Python install tests and the same real fleet/server install contract used by the Go server suite, in a disposable container. The machine unit stage covers CPU, Android Vulkan and Turnip package selection, environment overrides, failure preservation, concurrent changes and refusing setup while Ollama runs. No test installs host packages or requires GPU hardware; real model correctness on a GPU still needs a hardware check.
+Branch/PR verification runs its long suites side by side, each in disposable containers, and every one runs even when another fails:
+
+- **Server tests (SQLite)** and **Server tests (PostgreSQL)**: the whole server suite twice. The PostgreSQL run starts a private Podman pod with `postgres:17` beside the tests, where each test makes and drops a database of its own, and removes the pod afterwards.
+- **Python programs**: the whole `python/` suite, including `test_contract.py`, which runs the server's client contract against the Python `agent`, `agent-proxy` and `agent-machine`, and the Ollama, Adreno and llama.cpp install tests with the same real fleet install contract the Go server suite uses.
+- **Helm chart**: `helm lint --strict` and `helm template | kubeconform -strict` for every values file in `deploy/helm/agent-mesh/ci/`. The chart's custom resources (Prometheus operator, Gateway API) are checked against the CRDs catalog's schemas, not skipped.
+
+Before them, **Go formatting and vet** fails on any file `gofmt` would change and runs `go vet` for each system a module ships for. The machine unit stage covers CPU, Android Vulkan and Turnip package selection, environment overrides, failure preservation, concurrent changes and refusing setup while Ollama runs. No test installs host packages or requires GPU hardware; real model correctness on a GPU still needs a hardware check.
 
 Jenkins publishes JUnit results and archives logs in that stage. The distribution
 also contains the checksummed `android-runtime/result.json`, JUnit and logs.

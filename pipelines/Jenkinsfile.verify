@@ -3,7 +3,7 @@ pipeline {
     options {
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
-        timeout(time: 40, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '30'))
     }
     stages {
@@ -16,7 +16,7 @@ pipeline {
                 }
             }
         }
-        stage('Prepare verification container') {
+        stage('Prepare verification containers') {
             steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage prepare' }
         }
         stage('Tools unit tests') {
@@ -28,11 +28,28 @@ pipeline {
         stage('Machine unit tests') {
             steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage machine' }
         }
-        stage('Server unit tests') {
-            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage server' }
+        // gofmt, and go vet for every system each module ships for.
+        stage('Go formatting and vet') {
+            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage vet' }
         }
-        stage('Model server Python parity') {
-            steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage ollama-setup' }
+        // Each in containers of its own, so they run side by side; every one runs even when another fails.
+        stage('Suites') {
+            failFast false
+            parallel {
+                stage('Server tests (SQLite)') {
+                    steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage server' }
+                }
+                stage('Server tests (PostgreSQL)') {
+                    steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage server-postgres' }
+                }
+                // The Python agent, agent-proxy and agent-machine, with the client contract run against them.
+                stage('Python programs') {
+                    steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage python' }
+                }
+                stage('Helm chart') {
+                    steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage helm' }
+                }
+            }
         }
         stage('UI verification') {
             steps { sh 'python3 "$MESH_CI_HOME/verify.py" . --stage ui' }

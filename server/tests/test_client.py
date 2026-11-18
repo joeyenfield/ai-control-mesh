@@ -20,6 +20,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -279,55 +280,79 @@ def save_credentials(path: Path, server: str, tokens: dict, issuer: str) -> None
 
 
 @contextmanager
+def own_database():
+    """A database of its own for each server a test starts, on PostgreSQL: conftest gives a test one, and a test
+    with two servers would have them share it. Nothing on SQLite, where each server already has its own file."""
+    url = os.getenv("AI_PROXY_TEST_DATABASE_URL")
+    if not url:
+        yield None
+        return
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    name = "agent_test_" + uuid.uuid4().hex[:12]
+    engine = create_engine(url, isolation_level="AUTOCOMMIT")
+    with engine.connect() as connection:
+        connection.execute(text(f'CREATE DATABASE "{name}"'))
+    try:
+        yield make_url(url).set(database=name).render_as_string(hide_password=False)
+    finally:
+        with engine.connect() as connection:
+            connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
+        engine.dispose()
+
+
+@contextmanager
 def machine(tmp_path, agent_binary, accounts: bool = False, prepare=None):
     """An agent-server, and this machine's agent-proxy (the Go binary) pointed at it.
 
     prepare(env) runs `agent` commands on the machine before its agent-proxy starts.
     All runs use OAuth; accounts=True leaves the client signed out to test device login.
     """
-    issuer_port = free_port()
-    settings = Settings(
-        log_dir=tmp_path / "server",
-        default_backend="test", backends={"test": Backend("test", "http://ollama.test")},
-        intercept=InterceptSettings(ca_dir=tmp_path / "certs"), agents=fake_agents(), dist_dir=tmp_path / "dist",
-        oidc_issuer=f"http://127.0.0.1:{issuer_port}", oidc_state_dir=tmp_path / "issuer",
-        oidc_introspection_secret="contract-introspection-secret",
-    )
-    UserStore(settings.open_database()).add_user("dave", PASSWORD)
-    server_app = create_app(settings)
-    seen: list[httpx.Request] = []
-    with serve_issuer(settings, issuer_port) as issuer, serve(server_app) as server:
-        tokens = issue_device(issuer)
-        runtime = server_app.state.runtime
-        runtime.client = httpx.AsyncClient(transport=httpx.MockTransport(upstream(seen)))
-        # The integration server's providers are mocked; network filtering is tested separately.
-        runtime.intercept_client = runtime.client
-        port, intercept_port = free_port(), free_port()
-        env = {key: value for key, value in os.environ.items() if key not in CLEARED}
-        profile = tmp_path / "user-home"
-        profile.mkdir(parents=True, exist_ok=True)
-        env.update(AI_PROXY_CREDENTIALS=str(tmp_path / "machine" / "credentials.json"), AI_PROXY_URL=server,
-                   AI_PROXY_LOCAL_PORT=str(port), AI_PROXY_LOCAL_INTERCEPT_PORT=str(intercept_port),
-                   USERPROFILE=str(profile), HOME=str(profile))
-        if not accounts:
-            save_credentials(Path(env["AI_PROXY_CREDENTIALS"]), server, tokens, issuer)
-        if prepare:
-            prepare(env)
-        process = subprocess.Popen([str(agent_binary), "proxy"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        proxy = f"http://127.0.0.1:{port}"
-        try:
+    with own_database() as database_url:
+        issuer_port = free_port()
+        settings = Settings(
+            log_dir=tmp_path / "server",
+            default_backend="test", backends={"test": Backend("test", "http://ollama.test")},
+            intercept=InterceptSettings(ca_dir=tmp_path / "certs"), agents=fake_agents(), dist_dir=tmp_path / "dist",
+            oidc_issuer=f"http://127.0.0.1:{issuer_port}", oidc_state_dir=tmp_path / "issuer",
+            oidc_introspection_secret="contract-introspection-secret", database_url=database_url,
+        )
+        UserStore(settings.open_database()).add_user("dave", PASSWORD)
+        server_app = create_app(settings)
+        seen: list[httpx.Request] = []
+        with serve_issuer(settings, issuer_port) as issuer, serve(server_app) as server:
+            tokens = issue_device(issuer)
+            runtime = server_app.state.runtime
+            runtime.client = httpx.AsyncClient(transport=httpx.MockTransport(upstream(seen)))
+            # The integration server's providers are mocked; network filtering is tested separately.
+            runtime.intercept_client = runtime.client
+            port, intercept_port = free_port(), free_port()
+            env = {key: value for key, value in os.environ.items() if key not in CLEARED}
+            profile = tmp_path / "user-home"
+            profile.mkdir(parents=True, exist_ok=True)
+            env.update(AI_PROXY_CREDENTIALS=str(tmp_path / "machine" / "credentials.json"), AI_PROXY_URL=server,
+                       AI_PROXY_LOCAL_PORT=str(port), AI_PROXY_LOCAL_INTERCEPT_PORT=str(intercept_port),
+                       USERPROFILE=str(profile), HOME=str(profile))
+            if not accounts:
+                save_credentials(Path(env["AI_PROXY_CREDENTIALS"]), server, tokens, issuer)
+            if prepare:
+                prepare(env)
+            process = subprocess.Popen([str(agent_binary), "proxy"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            proxy = f"http://127.0.0.1:{port}"
             try:
-                wait_for(proxy, alive=lambda: process.poll() is None)
-            except AssertionError as error:
-                if process.poll() is not None:
-                    raise AssertionError("agent-proxy exited: " + process.stderr.read().decode(errors="replace")) from error
-                raise
-            yield SimpleNamespace(server=server, proxy=proxy, runtime=runtime, seen=seen, intercept_port=intercept_port,
-                                  env=env, binary=agent_binary, issuer=issuer, tokens=tokens, token=tokens["access_token"],
-                                  headers={"x-ai-proxy-token": tokens["access_token"]})
-        finally:
-            process.terminate()
-            process.wait(timeout=10)
+                try:
+                    wait_for(proxy, alive=lambda: process.poll() is None)
+                except AssertionError as error:
+                    if process.poll() is not None:
+                        raise AssertionError("agent-proxy exited: " + process.stderr.read().decode(errors="replace")) from error
+                    raise
+                yield SimpleNamespace(server=server, proxy=proxy, runtime=runtime, seen=seen, intercept_port=intercept_port,
+                                      env=env, binary=agent_binary, issuer=issuer, tokens=tokens, token=tokens["access_token"],
+                                      headers={"x-ai-proxy-token": tokens["access_token"]})
+            finally:
+                process.terminate()
+                process.wait(timeout=10)
 
 
 def run_agent(m, *args: str, **kwargs) -> subprocess.CompletedProcess:
