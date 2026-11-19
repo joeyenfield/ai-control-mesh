@@ -7,7 +7,7 @@ Run terminal coding agents — Claude Code, Codex, Copilot CLI, Qwen Code, OpenC
 ## Start here
 
 1. **[How it works](how-it-works.md)**: the parts and how they fit, in plain terms. Five minutes.
-2. **Try it**: [on your own computer](local.md) with one command, with [Docker or Podman](quickstart.md) and a guided tour, or on [Kubernetes](quickstart-kubernetes.md).
+2. **Try it**: [on your own computer](local.md) with one command that asks nothing (the server, `agent` signed in, and your computer in the fleet), with [Docker or Podman](quickstart.md) and a guided tour, or on [Kubernetes](quickstart-kubernetes.md).
 3. **Set it up for real**: [Getting started](getting-started.md), from nothing to a first recorded session.
 
 The documentation has two halves. The **guides** (from *Start here* to *Run a server*) are for using and running it, in plain steps. The **technical overview** is for when you want to know exactly how it works: components, flows as sequence diagrams, protocols and every endpoint.

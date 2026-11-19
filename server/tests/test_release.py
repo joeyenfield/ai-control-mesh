@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -33,6 +34,7 @@ def checkout(tmp_path: Path) -> Path:
         "benchmarks/tests/one.json": "{}",
         "deploy/compose/quickstart/machine.py": "# OIDC bootstrap",
         "devhelpers/release_scripts/release/termux_quickstart.py": "# Termux quickstart",
+        "devhelpers/release_scripts/release/local_quickstart.py": "# Local quickstart",
     }.items():
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text(text, encoding="utf-8")
@@ -83,7 +85,8 @@ def test_a_release_has_the_bundle_every_archive_and_installers_that_check_them(t
         assert bundle.read("BUILD").decode().strip() == VERSION
     assert {"VERSION", "LICENSE", "server/pyproject.toml", "server/agent_server/__init__.py", "ui/dist/index.html",
             "docs/index.md", "benchmarks/tests/one.json", "deploy/compose/quickstart/machine.py",
-            "devhelpers/release_scripts/release/termux_quickstart.py"} <= inside
+            "devhelpers/release_scripts/release/termux_quickstart.py",
+            "devhelpers/release_scripts/release/local_quickstart.py"} <= inside
     assert not any("__pycache__" in name or name.endswith(".pyc") for name in inside)
     assert "ui/package.json" not in inside
 
@@ -129,6 +132,10 @@ def test_termux_quickstart_signs_in_and_preserves_machine_choices_on_rerun(tmp_p
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    # The script sets these and its import path for machine.py: put them back afterwards.
+    for name in ("QUICKSTART_API", "QUICKSTART_ISSUER"):
+        monkeypatch.setenv(name, "")
+    monkeypatch.setattr(sys, "path", list(sys.path))
     monkeypatch.setenv("AI_PROXY_LOCAL_HOME", str(tmp_path / "instance"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     home = tmp_path / "instance"
@@ -157,6 +164,77 @@ def test_termux_quickstart_signs_in_and_preserves_machine_choices_on_rerun(tmp_p
     assert commands == [["agent-machine", "containers", "off"],
                         ["agent-machine", "roots", "add", str(tmp_path / "projects")],
                         ["agent-machine", "start"]]
+
+
+def load_script(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_local_quickstart_signs_in_as_admin_or_says_it_has_no_password(tmp_path, monkeypatch):
+    """The one-command install signs agent in by itself; with the password file gone it asks for a browser sign-in."""
+    helper = load_script(SCRIPT.with_name("local_quickstart.py"), "local_quickstart")
+    # The script sets these and its import path for machine.py: put them back afterwards.
+    for name in ("QUICKSTART_API", "QUICKSTART_ISSUER", "QUICKSTART_USER"):
+        monkeypatch.setenv(name, "")
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    home = tmp_path / "instance"
+    (home / "private").mkdir(parents=True)
+    (home / "local.json").write_text('{"port": 29999, "auth_port": 30000}', encoding="utf-8")
+    (home / "private" / "first-user-password").write_text("secret\n", encoding="utf-8")
+    signed: list[tuple[Path, str]] = []
+    monkeypatch.setitem(sys.modules, "machine", SimpleNamespace(
+        credentials_path=lambda: tmp_path / "credentials.json",
+        sign_in=lambda path, password: signed.append((path, password)),
+    ))
+    assert helper.main(["signin", str(home)]) == 0
+    assert signed == [(tmp_path / "credentials.json", "secret")]
+    assert os.environ["QUICKSTART_API"] == "http://localhost:29999"
+    assert os.environ["QUICKSTART_ISSUER"] == "http://localhost:30000"
+    (home / "private" / "first-user-password").unlink()
+    assert helper.main(["signin", str(home)]) == 2
+    assert len(signed) == 1
+    assert helper.main([]) == 1
+
+
+def test_local_quickstart_joins_a_new_machine_and_keeps_an_old_ones_choices(tmp_path, monkeypatch):
+    helper = load_script(SCRIPT.with_name("local_quickstart.py"), "local_quickstart")
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.delenv("AI_PROXY_MACHINE_HOME", raising=False)
+    monkeypatch.setattr(helper, "config_dir", lambda: tmp_path / "config")
+    commands: list[list[str]] = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **kwargs: commands.append(args))
+    assert helper.main(["machine", "/bin/agent-machine"]) == 0
+    assert (tmp_path / "projects").is_dir()
+    assert commands == [["/bin/agent-machine", feature, "on"] for feature in ("launches", "commands", "files", "servers")] + [
+        ["/bin/agent-machine", "roots", "add", str(tmp_path / "projects")],
+        ["/bin/agent-machine", "stop"], ["/bin/agent-machine", "start"]]
+    # Set up before (machine.json): its choices stay, and the new agent-machine is started.
+    (tmp_path / "config" / "agent-machine").mkdir(parents=True)
+    (tmp_path / "config" / "agent-machine" / "machine.json").write_text("{}")
+    commands.clear()
+    assert helper.main(["machine", "/bin/agent-machine"]) == 0
+    assert commands == [["/bin/agent-machine", "stop"], ["/bin/agent-machine", "start"]]
+
+
+def test_quickstart_sign_in_keeps_other_servers_and_selects_this_one(tmp_path, monkeypatch):
+    monkeypatch.delenv("AI_PROXY_CREDENTIALS", raising=False)
+    machine = load_script(Path(__file__).resolve().parents[2] / "deploy" / "compose" / "quickstart" / "machine.py", "quickstart_machine_test")
+    path = tmp_path / "agent-proxy" / "credentials.json"
+    path.parent.mkdir()
+    other = {"url": "https://mesh.example.com", "refresh_token": "kept"}
+    path.write_text(json.dumps({"default": "https://mesh.example.com", "servers": {"https://mesh.example.com": other}}))
+    machine.save_entry(path, {"url": machine.API, "refresh_token": "new", "issuer": machine.ISSUER})
+    saved = json.loads(path.read_text())
+    assert saved["default"] == machine.API.lower()
+    assert saved["servers"]["https://mesh.example.com"] == other
+    assert saved["servers"][machine.API.lower()]["refresh_token"] == "new"
+    assert not path.with_name("credentials.json.lock").exists()
+    # A second run reuses the sign-in while it's the default, without asking the issuer.
+    machine.sign_in(path, "unused")
+    assert json.loads(path.read_text()) == saved
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Termux bootstrap needs POSIX shell paths")

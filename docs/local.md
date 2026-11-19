@@ -18,21 +18,22 @@ On Windows, in PowerShell:
 irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/install-local.ps1 | iex
 ```
 
+It asks nothing. When it's done, open the console it prints, sign in as `admin` with the password it prints, and run an agent through your server with `agent claude-account .` (or any agent from `agent --list`). Your computer is already on the console's **Machines** page, so you can start agents there too.
+
 The installer comes with each [release](https://github.com/joeyenfield/ai-control-mesh/releases). It does all of this:
 
 1. It downloads the server, with its console already built, and checks its SHA-256.
 2. It installs the server into a Python environment of its own (`venv` in the folder below) and starts it with `agent-server local start`.
 3. It downloads `agent` and `agent-machine` for your computer (the Python versions where there's no Go build), checks them, and installs them into `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\agent-proxy`, added to your PATH). `agent-server` goes there too.
-4. On desktop systems, it signs `agent` and `agent-machine` in to the new server and starts the machine. Before machine sign-in, it opens `agent-machine config` so you can choose what this machine allows. Both programs share one account and server, so only one approval is needed. Termux sets up its machine automatically, as described below.
+4. It signs `agent` and `agent-machine` in to the new server as `admin`. It uses the password it just made, with the sign-in service's normal device approval, so there is no browser step. Both programs share this sign-in. Other servers you're signed in to stay, but the local one becomes the default.
+5. It joins this computer to your fleet and starts `agent-machine`. On a new machine it turns on launches, terminals, files and model servers, and adds `~/projects` (Windows: `%USERPROFILE%\projects`; created if missing) as a folder agents can start in. Containers and updates stay off. A machine you set up before keeps its choices.
 
    - **Agent (`agent` and `agent-proxy`):** lets coding agents launched on this computer use the server's permitted models and providers, with requests recorded under your account.
-   - **Machine (`agent-machine`):** adds this computer to your fleet with the functions you selected. The menu explains launches, terminals, file viewing, updates, model-server management and containers. Enter several numbers or names separated by commas. Press Enter to keep current settings, or enter `none` to switch them all off.
+   - **Machine (`agent-machine`):** lets the console start agents, open terminals and files in `~/projects`, and manage model servers on this computer, for the accounts you allow. The local server starts with one account: yours.
 
-On desktop systems, open the printed link in your browser and sign in as `admin` with the password printed during setup. Enter the device code if asked, approve, then return to the setup terminal. Machine setup reuses that sign-in while keeping its own permission choices.
+Change the machine's functions later with `agent-machine config`. Only the selected functions remain on; all others turn off. Add folders with `agent-machine roots add <folder>`. See [Choose machine functions](machines.md#choose-machine-functions) for what each function allows. `--no-machine` leaves this computer out of the fleet: you get only the server and `agent`. `--no-login` signs in nothing and prints the commands for later.
 
-On desktop systems, add a folder for the console to start agents in: `agent-machine roots add ~/projects`.
-
-Run `agent-machine config` again to change permissions later. Only the selected functions remain on; all others turn off. On a new machine they start off. The menu changes permissions; it does not install model servers or Docker/Podman. With `--no-login`, setup leaves permissions unchanged and prints the configuration and sign-in commands for later. On desktop systems without a terminal, it does the same. See [Choose machine functions](machines.md#choose-machine-functions) for what each permission allows.
+If the first account's password was changed and its file deleted, a rerun can't sign in by itself. It then runs `agent login`, which prints a link and a code to approve in your browser.
 
 Run it again to update: it stops the server, replaces its files and starts it again. Your data stays. When it's done it says again where the console is and where the `admin` password is kept. [Remove it](#remove-it) has its twin, which takes it all out.
 
@@ -41,7 +42,8 @@ Run it again to update: it stops the server, replaces its files and starts it ag
 | `--port N`, `-Port N` and `--auth-port N`, `-AuthPort N` | Other ports for the console and `agent-auth` (default 19999 and 20000). The choice is kept. |
 | `--prefix DIR`, `-Prefix DIR` | Where `agent-server`, `agent` and `agent-machine` go. The sh installer's default is `~/.local/bin`, or `/usr/local/bin` when run as root. |
 | `--no-client`, `-NoClient` | Only the server: no `agent` or `agent-machine` |
-| `--no-login`, `-NoLogin` | Skip sign-in and the machine permission menu; print the commands instead |
+| `--no-machine`, `-NoMachine` | Don't join this computer to the fleet: only the server and `agent` |
+| `--no-login`, `-NoLogin` | Don't sign in or join the fleet; print the commands instead |
 | `--python`, `-Python` | The Python `agent` and `agent-machine` rather than the Go builds. They go into the server's Python environment. It's used anyway on a system without a Go build. |
 | `--no-tray`, `-NoTray` | No [tray icon](#the-tray-icon). Without a desktop (a Linux server over SSH, say) it's left out by itself. |
 
@@ -119,13 +121,13 @@ When the server is ready, either installer prints:
 
 - the console's address, `http://localhost:19999`;
 - the password of the first account, `admin`;
-- the commands that connect this computer to it.
+- from a checkout, the commands that connect this computer to it. The web installer runs them itself.
 
 Open the console and sign in as `admin`. Change the password in **Organizations › Everyone › Edit user**, then delete the `first-user-password` file it names.
 
 ## Connect your computer
 
-The web installer has done this already, except `roots add`. From a checkout, run agents through it and let the console start agents in your folders:
+The web installer has done this already. From a checkout, run agents through it and let the console start agents in your folders:
 
 ```bash
 agent login http://localhost:19999

@@ -1,6 +1,6 @@
 # Installs AI Control Mesh {{VERSION}} on this computer, for you alone, and starts it: the server
-# and its sign-in service on localhost, then agent and agent-machine signed in to it
-# (docs/local.md). Windows, in PowerShell:
+# and its sign-in service on localhost, then agent and agent-machine signed in to it as admin and
+# this computer in its fleet, with no questions (docs/local.md). Windows, in PowerShell:
 #
 #   irm {{BASE}}/install-local.ps1 | iex
 #   & ([scriptblock]::Create((irm {{BASE}}/install-local.ps1))) -Port 29999 -AuthPort 30000
@@ -9,7 +9,8 @@
 #   -Prefix DIR            where agent-server, agent and agent-machine go (default
 #                          %LOCALAPPDATA%\Programs\agent-proxy, put on your PATH)
 #   -NoClient              only the server: no agent or agent-machine
-#   -NoLogin               skip sign-in and machine permission choices; print commands instead
+#   -NoMachine             don't join this computer to the fleet: only the server and agent
+#   -NoLogin               skip signing in and joining; print the commands instead
 #   -Python                the Python agent and agent-machine rather than the Go builds (used
 #                          anyway when there's no Go build for this processor)
 #   -NoTray                no tray icon (agent-tray: it shows what runs, starts and stops it,
@@ -18,7 +19,7 @@
 # Needs Python 3.11 or later (python.org's, or py). Run it again to update. Every download is
 # checked against the SHA-256 written into this script when the release was made.
 # devhelpers/release_scripts/release/release.py fills it in.
-param([int]$Port = 0, [int]$AuthPort = 0, [string]$Prefix = "", [switch]$NoClient, [switch]$NoLogin, [switch]$Python, [switch]$NoTray)
+param([int]$Port = 0, [int]$AuthPort = 0, [string]$Prefix = "", [switch]$NoClient, [switch]$NoLogin, [switch]$NoMachine, [switch]$Python, [switch]$NoTray)
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -130,7 +131,9 @@ try {
     $start = @("local", "start")
     if ($Port) { $start += @("--port", "$Port") }
     if ($AuthPort) { $start += @("--auth-port", "$AuthPort") }
-    Invoke-Program { & $agentServer @start }
+    # The server's own next steps leave out the sign-ins, which this script does itself.
+    $env:AI_PROXY_LOCAL_INSTALLER = "1"
+    try { Invoke-Program { & $agentServer @start } } finally { Remove-Item Env:AI_PROXY_LOCAL_INSTALLER -ErrorAction SilentlyContinue }
     if ($LASTEXITCODE -ne 0) { throw "The local server didn't start; see the logs in $home_\logs." }
     $state = Get-Content -Raw (Join-Path $home_ "local.json") | ConvertFrom-Json
     $server = "http://localhost:$(if ($state.port) { $state.port } else { 19999 })"
@@ -213,54 +216,45 @@ try {
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $work
 }
 
-if (-not $NoLogin -and $installed.Count -gt 0) {
-    Write-Output ""
-    Write-Output "Setup signs in each installed program separately: first the agent, then the machine."
-    Write-Output "Each sign-in has its own device code. Approve one, return here, then approve the next."
-    Write-Output "Use the same AI Control Mesh account for both."
-}
-foreach ($component in $installed) {
-    # Both login commands reuse the same sign-in; machine setup still selects its permissions.
-    $exe = Join-Path $Prefix "$component.exe"
-    if ($component -eq "agent") {
-        if ($NoLogin) { Write-Output "Next: agent login $server"; continue }
+# Both sign in by itself, as admin with the first account's password, through the local sign-in
+# service's device flow (local_quickstart.py): no browser step, no questions. Only when that
+# password is gone (changed since) does agent login ask.
+$quickstart = Join-Path $app "devhelpers\release_scripts\release\local_quickstart.py"
+$signed = $false
+$joined = $false
+if ($installed -contains "agent") {
+    if (-not $NoLogin) {
         Write-Output ""
-        Write-Output "Authorize the agent (agent and agent-proxy) to use $server"
-        Write-Output "This lets coding agents launched here use your server's permitted models and providers,"
-        Write-Output "with their requests recorded under your account."
-        Write-Output "Open the link printed below in your browser, sign in as admin with the password printed earlier,"
-        Write-Output "and enter this agent's device code if asked. Approve, then return to this terminal."
-        Invoke-Program { & $exe login $server }
-        if ($LASTEXITCODE -ne 0) { Write-Output "Sign in later with: agent login $server" }
-    } else {
-        if ($NoLogin) { Write-Output "Next: agent-machine config, then agent-machine login $server, then agent-machine start"; continue }
-        Write-Output ""
-        Invoke-Program { & $exe config }
-        if ($LASTEXITCODE -ne 0) { throw "Machine setup cancelled; run agent-machine config to choose functions later" }
-        Write-Output "Authorize this machine (agent-machine) to connect to $server"
-        Write-Output "This adds this computer to your fleet with the functions you just chose."
-        Write-Output "For launches, file viewing or terminal starting folders, allow projects with: agent-machine roots add <folder>"
-        Write-Output "This reuses the shared agent sign-in. No second approval is needed."
-        Write-Output "If not signed in yet, approve the link and device code printed below."
-        Invoke-Program { & $exe login $server --enable= }
-        if ($LASTEXITCODE -ne 0) {
-            Write-Output "Sign in later with: agent-machine login $server, then agent-machine start"
+        Write-Output "Signing agent in to $server as admin"
+        Invoke-Program { & $venvPython $quickstart signin $home_ }
+        if ($LASTEXITCODE -eq 0) {
+            $signed = $true
         } else {
-            Invoke-Program { & $exe stop } | Out-Null
-            Invoke-Program { & $exe start }
+            Write-Output "Sign in in your browser: open the link below, sign in and approve the code."
+            Invoke-Program { & (Join-Path $Prefix "agent.exe") login $server }
+            $signed = $LASTEXITCODE -eq 0
         }
     }
+    if (-not $signed) { Write-Output "Sign agent in later with: agent login $server" }
+}
+if (-not $NoMachine -and $installed -contains "agent-machine") {
+    if ($signed) {
+        Invoke-Program { & $venvPython $quickstart machine (Join-Path $Prefix "agent-machine.exe") }
+        $joined = $LASTEXITCODE -eq 0
+    }
+    if (-not $joined) { Write-Output "Join this computer later with: agent-machine config, then agent-machine login $server, then agent-machine start" }
 }
 Write-Output ""
 Write-Output "Done: AI Control Mesh $Version runs at $server"
 # Said again here: the first start printed it before the sign-ins scrolled it away.
 $passwordFile = Join-Path $home_ "private\first-user-password"
 if (Test-Path $passwordFile) {
-    Write-Output "Open $server and sign in as admin. The password is in $passwordFile"
+    Write-Output "Console: open $server and sign in as admin with the password in $passwordFile"
 } else {
-    Write-Output "Open $server and sign in with your account."
+    Write-Output "Console: open $server and sign in with your account."
 }
-if ($installed -contains "agent-machine") { Write-Output "Let the console start agents in a folder of yours: agent-machine roots add <folder>" }
+if ($signed) { Write-Output "Agents: run one in a project folder, recorded by your server: agent claude-account .  (agent --list shows them all)" }
+if ($joined) { Write-Output "This computer is on the console's Machines page. Its functions: agent-machine config; more folders: agent-machine roots add <folder>" }
 Write-Output "Stop it with agent-server local stop; start it again with agent-server local."
 Write-Output "Remove it with: irm $Base/uninstall-local.ps1 | iex"
 if ($tray) {

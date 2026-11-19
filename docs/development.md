@@ -154,13 +154,13 @@ To release, change `VERSION`, commit, tag `vX.Y.Z`, and build the distributions.
 
 Pushing a tag does not start a build. Run `devhelpers/release_scripts/release.ps1 installers --stable --publish` (or `sh devhelpers/release_scripts/release.sh installers --stable --publish`) to build locally and create the GitHub Release the web installer downloads from ([Run it on your own computer](local.md)). This builds the console and `tools/dist` without packages or the Android app. Then `devhelpers/release_scripts/release/release.py` writes the release's files:
 
-- the server bundle `ai-control-mesh-X.Y.Z.zip`: `VERSION`, a `BUILD` file naming the version (it has no git), the server's sources, `ui/dist`, `docs/` and `benchmarks/tests`;
+- the server bundle `ai-control-mesh-X.Y.Z.zip`: `VERSION`, a `BUILD` file naming the version (it has no git), the server's sources, `ui/dist`, `docs/`, `benchmarks/tests`, and the scripts that sign the new install in (`deploy/compose/quickstart/machine.py`, `local_quickstart.py`, `termux_quickstart.py`);
 - every `agent` and `agent-machine` archive, and the Python wheel (required: it's what the installers' `--python` and any system without a Go build use);
 - `install-local.sh` and `install-local.ps1`, filled in from `devhelpers/release_scripts/release/` with the release's address and every download's SHA-256;
 - `uninstall-local.sh` and `uninstall-local.ps1`, which remove such an install, copied as they are;
 - `SHA256SUMS`.
 
-`--stable` requires a clean checkout at `v` plus `VERSION`. Omit `--stable` to build a uniquely tagged snapshot. Builds stay local unless `--publish` is supplied; snapshots are GitHub prereleases and never replace latest. Image builds are separate `website` and `services` commands; see [Local releases and snapshots](releases.md). To try an installer before tagging, make the files with `--base-url http://127.0.0.1:<port>`, serve the folder, and run it with `AI_PROXY_LOCAL_HOME` and `--prefix` set to scratch folders.
+`--stable` requires a clean checkout at `v` plus `VERSION`. Omit `--stable` to build a uniquely tagged snapshot. Builds stay local unless `--publish` is supplied; snapshots are GitHub prereleases and never replace latest. Image builds are separate `website` and `services` commands; see [Local releases and snapshots](releases.md). To try an installer before tagging, make the files with `--base-url http://127.0.0.1:<port>`, serve the folder, and run it with `AI_PROXY_LOCAL_HOME` and `--prefix` set to scratch folders. It also signs in and joins the fleet, so set `HOME` (Windows: `APPDATA` and `USERPROFILE`) to a scratch folder too, or pass `--no-login`. Otherwise it changes your own sign-in and machine.
 
 ### Distributions
 

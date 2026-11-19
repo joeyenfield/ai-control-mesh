@@ -337,14 +337,16 @@ def _next_steps(instance: Instance, out: Any) -> None:
         lines.append(f"  Sign in as admin with the password {password} (kept in {instance.password_path} until you delete it).")
     except OSError:
         lines.append("  Sign in with your account.")
-    lines += [
-        "  Then, on this computer:",
-        f"    agent login {instance.url}",
-        f"    agent-machine login {instance.url} --enable launches,files",
-        "    agent-machine roots add <a folder with your projects>",
-        "    agent-machine start",
-        "  Stop it with: agent-server local stop",
-    ]
+    # The web installer signs agent and agent-machine in itself, and says so after.
+    if not os.environ.get("AI_PROXY_LOCAL_INSTALLER"):
+        lines += [
+            "  Then, on this computer:",
+            f"    agent login {instance.url}",
+            f"    agent-machine login {instance.url} --enable launches,files",
+            "    agent-machine roots add <a folder with your projects>",
+            "    agent-machine start",
+        ]
+    lines.append("  Stop it with: agent-server local stop")
     print("\n".join(lines), file=out)
 
 
