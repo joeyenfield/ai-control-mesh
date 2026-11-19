@@ -1152,6 +1152,10 @@ def test_a_fleet_machine_lists_its_folders_and_opens_a_shell_when_commands_are_o
     with machine(tmp_path, agent_binary) as m, fleet_machine(m, machine_binary, tmp_path, ["roots", "add", str(work)]) as fleet:
         base = f"{m.server}/api/machines/{fleet.box['id']}"
         assert fleet.box["commands"] is False and "Commands  : off" in fleet.status
+        # Its own log, read from the console: it shows the machine joining this server.
+        log = httpx.get(f"{base}/log", headers=m.headers, timeout=30)
+        assert log.status_code == 200, log.text
+        assert "connected to" in log.text, log.text[-2000:]
         # Neither launches nor commands: its folders stay private, and so does its shell.
         assert httpx.get(f"{base}/folders", headers=m.headers, params={"path": str(work)}, timeout=30).status_code == 409
         refused = httpx.post(f"{base}/shell", headers=m.headers, json={"project": str(work)}, timeout=30)

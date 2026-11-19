@@ -281,6 +281,13 @@ class Manager:
         op = str(request.get("op") or "")
         if op == "metrics":
             return {"metrics": metrics()}
+        if op == "machine_log":
+            # agent-machine's own log, for the console to see what it did (an update that didn't finish).
+            # Nothing secret is ever written to it, so it needs no switch of its own.
+            try:
+                return {"text": tail(settings.log_path(), int(request.get("tail") or 0))}
+            except FileNotFoundError:
+                return {"text": ""}
         if op == "search":
             try:
                 return {"result": self.catalogs.search(str(request.get("catalog") or ""), str(request.get("query") or ""), str(request.get("repo") or ""))}

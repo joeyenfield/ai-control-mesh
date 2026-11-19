@@ -132,6 +132,12 @@ export function BulkUpdate({ machines }: { machines: FleetMachine[] }) {
             {failed.map(([id, outcome]) => (
               <li key={id}>
                 <Link to={machinePath(id)}>{byId.get(id)?.name ?? id}</Link>: {outcome.reason}
+                {byId.get(id)?.connected && (byId.get(id)?.you.manage || byId.get(id)?.you.update) && (
+                  <>
+                    {" "}
+                    <Link to={machinePath(id, "log")}>See its log</Link>
+                  </>
+                )}
               </li>
             ))}
           </ul>

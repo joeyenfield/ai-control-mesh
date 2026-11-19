@@ -70,7 +70,7 @@ RECONNECT_WAIT = 10.0
 # Requests that only read, so one cut off by the machine dropping is asked again once it's back:
 # (channel, op). Changes (pull, start, delete, ...) never are: the machine may have done them already.
 READ_ONLY = {
-    ("provider", "status"), ("provider", "models"), ("provider", "log"), ("provider", "metrics"), ("provider", "search"),
+    ("provider", "status"), ("provider", "models"), ("provider", "log"), ("provider", "metrics"), ("provider", "search"), ("provider", "machine_log"),
     ("container", "status"), ("container", "logs"), ("folders", "list"), ("files", "list"), ("files", "read"), ("server", "settings"),
 }
 # The client a shell's session names (`agent --shell`): it stays private, as it's a remote terminal.

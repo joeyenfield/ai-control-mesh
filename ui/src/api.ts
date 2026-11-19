@@ -2992,6 +2992,16 @@ export async function addBackend(type: string, url: string, name?: string): Prom
   return chosen;
 }
 
+/** The end of agent-machine's own log on a machine (who manages it, or may update it). */
+export const fetchMachineLog = async (machineId: string) => {
+  const response = await apiFetch(`/api/machines/${encodeURIComponent(machineId)}/log?tail=200000`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(typeof body?.detail === "string" ? body.detail : `Request failed (${response.status})`, response.status);
+  }
+  return response.text();
+};
+
 /** A provider's log as its machine reads it: Strata's server or engine log, or the Ollama agent-machine started. */
 export const fetchProviderLog = async (ref: ProviderRef, source?: StrataLog) => {
   const response = await apiFetch(`${providerUrl(ref)}/log${source ? `?source=${source}` : ""}`);

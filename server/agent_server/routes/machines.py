@@ -262,6 +262,24 @@ def register(app: FastAPI, runtime: Runtime) -> None:
         answer = await ask(target, "update", timeout=60, channel="update", agent=bool(data.get("agent")))
         return {"updating": bool(answer.get("updating")), "from": answer.get("from"), "to": answer.get("to"), "message": answer.get("message")}
 
+    @app.get("/api/machines/{machine_id}/log")
+    async def machine_log(machine_id: str, request: Request, tail: int = 200_000) -> PlainTextResponse:
+        """The end of agent-machine's own log there: what it connected to, what it started, and how an update went.
+        For who manages the machine, or may update it (to see why an update didn't finish)."""
+        require_trusted(request)
+        target = visible(machine_id, request)
+        identity = auth.request_identity(request)
+        if not (can_manage(identity, target) or allowed(identity, target, "update")):
+            raise HTTPException(status_code=403, detail="Only the machine's owner, an admin, or the teams that may update it can read its log.")
+        try:
+            answer = await fleet.ask(target, "machine_log", timeout=20, channel="provider", tail=max(1024, min(int(tail), 2_000_000)))
+        except FleetError as exc:
+            # Machines older than this answer with an unknown model server kind: the op isn't theirs.
+            if "unknown model server kind" in exc.detail:
+                raise HTTPException(status_code=409, detail=f"{target.name}'s agent-machine is too old to send its log; update it first.") from exc
+            raise HTTPException(status_code=exc.status if 400 <= exc.status < 600 else 409, detail=exc.detail) from exc
+        return PlainTextResponse(str(answer.get("text") or ""))
+
     @app.get("/api/machines/{machine_id}/folders")
     async def folders(machine_id: str, request: Request, path: str = "") -> dict[str, Any]:
         """The folders inside one of the machine's launch folders, as the machine lists them; its roots without a path."""

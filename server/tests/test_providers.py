@@ -41,6 +41,8 @@ class FakeSocket:
         self.machine_id = machine_id
         self.requests: list[dict[str, Any]] = []
         self.servers_on = True
+        # An agent-machine from before machine_log: it reads the op as a model server's, with no kind.
+        self.old = False
 
     async def send_text(self, text: str) -> None:
         request = json.loads(text)
@@ -63,6 +65,10 @@ class FakeSocket:
                 answer["result"] = {{"delete": "deleted", "load": "loaded", "unload": "unloaded"}[op]: request["model"]}
             elif op == "log":
                 answer["text"] = "[strata] done\n"
+            elif op == "machine_log" and self.old:
+                answer.update(ok=False, error='unknown model server kind ""')
+            elif op == "machine_log":
+                answer["text"] = f"fleet: connected (last {request['tail']} bytes)\n"
             elif op == "metrics":
                 answer["metrics"] = {"cpu": {"percent": 12.5, "count": 8}, "memory": {"used": 1, "total": 2, "percent": 50}, "gpus": []}
             elif op == "search":
@@ -180,6 +186,24 @@ def test_provider_status_model_actions_logs_metrics_and_search_go_to_the_machine
         socket.servers_on = False
         refused = client.post("/api/machines/desk/providers/ollama-11434/models/load", json={"name": "qwen3:8b"})
         assert refused.status_code == 409 and "agent-machine servers on" in refused.json()["detail"]
+
+
+def test_agent_machines_own_log_comes_from_the_machine(tmp_path):
+    app = local_app(tmp_path)
+    with TestClient(app, **LOCAL) as client:
+        with_refusing_client(app)
+        socket = start(app)
+        answer = client.get("/api/machines/desk/log?tail=5000")
+        assert answer.status_code == 200 and answer.text == "fleet: connected (last 5000 bytes)\n"
+        assert answer.headers["content-type"].startswith("text/plain")
+        # The size asked for is kept between 1 kB and 2 MB.
+        client.get("/api/machines/desk/log?tail=10")
+        assert socket.requests[-1]["tail"] == 1024 and socket.requests[-1]["type"] == "provider"
+        assert client.get("/api/machines/nowhere/log").status_code == 404
+        # An agent-machine too old to send it says so, instead of a model server error.
+        socket.old = True
+        old = client.get("/api/machines/desk/log")
+        assert old.status_code == 409 and "too old to send its log" in old.json()["detail"]
 
 
 def test_a_pull_streams_the_machines_progress_and_its_failure(tmp_path):
