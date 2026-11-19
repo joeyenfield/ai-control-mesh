@@ -100,7 +100,7 @@ Sign-in is the normal OIDC setup with the issuer on loopback HTTP. The issuer ac
 
 - **The first account.** On its first start the API finds no accounts in its database and creates `admin`, an admin of the root organization, with a random password. It saves that password owner-only to `private/first-user-password` and prints it. `agent-server local start` reads that file to print the password with the next steps, until the file is deleted. When the environment names a user (`AI_PROXY_USERNAME` and `AI_PROXY_PASSWORD`, as the all-in-one image can), no first account or file is made.
 - **The console.** The browser goes to the API's `/api/auth/login`, is sent to the issuer on port 20000 to sign in, and comes back to the registered callback on port 19999. The tokens stay in host-only HttpOnly cookies for `localhost`.
-- **`agent` and `agent-machine`.** `agent login` and `agent-machine login` use the device flow ([CLI sign-in](oidc.md#cli-sign-in)). They print the issuer's address and a code; you sign in there as `admin` and approve. They don't open a browser themselves. Each program keeps its own credentials, and the local server is just another server URL in them.
+- **`agent` and `agent-machine`.** `agent login` and `agent-machine login` use the device flow ([CLI sign-in](oidc.md#cli-sign-in)). They print the issuer's address and a code; you sign in there as `admin` and approve. They don't open a browser themselves. The two programs share one credentials file, and the local server is just another server URL in it. The web installer does the approval itself (below), so nobody has to open a browser.
 
 ```mermaid
 sequenceDiagram
@@ -120,18 +120,15 @@ sequenceDiagram
   L->>I: spawn
   I->>I: open its state, read accounts from the API's database
   L->>I: poll discovery until the issuer matches
-  L-->>U: console address, admin's password, next steps
-  W->>C: agent login http://localhost:19999
-  C->>I: device authorization
-  C-->>U: issuer address and code
-  U->>I: sign in as admin in the browser, approve the code
-  C->>I: poll the token endpoint
-  I-->>C: access and refresh tokens
-  W->>C: agent-machine login --enable launches,files, then start
+  L-->>U: console address, admin's password
+  W->>I: local_quickstart.py signin: device authorization
+  W->>I: approve the code as admin, with first-user-password
+  I-->>W: access and refresh tokens, saved for agent and agent-machine
+  W->>C: local_quickstart.py machine: functions on, roots add ~/projects, start
   C->>S: machine joins the fleet over a WebSocket
 ```
 
-Without the web installer the last part is yours to run ([Connect your computer](local.md#connect-your-computer)).
+Without the web installer (or with `--no-login`) the last part is yours to run ([Connect your computer](local.md#connect-your-computer)).
 
 ## The database decision
 
@@ -177,7 +174,10 @@ An installer downloads each file and refuses it unless its SHA-256 matches the o
 4. It links `agent-server` into the prefix (on Windows, writes `agent-server.cmd` and adds the prefix to the user's PATH) and runs `agent-server local start`. It reads the port back from `local.json`.
 5. It installs `agent` and `agent-machine`: from the archive for this platform through the archive's own installer, or from the wheel into the server's `venv` with `--python` or when there's no Go build.
 6. On a desktop it installs the wheel's `tray` extra into the same `venv`, links `agent-tray`, turns on its start at sign-in, and starts it detached at the end. A failure here never fails the install.
-7. It signs `agent` and `agent-machine` in with the device flow, reading from the terminal (`/dev/tty` on Unix, since the script's own input is the download), and starts the machine. Without a terminal it prints the commands instead.
+7. It runs the bundled `local_quickstart.py signin` with the server's `venv` Python. That script uses `deploy/compose/quickstart/machine.py`: it asks the issuer for a device code and approves it as `admin` with `private/first-user-password`, as a browser would. It then saves the tokens in the credentials file that `agent` and `agent-machine` share, under its lock, keeping other servers' entries. A saved sign-in to the same server and issuer, while it's the default, is reused. Without the password file (exit code 2) it falls back to `agent login`, reading from the terminal (`/dev/tty` on Unix, since the script's own input is the download).
+8. Unless `--no-machine` is given, `local_quickstart.py machine` sets up a machine that has no `machine.json` yet: launches, commands, files and servers on, and `~/projects` as a root. Then it stops and starts `agent-machine`, so an update runs the new build. A machine that has `machine.json` keeps its settings.
+
+The installers start the server with `AI_PROXY_LOCAL_INSTALLER=1`, so `agent-server local start` leaves the manual sign-in commands out of its next steps.
 
 The Termux branch runs the guest installer with `--no-login`, then runs the bundled `termux_quickstart.py`. It uses the existing local admin password with the issuer's normal device flow to save shared credentials, enables the PRoot-compatible machine functions on first setup, disables containers, adds `/root/projects` and starts the machine. Reinstalling keeps existing machine choices apart from the unsupported containers toggle. The console still requires the admin's browser sign-in.
 

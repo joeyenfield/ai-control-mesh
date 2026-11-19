@@ -7,6 +7,7 @@ organization's providers (ollama,...) and QUICKSTART_GRANT gives its whole organ
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from http.cookiejar import CookieJar
 import json
 import os
@@ -36,6 +37,42 @@ class Browser:
         body = urlencode(data).encode() if data is not None else None
         with self.opener.open(Request(ISSUER + path, data=body, headers=headers), timeout=15) as response:
             return response.read().decode()
+
+
+@contextmanager
+def credentials_lock(path):
+    """The lock agent and agent-machine take on the shared file (a directory beside it), so a
+    refresh they make meanwhile isn't lost. A lock still held after 20 s is left for them."""
+    lock = path.with_name(path.name + ".lock")
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for attempt in range(200):
+        try:
+            lock.mkdir(mode=0o700)
+            break
+        except FileExistsError:
+            time.sleep(0.1)
+    else:
+        raise RuntimeError(f"{lock} is held by another sign-in or refresh")
+    try:
+        yield
+    finally:
+        lock.rmdir()
+
+
+def save_entry(path, entry):
+    """Adds the entry under its server and makes it the default, keeping other servers' sign-ins."""
+    key = entry["url"].strip().rstrip("/").lower()
+    with credentials_lock(path):
+        saved = json.loads(path.read_text()) if path.exists() else {}
+        servers = saved.get("servers") or {}
+        servers[key] = entry
+        temporary = path.with_suffix(".pending")
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w") as output:
+            json.dump({**saved, "default": key, "servers": servers}, output, indent=2)
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(path)
 
 
 def sign_in(path, password):
@@ -71,22 +108,19 @@ def sign_in(path, password):
         "issuer": ISSUER, "client_id": CLIENT, "token_endpoint": ISSUER + "/token",
         "revocation_endpoint": ISSUER + "/revoke",
     }
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    temporary = path.with_suffix(".pending")
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w") as output:
-        json.dump({"default": API, "servers": {API: entry}}, output, indent=2)
-        output.flush()
-        os.fsync(output.fileno())
-    temporary.replace(path)
+    save_entry(path, entry)
     print(f"Signed {path.parent.name} in as {USER}", flush=True)
 
 
 def credentials_path():
-    """The Unix auth profile shared by agent and agent-machine inside the containers."""
+    """The auth profile agent and agent-machine share for this OS user (settings.CredentialsPath)."""
     if os.getenv("AI_PROXY_CREDENTIALS"):
         return Path(os.environ["AI_PROXY_CREDENTIALS"]).expanduser()
-    return Path(os.getenv("XDG_CONFIG_HOME") or Path.home() / ".config") / "agent-proxy" / "credentials.json"
+    if sys.platform == "win32":
+        base = os.getenv("APPDATA") or Path.home() / "AppData" / "Roaming"
+    else:
+        base = os.getenv("XDG_CONFIG_HOME") or Path.home() / ".config"
+    return Path(base) / "agent-proxy" / "credentials.json"
 
 
 def main():

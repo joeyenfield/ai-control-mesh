@@ -38,7 +38,8 @@ ARCHIVE = re.compile(r"(agent|agent-machine)-(?P<version>[^/]+)-(?P<platform>[a-
 # What the server needs at run time, as the bundle's paths. server/ is installed with pip -e, so
 # the bundle's folder is the server's ROOT (config._find_root): VERSION and server/ are what it looks for.
 BUNDLED = ("VERSION", "LICENSE", "server/pyproject.toml", "server/README.md", "server/agent_server", "ui/dist", "docs", "benchmarks/tests",
-           "deploy/compose/quickstart/machine.py", "devhelpers/release_scripts/release/termux_quickstart.py")
+           "deploy/compose/quickstart/machine.py", "devhelpers/release_scripts/release/termux_quickstart.py",
+           "devhelpers/release_scripts/release/local_quickstart.py")
 SKIPPED = {"__pycache__", ".pytest_cache"}
 
 

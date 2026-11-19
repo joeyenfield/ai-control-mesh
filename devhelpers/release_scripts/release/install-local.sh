@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs AI Control Mesh {{VERSION}} on this computer, for you alone, and starts it: the server
-# and its sign-in service on localhost, then agent and agent-machine signed in to it
-# (docs/local.md). Linux, macOS and FreeBSD:
+# and its sign-in service on localhost, then agent and agent-machine signed in to it as admin and
+# this computer in its fleet, with no questions (docs/local.md). Linux, macOS and FreeBSD:
 #
 #   curl -fsSL {{BASE}}/install-local.sh | sh
 #   curl -fsSL {{BASE}}/install-local.sh | sh -s -- --port 29999 --auth-port 30000
@@ -10,7 +10,8 @@
 #   --prefix DIR              where agent-server, agent and agent-machine go (default
 #                             ~/.local/bin, or /usr/local/bin as root)
 #   --no-client               only the server: no agent or agent-machine
-#   --no-login                skip sign-in and machine permission choices; print commands instead
+#   --no-machine              don't join this computer to the fleet: only the server and agent
+#   --no-login                skip signing in and joining; print the commands instead
 #   --python                  the Python agent and agent-machine rather than the Go builds (used
 #                             anyway when there's no Go build for this system)
 #   --no-tray                 no tray icon (agent-tray, put in on a desktop: it shows what runs,
@@ -40,7 +41,8 @@ Installs AI Control Mesh on this computer, for you alone, and starts it (docs/lo
   --prefix DIR              where agent-server, agent and agent-machine go (default
                             ~/.local/bin, or /usr/local/bin as root)
   --no-client               only the server: no agent or agent-machine
-  --no-login                skip sign-in and machine permission choices; print commands instead
+  --no-machine              don't join this computer to the fleet: only the server and agent
+  --no-login                skip signing in and joining; print the commands instead
   --python                  the Python agent and agent-machine rather than the Go builds (used
                             anyway when there's no Go build for this system)
   --no-tray                 no tray icon (agent-tray, put in on a desktop: it shows what runs,
@@ -57,6 +59,7 @@ ports=""
 prefix=""
 client=1
 login=1
+machine=1
 use_python=0
 tray=1
 while [ $# -gt 0 ]; do
@@ -69,6 +72,7 @@ while [ $# -gt 0 ]; do
         --prefix=*) prefix=${1#--prefix=} ;;
         --no-client) client=0 ;;
         --no-login) login=0 ;;
+        --no-machine) machine=0 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "install-local: unknown option $1 (see --help)" >&2; exit 2 ;;
     esac
@@ -302,7 +306,7 @@ mkdir -p "$prefix"
 ln -sf "$venv/bin/agent-server" "$prefix/agent-server"
 
 # shellcheck disable=SC2086
-"$venv/bin/agent-server" local start $ports || fail "the local server didn't start; see the logs in $home/logs"
+AI_PROXY_LOCAL_INSTALLER=1 "$venv/bin/agent-server" local start $ports || fail "the local server didn't start; see the logs in $home/logs"
 port=$("$venv/bin/python" -c 'import json, sys; print(json.load(open(sys.argv[1])).get("port") or 19999)' "$home/local.json")
 server="http://localhost:$port"
 
@@ -378,59 +382,52 @@ if [ $tray -eq 1 ]; then
     fi
 fi
 
-# Sign-ins show a code to approve in the browser and wait: from the terminal, as this script's
-# own input is the download.
-if [ $login -eq 1 ] && [ -n "$installed" ] && ! (: </dev/tty) 2>/dev/null; then
-    say "No terminal to sign in from; run the commands below yourself."
-    login=0
-fi
-if [ $login -eq 1 ] && [ -n "$installed" ]; then
-    say ""
-    say "Setup signs in each installed program separately: first the agent, then the machine."
-    say "Each sign-in has its own device code. Approve one, return here, then approve the next."
-    say "Use the same AI Control Mesh account for both."
-fi
-for component in $installed; do
-    if [ "$component" = agent ]; then
+# Both sign in by itself, as admin with the first account's password, through the local sign-in
+# service's device flow (local_quickstart.py): no browser step, no questions. Only when that
+# password is gone (changed since) does agent login ask, in the terminal, as this script's own
+# input is the download.
+quickstart="$app/devhelpers/release_scripts/release/local_quickstart.py"
+signed=0
+joined=0
+case " $installed " in
+    *" agent "*)
         if [ $login -eq 1 ]; then
             say ""
-            say "Authorize the agent (agent and agent-proxy) to use $server"
-            say "This lets coding agents launched here use your server's permitted models and providers,"
-            say "with their requests recorded under your account."
-            say "Open the link printed below in your browser, sign in as admin with the password printed earlier,"
-            say "and enter this agent's device code if asked. Approve, then return to this terminal."
-            "$prefix/agent" login "$server" </dev/tty || say "Sign in later with: agent login $server"
-        else
-            say "Next: agent login $server"
+            say "Signing agent in to $server as admin"
+            if "$venv/bin/python" "$quickstart" signin "$home"; then
+                signed=1
+            elif (: </dev/tty) 2>/dev/null; then
+                say "Sign in in your browser: open the link below, sign in and approve the code."
+                "$prefix/agent" login "$server" </dev/tty && signed=1
+            fi
         fi
-    elif [ $login -eq 1 ]; then
-        say ""
-        "$prefix/agent-machine" config </dev/tty || fail "machine setup cancelled; run agent-machine config to choose functions later"
-        say "Authorize this machine (agent-machine) to connect to $server"
-        say "This adds this computer to your fleet with the functions you just chose."
-        say "For launches, file viewing or terminal starting folders, allow projects with: agent-machine roots add <folder>"
-        say "On Termux, this machine is the Ubuntu environment created for AI Control Mesh."
-        say "This reuses the shared agent sign-in. No second approval is needed."
-        say "If not signed in yet, approve the link and device code printed below."
-        if "$prefix/agent-machine" login "$server" --enable= </dev/tty; then
-            "$prefix/agent-machine" start || true
-        else
-            say "Sign in later with: agent-machine login $server, then agent-machine start"
+        [ $signed -eq 1 ] || say "Sign agent in later with: agent login $server"
+        ;;
+esac
+case " $installed " in
+    *" agent-machine "*)
+        if [ $machine -eq 1 ] && [ $signed -eq 1 ]; then
+            "$venv/bin/python" "$quickstart" machine "$prefix/agent-machine" && joined=1
         fi
-    else
-        say "Next: agent-machine config, then agent-machine login $server, then agent-machine start"
-    fi
-done
-
+        if [ $machine -eq 1 ] && [ $joined -eq 0 ]; then
+            say "Join this computer later with: agent-machine config, then agent-machine login $server, then agent-machine start"
+        fi
+        ;;
+esac
 say ""
 say "Done: AI Control Mesh $VERSION runs at $server"
 # Said again here: the first start printed it before the sign-ins scrolled it away.
 if [ -f "$home/private/first-user-password" ]; then
-    say "Open $server and sign in as admin. The password is in $home/private/first-user-password"
+    say "Console: open $server and sign in as admin with the password in $home/private/first-user-password"
 else
-    say "Open $server and sign in with your account."
+    say "Console: open $server and sign in with your account."
 fi
-case "$installed" in *agent-machine*) say "Let the console start agents in a folder of yours: agent-machine roots add <folder>" ;; esac
+if [ $signed -eq 1 ]; then
+    say "Agents: run one in a project folder, recorded by your server: agent claude-account .  (agent --list shows them all)"
+fi
+if [ $joined -eq 1 ]; then
+    say "This computer is on the console's Machines page. Its functions: agent-machine config; more folders: agent-machine roots add <folder>"
+fi
 # The archives' installer has said so already when it ran.
 case ":$PATH:" in
     *":$prefix:"*) ;;

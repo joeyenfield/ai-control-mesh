@@ -34,19 +34,35 @@ Use agents such as **Claude Code, Codex, Copilot CLI, OpenCode, Qwen Code, Aider
 
 ## Quick start
 
-Already have access to a server? [Install only the `agent` command](docs/running-agents.md#installing-only-the-agent-command) on your computer and sign in to that server. You do not need to install the server or join your computer to its fleet.
+One command installs the server and the `agent` command on your computer, signs `agent` in, and adds your computer to the server's fleet. It asks no questions. You need Python 3.11 or later.
 
-To host your own server, pick one of these three setups. All three run on your own computer, on loopback only.
+```bash
+curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/install-local.sh | sh
+```
+
+```powershell
+irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/install-local.ps1 | iex
+```
+
+When it finishes:
+
+1. **Run an agent through your server:** `agent claude-account .` in a project folder, or any agent from `agent --list`.
+2. **Open the console** at http://localhost:19999 and sign in as **admin** with the password the installer printed. You'll see the agent's session and requests, and you can start agents in `~/projects` from **Start an agent**.
+
+Everything stays on loopback, for you alone, with an icon in the system tray. Run the command again to update. `uninstall-local.sh` (or `.ps1`) from the same address removes it. [Run it on your own computer](docs/local.md) has the options (`--no-machine` for only the server and `agent`) and the details.
+
+Already have access to a server? [Install only the `agent` command](docs/running-agents.md#installing-only-the-agent-command) and sign in to it instead.
+
+### Other ways to try it
 
 | | You need | You get |
 | --- | --- | --- |
 | [The quickstart stack](#the-quickstart-stack) | Git, and Docker or Podman with Compose | The whole system with two fleet machines and Ollama, and a guided tour |
 | [One container](#one-container) | Docker or Podman | The whole system in a single container, no checkout |
-| [No containers](#no-containers) | Python 3.11 or later | The server, `agent` and `agent-machine` installed for you alone |
 
 Android/Termux: the [experimental full-server setup](docs/local.md#android-with-termux) uses a dedicated Ubuntu environment through PRoot-Distro. It does not need Docker or Podman.
 
-### The quickstart stack
+#### The quickstart stack
 
 ```bash
 git clone https://github.com/joeyenfield/ai-control-mesh.git
@@ -60,7 +76,7 @@ Open http://localhost:19999, sign in with **admin** / **secret**, and follow the
 
 **It's a local demo**: known credentials and ports bound to localhost. Container images are downloaded at startup; choose and download a model separately. Delete it with `docker compose -f deploy/compose/quickstart/compose.yaml down -v`. [`deploy/compose/`](deploy/compose/README.md) also has the all-in-one container as a Compose file, and two linked servers to try peering.
 
-### One container
+#### One container
 
 The whole system, with a machine and the coding agents already in it:
 
@@ -72,20 +88,6 @@ docker logs mesh     # the console's address and the admin password
 ```
 
 Then open http://localhost:19999. The three volumes keep the data, the machine's sign-ins and its projects when the container is re-created.
-
-### No containers
-
-One command installs the server, `agent` and `agent-machine` from the latest release and runs them on your own computer with your own folders, for you alone, with an icon in the system tray to start, stop and open it:
-
-```bash
-curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/install-local.sh | sh
-```
-
-```powershell
-irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/install-local.ps1 | iex
-```
-
-`uninstall-local.sh` (or `.ps1`) from the same address takes it out again. See [Run it on your own computer](docs/local.md), which covers the container, the installer and [removing it](docs/local.md#remove-it), and installing from a checkout (`./devhelpers/scripts/install-local.sh`).
 
 ## How it works
 
