@@ -2,7 +2,7 @@
 
 Build releases on your computer. GitHub Actions and self-hosted Actions runners are not part of this process. The configured [Jenkins pipelines](pipelines.md) can build branch snapshots on the LAN agent; only `master` builds automatically. Tags do not trigger builds. GitHub stores images and installer files when you explicitly publish them.
 
-Use Python 3.11 or later. Image builds need Podman and a running Podman machine on Windows/macOS. Installer builds also need Go 1.24 or later and Node.js 22/npm. Run the commands from the repository root; the scripts also work when invoked by full path from another directory.
+Use Python 3.11 or later. Image builds need Podman and a running Podman machine on Windows/macOS. Installer builds also need Go 1.24 or later, Node.js 22/npm, and the Android NDK for the Termux (`android/arm64`) build: set `ANDROID_NDK_HOME` to it, or `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) to an SDK with one under `ndk/`. An NDK in the default `~/Android/Sdk` isn't found unless one of these is set. Run the commands from the repository root; the scripts also work when invoked by full path from another directory.
 
 | Type | Default build | Other options |
 | --- | --- | --- |
