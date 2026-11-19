@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/term"
+
 	"ai-control-mesh/machine/internal/containers"
 	"ai-control-mesh/machine/internal/login"
 	"ai-control-mesh/machine/internal/mcp"
@@ -352,7 +354,14 @@ func startedBy() string {
 	if os.Getenv(startedEnv) == "background" {
 		return "background"
 	}
-	if info, err := os.Stdin.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+	return startedFrom(term.IsTerminal(int(os.Stdin.Fd())))
+}
+
+// startedFrom is "terminal" only when stdin is a real terminal. A character device isn't enough: a
+// service's stdin is /dev/null, which is one too, and a service taken for a terminal run is never
+// restarted after an update (the console's Update now left it on the old version).
+func startedFrom(interactive bool) string {
+	if interactive {
 		return "terminal"
 	}
 	return "service"
