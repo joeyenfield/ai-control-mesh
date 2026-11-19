@@ -1031,6 +1031,9 @@ h1 a:hover, h2 a:hover, h3 a:hover, .provider-card-head a:hover, .host-name a:ho
 
 /* Strata */
 .callout.detected { background: var(--route-ollama-soft); }
+.callout.warning { background: var(--bad-soft); }
+.callout.warning ul { margin: 0; padding-left: 20px; }
+.bulk-update { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .backend-pick { max-width: 360px; }
 .meter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .meter { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); }
@@ -1486,6 +1489,7 @@ ul.plain { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-dire
 .tabs.page-tabs button[aria-selected="true"] { color: var(--ink); }
 .callout { border: 1px solid color-mix(in srgb, var(--live) 28%, transparent); border-radius: var(--radius-small); }
 .callout.detected { border-color: color-mix(in srgb, var(--route-ollama) 30%, transparent); }
+.callout.warning { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
 /* Form labels: sentence case, quiet, above their control. */
 .field { font-weight: 600; font-size: 12.5px; color: var(--steel); }
 fieldset { border: 1px solid var(--line); border-radius: var(--radius-small); padding: 14px 16px 16px; margin: 0; min-width: 0; }

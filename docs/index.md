@@ -64,7 +64,7 @@ The documentation has two halves. The **guides** (from *Start here* to *Run a se
 | Containers on a machine | `agent-machine containers on`, `agent --switch` | Providers → Containers | [Providers](providers.md#containers-machines-run) |
 | Start agents on a machine from the console | `agent-machine launches on`, `roots add` | A machine's Agents tab | [Machines](machines.md#launches) |
 | Share MCP servers | `agent-machine mcp add`, `agent --mcp` | MCP servers tab, Start an agent | [MCP servers](mcp.md) |
-| Update machines from the server | `agent update`, `agent-machine update`, `updates on` | Update now | [Machines](machines.md#remote-updates) |
+| Update machines from the server | `agent update`, `agent-machine update`, `updates on` | Update now, Update all | [Machines](machines.md#remote-updates) |
 | Who may use a machine | | Access tab | [Machines](machines.md#who-may-use-a-machine) |
 | Users, organizations, teams | `agent-server user\|org\|team` | Organizations | [Accounts](accounts.md) |
 | Share a session | `--share`, `--team` | A session's sharing | [Accounts](accounts.md#session-sharing) |
