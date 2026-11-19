@@ -9,6 +9,7 @@ export function ConfirmDialog({
   error,
   onConfirm,
   onCancel,
+  secondary,
 }: {
   open: boolean;
   title: string;
@@ -18,6 +19,8 @@ export function ConfirmDialog({
   error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
+  /** A gentler choice beside the confirm button (keep the data, say), not styled as dangerous. */
+  secondary?: { label: string; onClick: () => void };
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
@@ -55,6 +58,11 @@ export function ConfirmDialog({
           <button ref={cancel} type="button" disabled={busy} onClick={onCancel}>
             Cancel
           </button>
+          {secondary && (
+            <button type="button" disabled={busy} onClick={secondary.onClick}>
+              {secondary.label}
+            </button>
+          )}
           <button type="submit" className="danger" disabled={busy}>
             {confirmLabel}
           </button>

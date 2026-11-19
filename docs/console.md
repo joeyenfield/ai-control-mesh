@@ -116,7 +116,12 @@ The states:
 
 Finished sessions collapse behind **Show … finished sessions** and stay readable until their session is deleted; the search covers them too. **Remove … not connected** (shown when more than one launcher dropped) clears dead rows, and **Notify me when an agent is waiting** turns on system notifications. In the Android app these are Android notifications: the first time, Android asks to allow them (if you refused before, the switch opens the app's notification settings). Tapping one opens that agent's terminal. With them on, the app keeps checking while it's in the background, until Android stops it; an app that's been closed, or set aside for a long while, doesn't notify.
 
-A terminal that isn't connected (launcher closed, or agent exited) has **Remove** for those who can control its session. It deletes the session with everything recorded for it: its terminal output, requests, traces and chats. A terminal still connected, or with a request in flight, can't be removed.
+A terminal that isn't connected (launcher closed, or agent exited) has **Remove** for those who can control its session. It asks which you want:
+
+- **Remove from list** ends the session and keeps everything recorded. The row moves to the finished sessions, and the session stays on the **Sessions** page with its terminal output, requests, traces and chats. It's shown only for a session that hasn't ended yet.
+- **Delete** deletes the session with everything recorded for it: its terminal output, requests, traces and chats. It can't be undone.
+
+A terminal still connected, or with a request in flight, can't be removed. **Remove … not connected** asks the same for every row it covers.
 
 ### Live agent view
 

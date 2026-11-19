@@ -52,7 +52,7 @@ function duration(ms: number) {
   return minutes < 60 ? `${minutes} min` : `${Math.round(minutes / 60)} h`;
 }
 
-/** A terminal whose launcher is gone, which you may delete with its session. */
+/** A terminal whose launcher is gone, which you may take off the list (ending its session) or delete with its session. */
 const removable = (terminal: TerminalSummary) => !terminal.connected && terminal.in_flight === 0 && terminal.you?.control === true;
 
 const byRecent = (a: TerminalSummary, b: TerminalSummary) =>
@@ -97,10 +97,27 @@ export function TerminalsPage() {
       void client.invalidateQueries();
     },
   });
+  // Off the list without deleting: the session ends, so it moves to the finished ones with everything recorded.
+  const hide = useMutation({
+    mutationFn: async (targets: TerminalSummary[]) => {
+      const results = await Promise.allSettled(targets.map((terminal) => api.endSession(terminal.session_id)));
+      const failed = results.filter((result) => result.status === "rejected").length;
+      if (failed === targets.length) throw (results[0] as PromiseRejectedResult).reason;
+      return { hidden: targets.length - failed, failed };
+    },
+    onSuccess: ({ hidden, failed }) => {
+      notify(`Moved ${hidden} ${hidden === 1 ? "session" : "sessions"} to finished; nothing was deleted${failed ? `. ${failed} couldn't be moved` : ""}`);
+      setRemoving(null);
+      void client.invalidateQueries();
+    },
+  });
   const ask = (targets: TerminalSummary[]) => {
     remove.reset();
+    hide.reset();
     setRemoving(targets);
   };
+  // Those still listed as running: ended ones are already among the finished.
+  const hideable = (removing ?? []).filter((terminal) => !(terminal.ended_at ?? terminal.session_ended_at));
 
   // The search narrows both lists; the state chips count within it.
   const text = query.trim().toLowerCase();
@@ -196,17 +213,32 @@ export function TerminalsPage() {
       <ConfirmDialog
         open={removing !== null}
         title={removing?.length === 1 ? "Remove this session?" : `Remove ${removing?.length ?? 0} sessions?`}
-        confirmLabel="Remove"
-        busy={remove.isPending}
-        error={remove.error?.message ?? null}
+        confirmLabel="Delete"
+        busy={remove.isPending || hide.isPending}
+        error={(remove.error ?? hide.error)?.message ?? null}
         onConfirm={() => removing && remove.mutate(removing)}
         onCancel={() => setRemoving(null)}
+        secondary={
+          hideable.length
+            ? { label: hideable.length === 1 ? "Remove from list" : `Remove ${hideable.length} from list`, onClick: () => hide.mutate(hideable) }
+            : undefined
+        }
       >
         <p>
           {removing?.length === 1
             ? `${removing[0].agent_name}${removing[0].project ? ` in ${removing[0].project}` : ""} isn't connected.`
-            : "These agents' terminals aren't connected."}{" "}
-          Removing deletes {removing?.length === 1 ? "the session" : "the sessions"} with everything recorded: the terminal output,
+            : "These agents' terminals aren't connected."}
+        </p>
+        {hideable.length > 0 && (
+          <p>
+            <strong>Remove from list</strong> ends {hideable.length === 1 ? "the session" : "those sessions"} and keeps everything recorded.{" "}
+            {hideable.length === 1
+              ? "It moves to the finished sessions below and stays on the Sessions page."
+              : "They move to the finished sessions below and stay on the Sessions page."}
+          </p>
+        )}
+        <p>
+          <strong>Delete</strong> removes {removing?.length === 1 ? "the session" : "the sessions"} with everything recorded: the terminal output,
           requests, traces and chats. It can't be undone.
         </p>
       </ConfirmDialog>
