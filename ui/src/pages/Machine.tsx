@@ -24,6 +24,7 @@ import { MachineAccess } from "./MachineAccess";
 import { MachineMcp } from "./MachineMcp";
 import { MachineAccounts } from "./MachineAccounts";
 import { MachineFiles } from "./MachineFiles";
+import { MachineLog, readsLog } from "./MachineLog";
 import { STATE_LABELS } from "./Subscriptions";
 import { McpChoice } from "../components/McpChoice";
 
@@ -96,6 +97,7 @@ export function MachinePage() {
         <NavLink to={machinePath(machine.id, "load")}>Load</NavLink>
         {(machine.you.owner || (machine.mcp?.servers?.length ?? 0) > 0) && <NavLink to={machinePath(machine.id, "mcp")}>MCP servers</NavLink>}
         <NavLink to={machinePath(machine.id, "accounts")}>Agent accounts</NavLink>
+        {readsLog(machine) && <NavLink to={machinePath(machine.id, "log")}>Log</NavLink>}
         {machine.you.manage && <NavLink to={machinePath(machine.id, "access")}>Access</NavLink>}
       </nav>
 
@@ -105,6 +107,7 @@ export function MachinePage() {
       {section === "files" && <MachineFiles machine={machine} />}
       {section === "providers" && <MachineProviders machine={machine} providers={providers} kind={kind} sub={sub} />}
       {section === "access" && <MachineAccess machine={machine} />}
+      {section === "log" && <MachineLog machine={machine} />}
       {section === "mcp" && <MachineMcp machine={machine} />}
       {section === "accounts" && <MachineAccounts machine={machine} />}
       {section === "load" && (
@@ -125,7 +128,7 @@ export function MachinePage() {
 const refOf = (machine: FleetMachine, provider: MachineProvider): ProviderRef => ({ machine: machine.id, provider: provider.id });
 
 // The machine's tabs (its summary is the page itself).
-const SECTIONS = ["agents", "terminal", "files", "providers", "load", "mcp", "accounts", "access"];
+const SECTIONS = ["agents", "terminal", "files", "providers", "load", "mcp", "accounts", "log", "access"];
 
 /** Why the machine won't change its model servers now, or null when it will. */
 function unmanageable(machine: FleetMachine): string | null {

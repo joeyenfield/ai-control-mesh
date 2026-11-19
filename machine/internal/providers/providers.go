@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -141,6 +142,14 @@ func (m *Manager) handle(request Request, progress Progress) (map[string]any, er
 	switch request.Op {
 	case "metrics":
 		return map[string]any{"metrics": Metrics()}, nil
+	case "machine_log":
+		// agent-machine's own log, for the console to see what it did (an update that didn't finish).
+		// Nothing secret is ever written to it, so it needs no switch of its own.
+		text, err := tailFile(settings.LogPath(), request.Tail)
+		if errors.Is(err, os.ErrNotExist) {
+			return map[string]any{"text": ""}, nil
+		}
+		return map[string]any{"text": text}, err
 	case "search":
 		result, err := m.search(request.Catalog, request.Query, request.Repo)
 		return map[string]any{"result": result}, err

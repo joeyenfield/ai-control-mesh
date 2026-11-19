@@ -649,6 +649,11 @@ def test_the_owner_lets_teams_use_each_feature_of_a_machine(tmp_path):
         seen = carol.get("/api/machines/m1").json()
         assert seen["you"]["launch"] is False and seen["you"]["view"] is True and seen["access"] == {}
         assert frank.get("/api/machines/m1").status_code == 404
+        # Its own log is for who manages it or may update it: not for those who may only look or start agents.
+        for client in (bob, carol):
+            refused = client.get("/api/machines/m1/log")
+            assert refused.status_code == 403 and "read its log" in refused.json()["detail"]
+        assert frank.get("/api/machines/m1/log").status_code == 404
         assert carol.post("/api/machines/m1/launch", json={"agent": "qwen", "project": ROOT, "model": "m"}).status_code == 403
         assert bob.post("/api/machines/m1/shell", json={"project": ROOT}).status_code == 403
         # Only the owner (or an admin) changes who can use it.
