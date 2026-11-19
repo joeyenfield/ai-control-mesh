@@ -354,7 +354,7 @@ sequenceDiagram
   M->>S: reconnects, on the server's build
 ```
 
-With `agent-machine updates on`, a machine on another build than the server's has **Update now** on its page. It needs the `update` feature: the owner, admins, or a granted organization or team.
+With `agent-machine updates on`, a machine on another build than the server's has **Update now** on its page, and **Update all** on the Machines page updates every such machine together, warning about any it couldn't. It needs the `update` feature: the owner, admins, or a granted organization or team.
 
 The machine runs `agent-machine update --server <server>` detached, so it can stop itself and start the new binary. Its output goes to `agent-machine.log`. With the agent box ticked, it adds `--with-agent`, which runs `agent update` from the same server first. Launches and terminals run `agent`, so it should be the server's build too. A failed `agent update` doesn't stop agent-machine's.
 

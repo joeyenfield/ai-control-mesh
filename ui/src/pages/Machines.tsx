@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, machineProviders, type FleetMachine, type RemovedMachine } from "../api";
 import { CodeLine } from "../components/CodeLine";
+import { BulkUpdate } from "../components/BulkUpdate";
 import { PartTag } from "../components/PartTag";
 import { StateDot } from "../components/ProviderState";
 import { remember, remembered, useClipboard, useMachines, useStatus, useToast } from "../hooks";
@@ -62,6 +63,8 @@ export function MachinesPage() {
           </div>
         </dl>
       )}
+
+      {machines.data && <BulkUpdate machines={list} />}
 
       {machines.data && list.length === 0 && (
         <div id="add">
