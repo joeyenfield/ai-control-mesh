@@ -1,0 +1,50 @@
+// Recreates docs/screenshots from the demo, for the branch Jenkins selected. Manual only.
+pipeline {
+    agent { label 'lan-builder' }
+    parameters {
+        string(name: 'NAMES', defaultValue: '', description: 'Only these screenshots (capture.mjs names, comma separated). Empty takes every one.')
+        booleanParam(name: 'PUSH', defaultValue: false, description: 'Commit changed screenshots to this branch and push them.')
+    }
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 45, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '15', artifactNumToKeepStr: '5'))
+    }
+    stages {
+        stage('Checkout branch') {
+            steps {
+                deleteDir()
+                checkout scm
+            }
+        }
+        // In a disposable Playwright container: the console is built and the demo run inside it.
+        stage('Capture') {
+            steps { sh 'python3 pipelines/screenshots/run.py . --names "$NAMES"' }
+        }
+        stage('Archive') {
+            steps {
+                sh 'git status --short docs/screenshots > screenshots-changed.txt; cat screenshots-changed.txt'
+                archiveArtifacts artifacts: 'docs/screenshots/*.png, screenshots-changed.txt', fingerprint: false
+            }
+        }
+        stage('Push') {
+            when { expression { params.PUSH && env.BRANCH_NAME } }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github-ci', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                    sh '''
+                        set -eu
+                        git add docs/screenshots
+                        if git diff --cached --quiet; then
+                            echo "No screenshot changed; nothing to push"
+                            exit 0
+                        fi
+                        git -c user.name="ai-control-mesh CI" -c user.email="ci@invalid" commit -q -m "Update the screenshots"
+                        helper='!f() { echo "username=$GIT_USER"; echo "password=$GIT_TOKEN"; }; f'
+                        git -c credential.helper= -c credential.helper="$helper" push origin "HEAD:refs/heads/$BRANCH_NAME"
+                    '''
+                }
+            }
+        }
+    }
+}

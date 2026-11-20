@@ -13,6 +13,7 @@ discovered branch has its own workspace, history and status. Both use
 | `ai-control-mesh` | Discovers repository branches and builds a complete versioned distribution. Only `master` builds automatically; use Build Now for another branch. PRs use verification instead. |
 | `ai-control-mesh-test` | Deploys one exact distribution with Compose and runs smoke tests. Successful branch builds queue this job when `RUN_DEPLOYMENT_TESTS` is enabled. |
 | `ai-control-mesh-distribute` | Explicitly promotes one tested distribution to `pi`, `github`, or `both`. No automatic release trigger. |
+| `ai-control-mesh-screenshots` | Recreates `docs/screenshots` for one branch from the demo. Manual only: no branch builds by itself. See [Screenshots](#screenshots). |
 
 Multibranch indexing runs every five minutes. It finds new branches, PRs and
 commits without a public webhook. Branches with an open origin PR are verified
@@ -73,6 +74,26 @@ preserves their build records. It creates or refreshes the two multibranch jobs,
 updates the two operations jobs to Pipeline from SCM, and indexes branches.
 It refuses to migrate a running job or overwrite an existing legacy backup.
 Run it again after merging to update the operations jobs to `master`.
+
+## Screenshots
+
+Open the branch in `ai-control-mesh-screenshots` and use **Build with Parameters**.
+The first build of a new branch has no parameter form yet; it runs with the defaults.
+
+| Parameter | Meaning |
+| --- | --- |
+| `NAMES` | Only these screenshots, as `capture.mjs` names them, comma separated (`terminals,terminals-dark`). Empty takes every one. |
+| `PUSH` | Commit the changed screenshots to the branch as "Update the screenshots" and push them with the `github-ci` credential. Nothing is pushed when no screenshot changed. |
+
+The job runs `pipelines/screenshots/run.py`. It copies the checkout into a
+disposable `mcr.microsoft.com/playwright` container, pinned to the
+`playwright-core` release that drives its browser. Inside the container it
+installs the server, builds the console, runs `demo.py --capture` and copies the
+PNGs back. The demo's ports stay inside the container, so the job never meets a
+server on the agent. The build archives every screenshot and
+`screenshots-changed.txt`, the list of those that changed. The agent needs
+Podman and network access to the image registry, npm and PyPI. Run the same by
+hand with `python3 pipelines/screenshots/run.py . [--names ...]`.
 
 ## Distributions and promotion
 
