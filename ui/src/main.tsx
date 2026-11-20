@@ -9,6 +9,7 @@ import { App } from "./App";
 import { ToastProvider } from "./hooks";
 import { RestartProvider } from "./components/Restart";
 import { ApiError } from "./api";
+import { watchIdle } from "./idle";
 
 const queryClient: QueryClient = new QueryClient({
   defaultOptions: { queries: { retry: (count, error) => !(error instanceof ApiError && error.status === 401) && count < 1, refetchOnWindowFocus: true } },
@@ -19,6 +20,9 @@ const queryClient: QueryClient = new QueryClient({
     },
   }),
 });
+
+// Pause the polls while nobody is using the console, refreshing once a minute instead (idle.ts).
+watchIdle(queryClient);
 
 // A console loaded before the server's last update asks for chunks (mermaid.js, the terminal) that the
 // rebuild replaced. Reload once to get the new build; the flag stops a loop if the chunk really is missing.
