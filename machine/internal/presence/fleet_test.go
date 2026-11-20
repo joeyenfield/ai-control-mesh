@@ -238,7 +238,11 @@ func TestPresenceAnswersContainerRequests(t *testing.T) {
 	if described == nil || described["enabled"] != false || (described["cli"] != "docker" && described["cli"] != "podman") {
 		t.Fatalf("hello containers %v", hello["containers"])
 	}
+	// An update (the accounts check finishing, say) can arrive before the answer.
 	answer := next()
+	for answer["type"] == "update" {
+		answer = next()
+	}
 	if answer["type"] != "container_result" || answer["request"] != "r7" || answer["ok"] != false || !strings.Contains(answer["error"].(string), "agent-machine containers on") {
 		t.Fatalf("answer %v", answer)
 	}
