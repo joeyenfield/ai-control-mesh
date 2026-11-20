@@ -85,6 +85,9 @@ class Terminal:
     # reconnects with an offset at or after it gets only what it missed. None: nobody resumes.
     contiguous_from: int | None = 0
     host: Any = None
+    # Whether the connected launcher said it ends the agent on a kill message. Launchers before 2.1.69 don't
+    # say: 2.1.68 ends it anyway, older ones ignore it.
+    can_kill: bool = False
     # Who each viewer is, so they can be dropped when the session stops being shared with them.
     watchers: dict[asyncio.Queue, Any] = field(default_factory=dict)
     # Viewers type into the agent concurrently; their messages go to the launcher one at a time.
@@ -115,6 +118,9 @@ class TerminalHub:
     def __init__(self, sessions: SessionStore):
         self.sessions = sessions
         self.terminals: dict[str, Terminal] = {}
+        # How long a kill sent to a launcher that didn't say it can kill gets before the viewer hears it was ignored.
+        self.kill_wait = 5.0
+        self._pending: set[asyncio.Future] = set()
         # Whether a session's terminal output is recorded (retention.py's capture policy); None: always.
         self.capture: Any = None
 
@@ -190,6 +196,7 @@ class TerminalHub:
             # A reconnecting launcher replaces a connection the proxy hasn't noticed is dead.
             asyncio.ensure_future(_close_quietly(terminal.host))
         terminal.host = host
+        terminal.can_kill = hello.get("kill") is True
         terminal.cols, terminal.rows = _size(hello, terminal)
         terminal.command = str(hello.get("command") or terminal.command or "") or None
         terminal.ended_at = None
@@ -301,20 +308,38 @@ class TerminalHub:
             return "The agent's terminal isn't connected."
         return None
 
-    async def kill(self, terminal: Terminal) -> str | None:
+    async def kill(self, terminal: Terminal, viewer: asyncio.Queue | None = None) -> str | None:
         """Ask the launcher to kill the agent (the console's Kill button). Returns why it couldn't, or None.
 
-        The launcher kills the agent's process group and then reports its exit as usual; an older
-        launcher ignores the message, so the agent keeps running there.
+        The launcher kills the agent's process group and then reports its exit as usual. A launcher
+        that didn't say it can (before 2.1.69) still gets the message, since 2.1.68 handles it; if the
+        agent is still running a little later, the launcher was older and the viewer is told.
         """
         if terminal.host is None:
             return "The agent's terminal isn't connected." if terminal.ended_at is None else "The agent has exited."
+        host = terminal.host
         try:
             async with terminal.host_lock:
-                await terminal.host.send_text(json.dumps({"type": "kill"}))
+                await host.send_text(json.dumps({"type": "kill"}))
         except Exception:  # noqa: BLE001 - the host's handler notices the dead connection and detaches it
             return "The agent's terminal isn't connected."
+        if not terminal.can_kill and viewer is not None:
+            task = asyncio.ensure_future(self._explain_ignored_kill(terminal, host, viewer))
+            # Held so the task isn't collected before it runs.
+            self._pending.add(task)
+            task.add_done_callback(self._pending.discard)
         return None
+
+    async def _explain_ignored_kill(self, terminal: Terminal, host: Any, viewer: asyncio.Queue) -> None:
+        await asyncio.sleep(self.kill_wait)
+        if terminal.host is host and terminal.ended_at is None:
+            try:
+                viewer.put_nowait({"type": "error", "message": (
+                    "The agent is still running: it was started by an agent launcher older than 2.1.68, which can't "
+                    "end it from the console. End it on its computer, and update agent there so the next ones can be."
+                )})
+            except asyncio.QueueFull:
+                pass
 
     async def close_all(self) -> None:
         """Before a restart: launchers reconnect and resend what's missing, viewers reconnect too."""

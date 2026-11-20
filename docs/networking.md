@@ -271,7 +271,7 @@ A shared terminal has one host (the launcher) and any number of viewers (console
 | launcher → server | text `{"type": "exit", "status": n}` | The agent exited |
 | agent-proxy → server | text `{"type": "token", "token": "…"}` | Its new access token, before the one the socket opened with expires (also every minute) |
 | server → launcher | text `{"type": "input", "parts": ["text", "\r"]}` | A viewer's input, typed in as separate writes a short gap apart |
-| server → launcher | text `{"type": "kill"}` | A viewer pressed **Kill**: the launcher kills the agent's process group at once (TerminateProcess on Windows), then sends its `exit` as usual. Older launchers ignore it |
+| server → launcher | text `{"type": "kill"}` | A viewer pressed **Kill**: the launcher kills the agent's process group at once (TerminateProcess on Windows), then sends its `exit` as usual. A launcher says it handles this with `"kill": true` in its hello (2.1.69 and later). One that doesn't still gets it; if its agent hasn't exited a few seconds later, the viewer gets an `error` |
 
 **Viewer: `WS /api/terminals/<id>/view`**:
 

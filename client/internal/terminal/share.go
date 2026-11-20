@@ -193,7 +193,8 @@ func (s *Share) stream() error {
 	s.history.mu.Lock()
 	cols, rows := s.cols, s.rows
 	s.history.mu.Unlock()
-	hello, _ := json.Marshal(map[string]any{"type": "hello", "cols": cols, "rows": rows, "command": s.Command})
+	// "kill": this launcher ends the agent on a {"type": "kill"}; the server tells viewers of an older one it can't.
+	hello, _ := json.Marshal(map[string]any{"type": "hello", "cols": cols, "rows": rows, "command": s.Command, "kill": true})
 	// A refusing server may close before the hello is even read.
 	_ = conn.WriteMessage(websocket.TextMessage, hello)
 	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
