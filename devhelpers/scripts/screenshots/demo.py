@@ -995,6 +995,12 @@ def share_terminals() -> None:
 
     threading.Thread(target=spin, daemon=True).start()
 
+    # A launcher that dropped without the agent exiting: listed as not connected, with Move to finished and Delete.
+    _, dropped, _ = start("qwen", "qwen3.6:35b", "laptop", "mobile-app", (90, 24), {"hostname": "ai-laptop", "machine_name": "ai-laptop"})
+    dropped.append(b"> Add pull to refresh on the orders screen\r\n\r\nReading src/screens/Orders.tsx\r\n")
+    time.sleep(0.5)
+    dropped.socket.close()
+
     finished_id, finished, share = start("codex", "gpt-oss:20b", "desktop", "cli-tools", (90, 24), {"machine": "ai-desktop", "machine_name": "ai-desktop"})
     finished.append(b"> Rename the --out flag to --output\r\n\r\nUpdated 3 files. All 41 tests pass.\r\n")
     time.sleep(1)
