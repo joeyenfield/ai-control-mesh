@@ -88,7 +88,7 @@ strong { font-weight: 650; color: var(--text); }
 pre { overflow-x: auto; padding: 23px 20px; margin: 0; font-size: 13px; line-height: 2.1; color: var(--mint); }
 pre code { font-size: inherit; }
 /* Quickstart: the level cards at the top pick one whole guide (Basic, Intermediate, Advanced,
-   Professional); inside a guide, tabs and switches (engine, where models run, your terminal) pick
+   Professional, Agent only); inside a guide, tabs and switches (engine, where models run, your terminal) pick
    its command block and the words that go with it. Radios and :has() do it all, so the choices
    work without JavaScript; only copying needs it. A choice is a radio with an opt-<choice> class,
    and what belongs to another choice of the same switch (when-<other>) is hidden while it is checked. */
@@ -96,6 +96,7 @@ pre code { font-size: inherit; }
 .quickstart-page:has(#lvl-intermediate:checked) .qs-guide:not(.guide-intermediate),
 .quickstart-page:has(#lvl-advanced:checked) .qs-guide:not(.guide-advanced),
 .quickstart-page:has(#lvl-professional:checked) .qs-guide:not(.guide-professional),
+.quickstart-page:has(#lvl-agent-only:checked) .qs-guide:not(.guide-agent-only),
 .qs-guide:has(.opt-one:checked) .when-local, .qs-guide:has(.opt-local:checked) .when-one,
 .qs-guide:has(.opt-docker:checked) .when-podman, .qs-guide:has(.opt-podman:checked) .when-docker,
 .qs-guide:has(.opt-cpu:checked) .when-gpu, .qs-guide:has(.opt-gpu:checked) .when-cpu,
@@ -123,6 +124,26 @@ pre code { font-size: inherit; }
 .qs-level-grid input:checked + .qs-level::after { content: "Your guide ↓"; position: absolute; top: 20px; right: 20px; font: 10px/1.6 var(--mono); letter-spacing: .06em; color: var(--mint); }
 .qs-level-grid input:focus-visible + .qs-level { outline: 2px solid var(--lavender); outline-offset: 3px; }
 .qs-guide > .quickstart { border-top: 1px solid var(--line); }
+/* Agent only spans the row under the four levels: it joins a server rather than setting one up. */
+.qs-level-wide { grid-column: 1 / -1; }
+@media (min-width: 851px) {
+  .qs-level-wide { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 28px; row-gap: 6px; align-items: baseline; padding-right: 150px; }
+  .qs-level-wide .qs-level-tag { grid-row: 1 / 3; }
+  .qs-level-wide strong { grid-column: 2; }
+  .qs-level-wide .qs-level-about { grid-column: 2; }
+  .qs-level-wide small, .qs-level-wide small:first-of-type { grid-column: 3; margin: 0; padding: 0; border: 0; white-space: nowrap; }
+  .qs-level-wide small:first-of-type { grid-row: 1; }
+}
+/* Each guide ends with how to stop or remove what it set up, apart from its steps. */
+.qs-remove-section { display: grid; grid-template-columns: .85fr 1.15fr; gap: 72px; border-top: 1px solid var(--line); }
+.qs-remove-copy > p:not(.eyebrow) { margin-top: 18px; font-size: 14px; }
+.qs-remove-copy .text-link { display: flex; width: fit-content; margin-top: 18px; }
+.qs-remove-section .qs-remove-box { margin-top: 0; }
+.qs-remove-follows { border-top: 0; padding-inline: 0; color: var(--muted); }
+.qs-toc-remove { margin-top: 18px; font-size: 14px; color: var(--muted); }
+.qs-toc-remove a { color: var(--mint); display: inline-flex; min-height: 44px; align-items: center; }
+@media (max-width: 1100px) { .qs-remove-section { gap: 40px; } }
+@media (max-width: 850px) { .qs-remove-section { grid-template-columns: 1fr; gap: 24px; } }
 /* A guide opens with the list of its steps, each a link to the step. */
 .qs-toc-section { padding-block: 8px 56px; }
 .qs-toc-section h2 { margin-bottom: 26px; }
@@ -551,6 +572,11 @@ h2 { font-size: clamp(28px, 3vw, 38px); }
 .coaching-preview img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
 .coaching-preview figcaption { padding: 12px 16px; font-size: 12px; color: var(--muted); }
 .coaching-preview figcaption a { color: var(--mint); display: inline-flex; min-height: 44px; align-items: center; }
+/* The coaching page's lists of checks and tables: compact, without the browser's large indent. */
+.check-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.check-list li { margin-bottom: 8px; }
+.check-list strong { color: var(--text); font-weight: 600; }
+#custom .code-window { max-width: 900px; margin-bottom: 32px; }
 .callout { margin-top: 20px; }
 .tinted .section-note { margin-top: 20px; }
 .product-gallery { grid-template-columns: 1fr 1fr; gap: 20px; }

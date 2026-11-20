@@ -167,29 +167,13 @@ try {
       }
     }
     if (pagePath === '/quickstart.html') {
-    assert.equal(await page.locator('#agent-only-title').evaluate(element => getComputedStyle(element).display), 'block');
     const pick = async (...ids) => { for (const id of ids) await page.locator(`label[for="${id}"]`).click(); };
     const copy = page.locator('[data-copy-shown="qs-cmd"]:visible');
     const removeCopy = page.locator('[data-copy-shown="qs-remove-cmd"]:visible');
-    const status = page.locator('.qs-guide:visible .copy-status');
+    const status = page.locator('.qs-guide:visible .quickstart .copy-status');
     // The page opens on Basic, one container, Docker, Linux or macOS.
     // Verify both clipboard outcomes without depending on the OS clipboard.
     await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.copiedCommand = text; } } }));
-    for (const state of ['keep', 'purge']) {
-      await page.locator(`label[for="agent-${state}"]`).click();
-      for (const platform of ['unix', 'windows']) {
-        await page.locator(`[data-copy-shown="agent-remove-${platform}"]`).click();
-        const removal = await page.evaluate(() => window.copiedCommand);
-        assert.ok(removal.includes(platform === 'unix' ? '--only agent' : '-Only agent'));
-        assert.equal(removal.includes(platform === 'unix' ? '--purge' : '-Purge'), state === 'purge');
-      }
-    }
-    await page.locator('label[for="agent-keep"]').click();
-    for (const [id, option] of [['agent-only-unix', '--only agent --no-tray'], ['agent-only-windows', '-Only agent -NoTray']]) {
-      await page.locator(`[data-copy="${id}"]`).click();
-      assert.ok((await page.evaluate(() => window.copiedCommand)).includes(option));
-      assert.match(await page.locator('#agent-only .copy-status').textContent(), /Commands copied/);
-    }
     await copy.click();
     const copied = await page.evaluate(() => window.copiedCommand);
     assert.ok(copied.startsWith('docker run -d --name mesh --pull=always \\') && copied.endsWith('docker logs mesh'), copied);
@@ -218,11 +202,13 @@ try {
       ['professional', ['p-cloud'], 'helm install mesh ', 'values-cloud.yaml'],
       ['professional', ['p-onprem'], 'helm install mesh ', 'values-onprem.yaml'],
       ['professional', ['p-single'], 'helm install mesh ', '--set auth.host=auth.example.com'],
+      ['agent-only', ['o-windows'], '& ([scriptblock]::Create((irm https://api.example.com/install.ps1)))', '-Only agent -NoTray'],
+      ['agent-only', ['o-unix'], 'curl -fsSL https://api.example.com/install.sh', '--only agent --no-tray'],
       ['basic', ['b-one', 'b-docker', 'b-unix'], 'docker run -d --name mesh --pull=always \\', 'docker logs mesh'],
     ]) {
       const name = `${level}/${choices.join('/')}`;
       await pick(`lvl-${level}`, ...choices);
-      const dataPrefix = { basic: 'b', intermediate: 'i', advanced: 'a', professional: 'p' }[level];
+      const dataPrefix = { basic: 'b', intermediate: 'i', advanced: 'a', professional: 'p', 'agent-only': 'o' }[level];
       await page.locator(`label[for="${dataPrefix}-keep"]`).click();
       assert.equal(await page.locator('.qs-guide:visible').count(), 1, `${name} shows one guide`);
       assert.equal(await page.locator(`.guide-${level}`).isVisible(), true, `${name} shows its own guide`);
@@ -235,6 +221,10 @@ try {
       const numbers = await page.locator('.qs-guide:visible .step-number').allTextContents();
       assert.deepEqual(numbers, listed.map((hash, index) => String(index + 1)), `${name} numbers its steps from 1`);
       for (const hash of listed) assert.equal(await page.locator(hash).isVisible(), true, `${name} lists ${hash}`);
+      // Setting up and removing are separate: the removal commands sit in the guide's own Remove section, linked from its step list.
+      assert.equal(await page.locator(`#${level}-remove`).isVisible(), true, `${name} has a Remove section`);
+      assert.equal(await page.locator(`#${level}-remove .qs-remove-cmd:visible`).count(), 1, `${name} removal is in its Remove section`);
+      assert.equal(await page.locator(`.guide-${level} .qs-toc-remove a[href="#${level}-remove"]`).isVisible(), true, `${name} links its Remove section`);
       assert.equal(await page.locator('#b-podman-setup').isVisible(), level === 'basic' && choices.includes('b-podman'));
       assert.equal(await page.locator('#b-clear-docker').isVisible(), level === 'basic' && choices.includes('b-one') && choices.includes('b-docker'));
       assert.equal(await page.locator('#b-clear-podman').isVisible(), level === 'basic' && choices.includes('b-one') && choices.includes('b-podman'));
@@ -259,7 +249,8 @@ try {
         await page.locator(`label[for="${dataPrefix}-purge"]`).click();
         const purge = await page.locator('.qs-remove-cmd:visible code').textContent();
         assert.notEqual(purge, keep, `${name} has a purge command`);
-        assert.ok(purge.includes(level === 'intermediate' ? 'down -v' : 'kubectl delete namespace mesh'));
+        const purgeWord = { intermediate: 'down -v', 'agent-only': choices.includes('o-windows') ? '-Only agent -Purge' : '--only agent --purge' }[level] ?? 'kubectl delete namespace mesh';
+        assert.ok(purge.includes(purgeWord), `${name}: ${purge}`);
         await removeCopy.click();
         assert.equal(await page.evaluate(() => getSelection().toString().trim()), purge.trim());
         await page.locator(`label[for="${dataPrefix}-keep"]`).click();

@@ -25,7 +25,7 @@
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=a19894fe72">
+  <link rel="stylesheet" href="/styles.css?v=6a9d475a20">
   <script src="/site.js?v=35d7912c1a" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Quickstart","url":"https://aicontrolmesh.com/quickstart.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
@@ -48,45 +48,23 @@
   </header>
 <main id="main" class="detail-page quickstart-page">
 
-  <section class="page-intro wrap"><p class="eyebrow">Quickstart / On your computer</p><h1>Run your first agent.<br><span>See it in the console.</span></h1><p class="hero-lede">Connect your computer to an existing server with just the agent command, or host your own mesh. The server setup guides walk you through signing in, connecting a model provider, starting an agent and inspecting its requests. Start with Basic for one computer; choose Professional for production deployment guidance.</p></section>
-  <nav class="page-nav wrap" aria-label="On this page"><a href="#agent-only">Install only the agent</a><a href="#quickstart">Set up a server</a><a href="#steps">Your guide</a></nav>
-
-  <section class="quickstart section wrap" id="agent-only" aria-labelledby="agent-only-title">
-    <div class="quickstart-copy">
-      <p class="eyebrow">Already have a server?</p>
-      <h2 id="agent-only-title">Install just the <code>agent</code> command.</h2>
-      <p>Run coding agents from your own project folders and send their traffic to an existing AI Control Mesh server. Install the launcher and its local proxy on your laptop or desktop. The server, console and model providers stay on your existing deployment.</p>
-      <p>Replace <code>https://api.example.com</code> with your server's API address. The installer checks the download and prints a sign-in link and code. You need an account on that server.</p>
-      <p class="qs-note">These commands skip the optional tray icon. They do not install the server or <code>agent-machine</code>, or register your computer in the fleet. Native builds need no Docker or Python.</p>
-      <p>After signing in, run <code>agent --list</code> to see the available agents. Install the coding agent you want to use, then launch it from a project folder, for example <code>agent codex-account .</code> with your own Codex sign-in.</p>
-      <a class="text-link" href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/running-agents.md#installing-only-the-agent-command">Agent-only installation guide →</a>
-    </div>
-    <div class="quickstart-install">
-      <div class="code-window">
-        <div class="code-toolbar"><span class="mono">LINUX / MACOS / FREEBSD</span><button class="copy-button" type="button" data-copy="agent-only-unix" hidden>Copy command</button></div>
-        <pre tabindex="0" aria-label="Install only the agent command on Linux, macOS or FreeBSD"><code id="agent-only-unix">curl -fsSL https://api.example.com/install.sh | sh -s -- --only agent --no-tray</code></pre>
-        <div class="code-toolbar"><span class="mono">WINDOWS POWERSHELL</span><button class="copy-button" type="button" data-copy="agent-only-windows" hidden>Copy command</button></div>
-        <pre tabindex="0" aria-label="Install only the agent command on Windows"><code id="agent-only-windows">&amp; ([scriptblock]::Create((irm https://api.example.com/install.ps1))) -Only agent -NoTray</code></pre>
-      </div>
-<div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="agent-data" id="agent-keep" checked><label for="agent-keep">Keep data</label><input type="radio" name="agent-data" id="agent-purge"><label for="agent-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT / LINUX / MACOS / FREEBSD</span><button class="copy-button" type="button" data-copy-shown="agent-remove-unix" hidden>Copy commands</button></div><pre class="agent-remove-unix when-keep-data" tabindex="0" aria-label="Uninstall agent: Linux / macOS / FreeBSD, keep data"><code>curl -fsSL https://api.example.com/uninstall.sh | sh -s -- --only agent</code></pre><pre class="agent-remove-unix when-purge-data" tabindex="0" aria-label="Uninstall agent: Linux / macOS / FreeBSD, purge data"><code>curl -fsSL https://api.example.com/uninstall.sh | sh -s -- --only agent --purge</code></pre><div class="code-toolbar"><span class="mono">REMOVE IT / WINDOWS POWERSHELL</span><button class="copy-button" type="button" data-copy-shown="agent-remove-windows" hidden>Copy commands</button></div><pre class="agent-remove-windows when-keep-data" tabindex="0" aria-label="Uninstall agent: Windows PowerShell, keep data"><code>&amp; ([scriptblock]::Create((irm https://api.example.com/uninstall.ps1))) -Only agent</code></pre><pre class="agent-remove-windows when-purge-data" tabindex="0" aria-label="Uninstall agent: Windows PowerShell, purge data"><code>&amp; ([scriptblock]::Create((irm https://api.example.com/uninstall.ps1))) -Only agent -Purge</code></pre><p class="qs-note">Replace https://api.example.com with your server’s API address. Purge data revokes local sign-ins and deletes local settings.</p></div>
-      <p class="copy-status" role="status" aria-live="polite"></p>
-      <p class="qs-note">In your server's console, open <strong>Downloads → Only the agent command</strong> to get the command with the correct address. To sign in later, run <code>agent login https://api.example.com</code>.</p>
-    </div>
-  </section>
+  <section class="page-intro wrap"><p class="eyebrow">Quickstart / On your computer</p><h1>Run your first agent.<br><span>See it in the console.</span></h1><p class="hero-lede">Host your own mesh, or connect your computer to a server you already have. Each guide has two parts: <strong>set it up</strong>, numbered steps from the first command to an agent's answer, and <strong>stop or remove it</strong>, the commands that take it away again. Start with Basic for one computer; choose Professional for production.</p></section>
+  <nav class="page-nav wrap" aria-label="On this page"><a href="#quickstart">Pick your level</a><a href="#steps">Set it up</a><a href="#agent-only">Only the agent command</a></nav>
 
   <section class="section wrap qs-levels" id="quickstart" aria-labelledby="levels-title">
-    <div class="section-heading"><p class="eyebrow">Start here</p><h2 id="levels-title">Pick your level.</h2><p>The guide below changes with your choice. Each one is numbered steps from the first command to an agent's answer.</p></div>
+    <div class="section-heading"><p class="eyebrow">Start here</p><h2 id="levels-title">Pick your level.</h2><p>The guide below changes with your choice. Each one sets it up step by step, then ends with how to stop or remove it.</p></div>
     <fieldset class="qs-level-grid"><legend>Level</legend>
       <input type="radio" name="qs-level" id="lvl-basic" value="basic" checked><label class="qs-level" for="lvl-basic"><span class="qs-level-tag">Basic</span><strong>One machine</strong><span class="qs-level-about">The whole system in a single container, or installed with no containers at all.</span><small><b>Bring:</b> Docker or Podman, or only Python</small><small>About 10 minutes</small></label>
       <input type="radio" name="qs-level" id="lvl-intermediate" value="intermediate"><label class="qs-level" for="lvl-intermediate"><span class="qs-level-tag">Intermediate</span><strong>A small fleet</strong><span class="qs-level-about">A Compose stack: the server, sign-in, PostgreSQL and two machines sharing a provider.</span><small><b>Bring:</b> Git, and Docker or Podman with Compose</small><small>About 10 minutes</small></label>
       <input type="radio" name="qs-level" id="lvl-advanced" value="advanced"><label class="qs-level" for="lvl-advanced"><span class="qs-level-tag">Advanced</span><strong>Kubernetes</strong><span class="qs-level-about">Try the server and a connected machine on a local Kubernetes cluster using Helm.</span><small><b>Bring:</b> A local cluster, kubectl and Helm</small><small>About 20 minutes</small></label>
       <input type="radio" name="qs-level" id="lvl-professional" value="professional"><label class="qs-level" for="lvl-professional"><span class="qs-level-tag">Professional</span><strong>Production</strong><span class="qs-level-about">The Helm chart for a team: your host names, HTTPS, PostgreSQL and your own secrets.</span><small><b>Bring:</b> A cluster, DNS and TLS</small><small>An afternoon</small></label>
+      <input type="radio" name="qs-level" id="lvl-agent-only" value="agent-only"><label class="qs-level qs-level-wide" for="lvl-agent-only"><span class="qs-level-tag">Agent only</span><strong>Already have a server?</strong><span class="qs-level-about">Install just the <code>agent</code> command on your computer and run coding agents through a server someone else runs. No server, no containers, no fleet machine.</span><small><b>Bring:</b> An account on that server and its address</small><small>About 2 minutes</small></label>
     </fieldset>
   </section>
 
   <div class="qs-guides" id="steps">
 <div class="qs-guide guide-basic" id="basic">
-  <section class="wrap qs-toc-section" aria-labelledby="basic-toc-title"><p class="eyebrow">Basic / 9 steps</p><h2 id="basic-toc-title">Step by step.</h2><ol class="qs-toc"><li><a href="#basic-step-1">Run one command</a></li><li><a href="#quickstart-basic-step-2">Sign in</a></li><li><a href="#quickstart-basic-step-3">Check your machine</a></li><li><a href="#quickstart-basic-step-4">Start a model server</a></li><li><a href="#quickstart-basic-step-5">Add my-machine's model server as your own provider</a></li><li><a href="#quickstart-basic-step-6">Find a model and pull it</a></li><li><a href="#quickstart-basic-step-7">Start Qwen Code on my-machine</a></li><li><a href="#quickstart-basic-step-8">Ask it something</a></li><li><a href="#quickstart-basic-step-9">See what it sent</a></li></ol></section>
+  <section class="wrap qs-toc-section" aria-labelledby="basic-toc-title"><p class="eyebrow">Basic / 9 steps</p><h2 id="basic-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#basic-step-1">Run one command</a></li><li><a href="#quickstart-basic-step-2">Sign in</a></li><li><a href="#quickstart-basic-step-3">Check your machine</a></li><li><a href="#quickstart-basic-step-4">Start a model server</a></li><li><a href="#quickstart-basic-step-5">Add my-machine's model server as your own provider</a></li><li><a href="#quickstart-basic-step-6">Find a model and pull it</a></li><li><a href="#quickstart-basic-step-7">Start Qwen Code on my-machine</a></li><li><a href="#quickstart-basic-step-8">Ask it something</a></li><li><a href="#quickstart-basic-step-9">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#basic-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
   <section class="quickstart section wrap" id="basic-step-1" aria-labelledby="basic-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>
@@ -164,23 +142,6 @@ podman logs mesh</code></pre>
           <p class="qs-note when-one when-gpu">The GPU image is the same system with the CUDA libraries for its model server, about 4 GB. Docker needs the NVIDIA Container Toolkit. With Podman, check it sees the GPU first: <code>podman run --rm --device nvidia.com/gpu=all docker.io/library/ubuntu:24.04 nvidia-smi</code>. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/gpu.md">GPU setup →</a></p>
           <p class="qs-note when-local">The installer prints the address and the <code>admin</code> password it made.<span class="when-unix"> The same command works on FreeBSD.</span></p>
         </div>
-        <div class="code-window qs-box qs-remove-box">
-          <div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="b-data" id="b-keep" checked><label for="b-keep">Keep data</label><input type="radio" name="b-data" id="b-purge"><label for="b-purge">Purge data</label></fieldset></div>
-          <div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div>
-          <pre class="qs-remove-cmd when-one when-docker when-keep-data" id="b-clear-docker" tabindex="0" aria-label="Remove the Docker demo and keep its data"><code>docker rm -f mesh</code></pre>
-          <pre class="qs-remove-cmd when-one when-docker when-purge-data" id="b-clear-docker-purge" tabindex="0" aria-label="Remove the Docker demo and its data"><code>docker rm -f mesh
-docker volume rm mesh-data mesh-home mesh-workspace</code></pre>
-          <pre class="qs-remove-cmd when-one when-podman when-keep-data" id="b-clear-podman" tabindex="0" aria-label="Remove the Podman demo and keep its data"><code>podman rm -f mesh</code></pre>
-          <pre class="qs-remove-cmd when-one when-podman when-purge-data" id="b-clear-podman-purge" tabindex="0" aria-label="Remove the Podman demo and its data"><code>podman rm -f mesh
-podman volume rm mesh-data mesh-home mesh-workspace</code></pre>
-          <pre class="qs-remove-cmd when-local when-unix when-keep-data" id="b-remove-local-unix" tabindex="0" aria-label="Uninstall the local setup and keep its data on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh</code></pre>
-          <pre class="qs-remove-cmd when-local when-unix when-purge-data" id="b-remove-local-unix-purge" tabindex="0" aria-label="Uninstall the local setup and purge its data on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh -s -- --purge</code></pre>
-          <pre class="qs-remove-cmd when-local when-windows when-keep-data" id="b-remove-local-windows" tabindex="0" aria-label="Uninstall the local setup and keep its data on Windows PowerShell"><code>irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1 | iex</code></pre>
-          <pre class="qs-remove-cmd when-local when-windows when-purge-data" id="b-remove-local-windows-purge" tabindex="0" aria-label="Uninstall the local setup and purge its data on Windows PowerShell"><code>&amp; ([scriptblock]::Create((irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1))) -Purge</code></pre>
-          <p class="qs-note when-keep-data">Saved data stays for a later run or install.</p>
-          <p class="qs-note when-one when-purge-data">The volume command deletes your settings, sign-ins, models and workspace.</p>
-          <p class="qs-note when-local when-purge-data">The purge option deletes the server's database, recordings, keys and local sign-ins. See <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/local.md#remove-it">Remove it</a>.</p>
-        </div>
         <p class="copy-status" role="status" aria-live="polite"></p>
         <p class="demo-notice"><strong>Local demo only.</strong> Its ports are bound to 127.0.0.1. Keep it on your computer: for a real deployment you need your own secrets, HTTPS host names and sign-in. <a href="#professional">The Professional level →</a></p>
       </div>
@@ -233,17 +194,40 @@ podman volume rm mesh-data mesh-home mesh-workspace</code></pre>
         </li>
     </ol>
   </section>
-  <section class="section wrap qs-steps-section" aria-labelledby="basic-next-title"><div class="section-heading"><p class="eyebrow">When you are done</p><h2 id="basic-next-title">Keep going.</h2></div>
+  <section class="section wrap qs-steps-section" aria-labelledby="basic-next-title"><div class="section-heading"><p class="eyebrow">Next</p><h2 id="basic-next-title">Keep going.</h2></div>
     <div class="detail-grid">
       <article><h3>Give it a task</h3><p>Send <em>write a Python script that prints the first ten primes</em> and watch it work. <strong>Live</strong> shows each model request as it streams; <strong>Running agents</strong> shows which agents are working or waiting for you.</p></article>
       <article><h3>Bring your own provider</h3><p>Nothing here is tied to Ollama. Add llama.cpp, Strata, Docker Model Runner or an OpenAI-compatible server on any machine, or a hosted API with a key the server keeps, and start the same agents on it.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/providers.md">Providers →</a></article>
-      <article><h3>Stop or remove it</h3><p><span class="when-one"><code>docker rm -f mesh</code> removes the container and keeps your data in its three volumes; <code>docker volume rm mesh-data mesh-home mesh-workspace</code> deletes that too.</span><span class="when-local"><code>agent-server local stop</code> stops it. <code>uninstall-local</code>, from the same address as the installer, removes it; with <code>--purge</code> your data goes too.</span></p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/local.md">Run it on your own computer →</a></article>
       <article><h3>Add a second machine</h3><p>One machine is a start. The Intermediate level runs a small fleet: two machines, PostgreSQL and a provider one machine shares with the other.</p><a href="#intermediate">The Intermediate level →</a></article>
+    </div>
+  </section>
+  <section class="section wrap qs-remove-section" id="basic-remove" aria-labelledby="basic-remove-title">
+    <div class="qs-remove-copy"><p class="eyebrow">When you are done</p><h2 id="basic-remove-title">Stop or remove it.</h2><p class="when-one">The container keeps your settings, sign-ins, models and workspace in three volumes. Removing the container keeps them for a later run; purging deletes them too.</p><p class="when-one">To stop it without removing anything, run <code class="when-docker">docker stop mesh</code><code class="when-podman">podman stop mesh</code>, and <code class="when-docker">docker start mesh</code><code class="when-podman">podman start mesh</code> to carry on.</p><p class="when-local">To stop it without removing anything, run <code>agent-server local stop</code>, or use the tray icon. <code>agent-server local start</code> starts it again.</p><p class="when-local">The uninstaller removes the server, <code>agent</code> and <code>agent-machine</code>. It keeps the database, recordings and keys unless you purge.</p><a class="text-link" href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/local.md#remove-it">Remove it, in the guide <span aria-hidden="true">→</span></a></div>
+    <div class="quickstart-install">
+        <div class="code-window qs-box qs-remove-box">
+          <div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="b-data" id="b-keep" checked><label for="b-keep">Keep data</label><input type="radio" name="b-data" id="b-purge"><label for="b-purge">Purge data</label></fieldset></div>
+          <div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div>
+          <pre class="qs-remove-cmd when-one when-docker when-keep-data" id="b-clear-docker" tabindex="0" aria-label="Remove the Docker demo and keep its data"><code>docker rm -f mesh</code></pre>
+          <pre class="qs-remove-cmd when-one when-docker when-purge-data" id="b-clear-docker-purge" tabindex="0" aria-label="Remove the Docker demo and its data"><code>docker rm -f mesh
+docker volume rm mesh-data mesh-home mesh-workspace</code></pre>
+          <pre class="qs-remove-cmd when-one when-podman when-keep-data" id="b-clear-podman" tabindex="0" aria-label="Remove the Podman demo and keep its data"><code>podman rm -f mesh</code></pre>
+          <pre class="qs-remove-cmd when-one when-podman when-purge-data" id="b-clear-podman-purge" tabindex="0" aria-label="Remove the Podman demo and its data"><code>podman rm -f mesh
+podman volume rm mesh-data mesh-home mesh-workspace</code></pre>
+          <pre class="qs-remove-cmd when-local when-unix when-keep-data" id="b-remove-local-unix" tabindex="0" aria-label="Uninstall the local setup and keep its data on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh</code></pre>
+          <pre class="qs-remove-cmd when-local when-unix when-purge-data" id="b-remove-local-unix-purge" tabindex="0" aria-label="Uninstall the local setup and purge its data on Linux, macOS or FreeBSD"><code>curl -fsSL https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.sh | sh -s -- --purge</code></pre>
+          <pre class="qs-remove-cmd when-local when-windows when-keep-data" id="b-remove-local-windows" tabindex="0" aria-label="Uninstall the local setup and keep its data on Windows PowerShell"><code>irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1 | iex</code></pre>
+          <pre class="qs-remove-cmd when-local when-windows when-purge-data" id="b-remove-local-windows-purge" tabindex="0" aria-label="Uninstall the local setup and purge its data on Windows PowerShell"><code>&amp; ([scriptblock]::Create((irm https://github.com/joeyenfield/ai-control-mesh/releases/latest/download/uninstall-local.ps1))) -Purge</code></pre>
+          <p class="qs-note when-keep-data">Saved data stays for a later run or install.</p>
+          <p class="qs-note when-one when-purge-data">The volume command deletes your settings, sign-ins, models and workspace.</p>
+          <p class="qs-note when-local when-purge-data">The purge option deletes the server's database, recordings, keys and local sign-ins. See <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/local.md#remove-it">Remove it</a>.</p>
+        </div>
+        <p class="qs-note qs-remove-follows">The commands follow the choices you made in step 1.</p>
+        <p class="copy-status" role="status" aria-live="polite"></p>
     </div>
   </section>
 </div>
 <div class="qs-guide guide-intermediate" id="intermediate">
-  <section class="wrap qs-toc-section" aria-labelledby="intermediate-toc-title"><p class="eyebrow">Intermediate / 8 steps</p><h2 id="intermediate-toc-title">Step by step.</h2><ol class="qs-toc"><li><a href="#intermediate-step-1">Start the stack</a></li><li><a href="#quickstart-step-2">Sign in</a></li><li><a href="#quickstart-step-3">Check the machines</a></li><li><a href="#quickstart-step-4">Add machine-1's model server as your own provider</a></li><li><a href="#quickstart-step-5">Find a model and pull it</a></li><li><a href="#quickstart-step-6">Start Qwen Code on machine-1</a></li><li><a href="#quickstart-step-7">Ask it something</a></li><li><a href="#quickstart-step-8">See what it sent</a></li></ol></section>
+  <section class="wrap qs-toc-section" aria-labelledby="intermediate-toc-title"><p class="eyebrow">Intermediate / 8 steps</p><h2 id="intermediate-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#intermediate-step-1">Start the stack</a></li><li><a href="#quickstart-step-2">Sign in</a></li><li><a href="#quickstart-step-3">Check the machines</a></li><li><a href="#quickstart-step-4">Add machine-1's model server as your own provider</a></li><li><a href="#quickstart-step-5">Find a model and pull it</a></li><li><a href="#quickstart-step-6">Start Qwen Code on machine-1</a></li><li><a href="#quickstart-step-7">Ask it something</a></li><li><a href="#quickstart-step-8">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#intermediate-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
   <section class="quickstart section wrap" id="intermediate-step-1" aria-labelledby="intermediate-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>
@@ -275,7 +259,6 @@ podman compose -f deploy/compose/quickstart/compose.yaml -f deploy/compose/quick
           <p class="qs-note when-podman">Podman needs a Compose provider (<code>podman compose version</code>). On Windows and macOS, run <code>podman machine init</code> once, then <code>podman machine start</code>.</p>
           <p class="qs-note when-gpu">The GPU file gives the model server your NVIDIA GPUs, so models answer much faster. Use it every time you start the stack. Docker needs the NVIDIA Container Toolkit with CDI on. With Podman, check it sees the GPU first: <code>podman run --rm --device nvidia.com/gpu=all docker.io/library/ubuntu:24.04 nvidia-smi</code>. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/gpu.md">GPU setup →</a></p>
         </div>
-        <div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="i-data" id="i-keep" checked><label for="i-keep">Keep data</label><input type="radio" name="i-data" id="i-purge"><label for="i-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div><pre class="qs-remove-cmd when-docker when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>docker compose -f deploy/compose/quickstart/compose.yaml down</code></pre><pre class="qs-remove-cmd when-docker when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>docker compose -f deploy/compose/quickstart/compose.yaml down -v</code></pre><pre class="qs-remove-cmd when-podman when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>podman compose -f deploy/compose/quickstart/compose.yaml down</code></pre><pre class="qs-remove-cmd when-podman when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>podman compose -f deploy/compose/quickstart/compose.yaml down -v</code></pre><p class="qs-note">Purge data deletes the stack’s named volumes, including settings, sign-ins, models and workspaces. Run from the repository folder used above.</p></div>
         <p class="copy-status" role="status" aria-live="polite"></p>
         <p class="demo-notice"><strong>Local demo only.</strong> Its ports are bound to 127.0.0.1. Keep it on your computer: for a real deployment you need your own secrets, HTTPS host names and sign-in. <a href="#professional">The Professional level →</a></p>
       </div>
@@ -324,19 +307,26 @@ podman compose -f deploy/compose/quickstart/compose.yaml -f deploy/compose/quick
         </li>
     </ol>
   </section>
-  <section class="section wrap qs-steps-section" aria-labelledby="intermediate-next-title"><div class="section-heading"><p class="eyebrow">When you are done</p><h2 id="intermediate-next-title">Keep going.</h2></div>
+  <section class="section wrap qs-steps-section" aria-labelledby="intermediate-next-title"><div class="section-heading"><p class="eyebrow">Next</p><h2 id="intermediate-next-title">Keep going.</h2></div>
     <div class="detail-grid">
       <article><h3>Give it a task</h3><p>Send <em>write a Python script that prints the first ten primes</em> and watch it work. <strong>Live</strong> shows each model request as it streams; <strong>Running agents</strong> shows which agents are working or waiting for you.</p></article>
       <article><h3>Read it back</h3><p><strong>Sessions</strong> has one row per agent run, with a <strong>Chat</strong> view when capture is on. <strong>Traffic</strong> groups requests by what they were for.</p></article>
       <article><h3>Bring your own provider</h3><p>Nothing here is tied to Ollama. Add llama.cpp, Strata, Docker Model Runner or an OpenAI-compatible server on any machine, or a hosted API with a key the server keeps, and start the same agents on it.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/providers.md">Providers →</a></article>
       <article><h3>Use machine-2</h3><p>Start an agent on <strong>machine-2</strong> with the same provider: it has no model server of its own, and reaches machine-1's through the server.</p></article>
-      <article><h3>Stop, reset or troubleshoot</h3><p><code>compose down</code> stops it and keeps your data; <code>down -v</code> deletes it too. The guide lists what to check when something doesn't start.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/quickstart.md#stop-reset-and-troubleshoot">Stop, reset and troubleshoot →</a></article>
       <article><h3>On a cluster</h3><p>The Advanced level runs the same system from its Helm chart on a local Kubernetes cluster, with a machine you approve yourself.</p><a href="#advanced">The Advanced level →</a></article>
+    </div>
+  </section>
+  <section class="section wrap qs-remove-section" id="intermediate-remove" aria-labelledby="intermediate-remove-title">
+    <div class="qs-remove-copy"><p class="eyebrow">When you are done</p><h2 id="intermediate-remove-title">Stop or remove it.</h2><p>Run the commands from the <code>ai-control-mesh</code> folder you cloned. Taking the stack down keeps your data in its volumes for the next <code>up</code>; purging deletes the database, sign-ins and models too.</p><p>To stop it without removing anything, run <code class="when-docker">docker compose -f deploy/compose/quickstart/compose.yaml stop</code><code class="when-podman">podman compose -f deploy/compose/quickstart/compose.yaml stop</code>. Delete the folder afterwards if you no longer need it.</p><a class="text-link" href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/quickstart.md#stop-reset-and-troubleshoot">Stop, reset and troubleshoot <span aria-hidden="true">→</span></a></div>
+    <div class="quickstart-install">
+        <div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="i-data" id="i-keep" checked><label for="i-keep">Keep data</label><input type="radio" name="i-data" id="i-purge"><label for="i-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div><pre class="qs-remove-cmd when-docker when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>docker compose -f deploy/compose/quickstart/compose.yaml down</code></pre><pre class="qs-remove-cmd when-docker when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>docker compose -f deploy/compose/quickstart/compose.yaml down -v</code></pre><pre class="qs-remove-cmd when-podman when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>podman compose -f deploy/compose/quickstart/compose.yaml down</code></pre><pre class="qs-remove-cmd when-podman when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>podman compose -f deploy/compose/quickstart/compose.yaml down -v</code></pre><p class="qs-note">Purge data deletes the stack’s named volumes, including settings, sign-ins, models and workspaces. Run from the repository folder used above.</p></div>
+        <p class="qs-note qs-remove-follows">The commands follow the choices you made in step 1.</p>
+        <p class="copy-status" role="status" aria-live="polite"></p>
     </div>
   </section>
 </div>
 <div class="qs-guide guide-advanced" id="advanced">
-  <section class="wrap qs-toc-section" aria-labelledby="advanced-toc-title"><p class="eyebrow">Advanced / 9 steps</p><h2 id="advanced-toc-title">Step by step.</h2><ol class="qs-toc"><li><a href="#advanced-step-1">Install the chart</a></li><li><a href="#quickstart-helm-step-2">Forward the two ports</a></li><li><a href="#quickstart-helm-step-3">Read the password and sign in</a></li><li><a href="#quickstart-helm-step-4">Let the machine in</a></li><li><a href="#quickstart-helm-step-5">Add k8s-machine's model server as your own provider</a></li><li><a href="#quickstart-helm-step-6">Find a model and pull it</a></li><li><a href="#quickstart-helm-step-7">Start Qwen Code on k8s-machine</a></li><li><a href="#quickstart-helm-step-8">Ask it something</a></li><li><a href="#quickstart-helm-step-9">See what it sent</a></li></ol></section>
+  <section class="wrap qs-toc-section" aria-labelledby="advanced-toc-title"><p class="eyebrow">Advanced / 9 steps</p><h2 id="advanced-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#advanced-step-1">Install the chart</a></li><li><a href="#quickstart-helm-step-2">Forward the two ports</a></li><li><a href="#quickstart-helm-step-3">Read the password and sign in</a></li><li><a href="#quickstart-helm-step-4">Let the machine in</a></li><li><a href="#quickstart-helm-step-5">Add k8s-machine's model server as your own provider</a></li><li><a href="#quickstart-helm-step-6">Find a model and pull it</a></li><li><a href="#quickstart-helm-step-7">Start Qwen Code on k8s-machine</a></li><li><a href="#quickstart-helm-step-8">Ask it something</a></li><li><a href="#quickstart-helm-step-9">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#advanced-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
   <section class="quickstart section wrap" id="advanced-step-1" aria-labelledby="advanced-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>
@@ -360,8 +350,6 @@ kubectl -n mesh get pods -w</code></pre>
           <p class="qs-note">Keep the release name <code>mesh</code>: the machine's relays name its Services. The last command watches the pods: go on when both are <code>Running</code> (the first pull takes a few minutes), and stop it with Ctrl+C.</p>
           <p class="qs-note when-gpu">This quickstart runs its model server on the CPU. To give it a GPU, add a <code>nvidia.com/gpu: 1</code> limit to the <code>ollama</code> container in <code>deploy/helm/quickstart/machine.yaml</code>; the cluster needs the NVIDIA device plugin.</p>
         </div>
-        <div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="a-data" id="a-keep" checked><label for="a-keep">Keep data</label><input type="radio" name="a-data" id="a-purge"><label for="a-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div><pre class="qs-remove-cmd  when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>kubectl -n mesh delete deployment quickstart-machine
-helm uninstall mesh -n mesh</code></pre><pre class="qs-remove-cmd  when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>kubectl delete namespace mesh</code></pre><p class="qs-note">Keep data retains the persistent volumes and generated secrets. Purge data deletes everything in the mesh namespace. Storage with a Retain reclaim policy needs separate deletion.</p></div>
         <p class="copy-status" role="status" aria-live="polite"></p>
         <p class="demo-notice"><strong>Local demo only.</strong> Its ports are bound to 127.0.0.1. Keep it on your computer: for a real deployment you need your own secrets, HTTPS host names and sign-in. <a href="#professional">The Professional level →</a></p>
       </div>
@@ -426,17 +414,25 @@ kubectl -n mesh port-forward svc/mesh-agent-mesh-auth 20000:20000</code></pre></
         </li>
     </ol>
   </section>
-  <section class="section wrap qs-steps-section" aria-labelledby="advanced-next-title"><div class="section-heading"><p class="eyebrow">When you are done</p><h2 id="advanced-next-title">Keep going.</h2></div>
+  <section class="section wrap qs-steps-section" aria-labelledby="advanced-next-title"><div class="section-heading"><p class="eyebrow">Next</p><h2 id="advanced-next-title">Keep going.</h2></div>
     <div class="detail-grid">
       <article><h3>Give it a task</h3><p>Send <em>write a Python script that prints the first ten primes</em> and watch it work. <strong>Live</strong> shows each model request as it streams; <strong>Running agents</strong> shows which agents are working or waiting for you.</p></article>
       <article><h3>Bring your own provider</h3><p>Nothing here is tied to Ollama. Add llama.cpp, Strata, Docker Model Runner or an OpenAI-compatible server on any machine, or a hosted API with a key the server keeps, and start the same agents on it.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/providers.md">Providers →</a></article>
-      <article><h3>Stop and clean up</h3><p><code>kubectl -n mesh scale deploy/mesh-agent-mesh deploy/quickstart-machine --replicas=0</code> stops it and keeps everything; <code>kubectl delete namespace mesh</code> deletes all of it.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/quickstart-kubernetes.md#stop-and-clean-up">Stop, clean up and troubleshoot →</a></article>
       <article><h3>A real cluster</h3><p>A real install changes the same things as any other: HTTPS host names, PostgreSQL, your own secrets, and machines signed in from wherever they are.</p><a href="#professional">The Professional level →</a></article>
+    </div>
+  </section>
+  <section class="section wrap qs-remove-section" id="advanced-remove" aria-labelledby="advanced-remove-title">
+    <div class="qs-remove-copy"><p class="eyebrow">When you are done</p><h2 id="advanced-remove-title">Stop or remove it.</h2><p>To stop it and keep everything, scale it to nothing: <code>kubectl -n mesh scale deploy/mesh-agent-mesh deploy/quickstart-machine --replicas=0</code>, and back to 1 to carry on.</p><p>Removing the release keeps the persistent volumes and generated secrets; purging deletes everything in the <code>mesh</code> namespace.</p><a class="text-link" href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/quickstart-kubernetes.md#stop-and-clean-up">Stop, clean up and troubleshoot <span aria-hidden="true">→</span></a></div>
+    <div class="quickstart-install">
+        <div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="a-data" id="a-keep" checked><label for="a-keep">Keep data</label><input type="radio" name="a-data" id="a-purge"><label for="a-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div><pre class="qs-remove-cmd  when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>kubectl -n mesh delete deployment quickstart-machine
+helm uninstall mesh -n mesh</code></pre><pre class="qs-remove-cmd  when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>kubectl delete namespace mesh</code></pre><p class="qs-note">Keep data retains the persistent volumes and generated secrets. Purge data deletes everything in the mesh namespace. Storage with a Retain reclaim policy needs separate deletion.</p></div>
+        <p class="qs-note qs-remove-follows">The commands follow the choices you made in step 1.</p>
+        <p class="copy-status" role="status" aria-live="polite"></p>
     </div>
   </section>
 </div>
 <div class="qs-guide guide-professional" id="professional">
-  <section class="wrap qs-toc-section" aria-labelledby="professional-toc-title"><p class="eyebrow">Professional / 7 steps</p><h2 id="professional-toc-title">Step by step.</h2><ol class="qs-toc"><li><a href="#professional-step-1">Choose a size</a></li><li><a href="#pro-step-2">Host names, TLS and routing</a></li><li><a href="#pro-step-3">Your own secrets</a></li><li><a href="#pro-step-4">The database</a></li><li><a href="#pro-step-5">Install the chart</a></li><li><a href="#pro-step-6">Sign in and add your people</a></li><li><a href="#pro-step-7">Bring your machines and your providers</a></li></ol></section>
+  <section class="wrap qs-toc-section" aria-labelledby="professional-toc-title"><p class="eyebrow">Professional / 7 steps</p><h2 id="professional-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#professional-step-1">Choose a size</a></li><li><a href="#pro-step-2">Host names, TLS and routing</a></li><li><a href="#pro-step-3">Your own secrets</a></li><li><a href="#pro-step-4">The database</a></li><li><a href="#pro-step-5">Install the chart</a></li><li><a href="#pro-step-6">Sign in and add your people</a></li><li><a href="#pro-step-7">Bring your machines and your providers</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#professional-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
   <section class="quickstart section wrap" id="professional-step-1" aria-labelledby="professional-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>
@@ -462,8 +458,6 @@ kubectl -n mesh port-forward svc/mesh-agent-mesh-auth 20000:20000</code></pre></
           <p class="qs-note when-onprem">A Deployment per role, with PostgreSQL from the CloudNativePG operator, a bundled Valkey and your S3-compatible bucket. Install the operator and Gateway API or ingress-nginx first.</p>
           <p class="qs-note">This is the command you run in step 5, from a checkout of the repository. Steps 2 to 4 come first.</p>
         </div>
-        <div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="p-data" id="p-keep" checked><label for="p-keep">Keep data</label><input type="radio" name="p-data" id="p-purge"><label for="p-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div><pre class="qs-remove-cmd  when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>helm uninstall mesh -n mesh</code></pre><pre class="qs-remove-cmd  when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>helm uninstall mesh -n mesh
-kubectl delete namespace mesh</code></pre><p class="qs-note">Purge data deletes all resources in the mesh namespace. Use a namespace dedicated to this installation. External PostgreSQL, Redis and object storage, retained persistent volumes and backups require separate cleanup in your provider; this command does not erase them.</p></div>
         <p class="copy-status" role="status" aria-live="polite"></p>
       </div>
   </section>
@@ -503,12 +497,71 @@ agent-machine start</code></pre></div>
         </li>
     </ol>
   </section>
-  <section class="section wrap qs-steps-section" aria-labelledby="professional-next-title"><div class="section-heading"><p class="eyebrow">When you are done</p><h2 id="professional-next-title">Keep going.</h2></div>
+  <section class="section wrap qs-steps-section" aria-labelledby="professional-next-title"><div class="section-heading"><p class="eyebrow">Next</p><h2 id="professional-next-title">Keep going.</h2></div>
     <div class="detail-grid">
       <article><h3>Evaluate it with your team</h3><p>What to check before a team relies on it: accounts, retention, usage limits and the audit trail.</p><a href="/teams.html#evaluation">For teams →</a></article>
       <article><h3>Security and data</h3><p>Where recordings live, what is redacted, and what leaves your network.</p><a href="/security.html">Security →</a></article>
       <article><h3>Without Kubernetes</h3><p>The same real install runs from Docker Compose: PostgreSQL, the sign-in service and the server behind your own HTTPS.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/deployment.md">Deployment →</a></article>
       <article><h3>Try it first</h3><p>Not ready for DNS and secrets? The Advanced level runs this chart in its smallest form on a local cluster.</p><a href="#advanced">The Advanced level →</a></article>
+    </div>
+  </section>
+  <section class="section wrap qs-remove-section" id="professional-remove" aria-labelledby="professional-remove-title">
+    <div class="qs-remove-copy"><p class="eyebrow">When you are done</p><h2 id="professional-remove-title">Stop or remove it.</h2><p>Removing the release keeps the namespace and what is in it. Purging deletes the whole namespace, so install into one used only by this deployment.</p><p>Take a backup of the database first if you may want the history, settings or recordings later.</p><a class="text-link" href="https://github.com/joeyenfield/ai-control-mesh/blob/master/deploy/helm/agent-mesh/README.md">The chart's README <span aria-hidden="true">→</span></a></div>
+    <div class="quickstart-install">
+        <div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="p-data" id="p-keep" checked><label for="p-keep">Keep data</label><input type="radio" name="p-data" id="p-purge"><label for="p-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div><pre class="qs-remove-cmd  when-keep-data" tabindex="0" aria-label="Removal commands: keep data"><code>helm uninstall mesh -n mesh</code></pre><pre class="qs-remove-cmd  when-purge-data" tabindex="0" aria-label="Removal commands: purge data"><code>helm uninstall mesh -n mesh
+kubectl delete namespace mesh</code></pre><p class="qs-note">Purge data deletes all resources in the mesh namespace. Use a namespace dedicated to this installation. External PostgreSQL, Redis and object storage, retained persistent volumes and backups require separate cleanup in your provider; this command does not erase them.</p></div>
+        <p class="copy-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+</div>
+<div class="qs-guide guide-agent-only" id="agent-only">
+  <section class="wrap qs-toc-section" aria-labelledby="agent-only-toc-title"><p class="eyebrow">Agent only / 4 steps</p><h2 id="agent-only-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#agent-only-step-1">Install the agent command</a></li><li><a href="#agent-only-step-2">Sign in</a></li><li><a href="#agent-only-step-3">See which agents you can run</a></li><li><a href="#agent-only-step-4">Start one in a project folder</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#agent-only-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
+  <section class="quickstart section wrap" id="agent-only-step-1" aria-labelledby="agent-only-start-title">
+      <div class="quickstart-copy">
+        <p class="eyebrow">Step 1</p>
+        <h2 id="agent-only-start-title"><span class="step-number">1</span>Install the agent command</h2>
+        <p><strong>Only the launcher</strong> and its local proxy, <code>agent</code> and <code>agent-proxy</code>, on your laptop or desktop. Coding agents you start with it send their traffic to your existing AI Control Mesh server. The server, console and model providers stay where they are.</p>
+        <p class="prerequisites"><strong>Bring:</strong> your server's API address and an account on it. Native builds need no Docker or Python.</p>
+        <p class="qs-note">These commands skip the optional tray icon. They do not install the server or <code>agent-machine</code>, or add your computer to the fleet.</p>
+        <a class="text-link" href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/running-agents.md#installing-only-the-agent-command">Installing only the agent command <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="quickstart-install">
+        <div class="code-window qs-box">
+          <div class="qs-toggles">
+            <fieldset class="seg"><legend>Your terminal</legend><input type="radio" name="o-os" id="o-unix" class="opt-unix" checked><label for="o-unix">Linux / macOS / FreeBSD</label><input type="radio" name="o-os" id="o-windows" class="opt-windows"><label for="o-windows">Windows PowerShell</label></fieldset>
+          </div>
+          <div class="code-toolbar"><span class="mono">TERMINAL</span><button class="copy-button" type="button" data-copy-shown="qs-cmd" hidden>Copy commands</button></div>
+          <pre class="qs-cmd when-unix" tabindex="0" aria-label="Install only the agent command on Linux, macOS or FreeBSD"><code id="agent-only-unix">curl -fsSL https://api.example.com/install.sh | sh -s -- --only agent --no-tray</code></pre>
+          <pre class="qs-cmd when-windows" tabindex="0" aria-label="Install only the agent command on Windows"><code id="agent-only-windows">&amp; ([scriptblock]::Create((irm https://api.example.com/install.ps1))) -Only agent -NoTray</code></pre>
+          <p class="qs-note">Replace <code>https://api.example.com</code> with your server's API address. In your server's console, <strong>Downloads → Only the agent command</strong> gives the command with the right address already in it. The installer checks the download before it installs anything.</p>
+        </div>
+        <p class="copy-status" role="status" aria-live="polite"></p>
+      </div>
+  </section>
+  <section class="section wrap qs-steps-section" aria-labelledby="agent-only-steps-title">
+    <div class="section-heading"><p class="eyebrow">Steps 2 to 4</p><h2 id="agent-only-steps-title">From sign-in to a running agent.</h2></div>
+    <ol class="qs-steps" start="2">
+        <li class="qs-step" id="agent-only-step-2"><h3><span class="step-number">2</span>Sign in</h3>
+          <p>At the end, the installer prints a link and a short code. Open the link, sign in to your server and approve the code. Signed-in tokens stay on your computer; no password is typed into the terminal.</p>
+          <p>To sign in later, or to another server, run <code>agent login https://api.example.com</code>.</p></li>
+        <li class="qs-step" id="agent-only-step-3"><h3><span class="step-number">3</span>See which agents you can run</h3>
+          <p>Run <code>agent --list</code>. It lists the coding agents your server defines, whether each is installed on this computer, and the command that installs one that isn't. Install the one you want to use, such as Qwen Code, OpenCode or Codex.</p></li>
+        <li class="qs-step" id="agent-only-step-4"><h3><span class="step-number">4</span>Start one in a project folder</h3>
+          <p>From your project's folder, run for example <code>agent qwen . --model &lt;model&gt;</code>, or <code>agent codex-account .</code> to use your own Codex sign-in. The agent works as it always does; its requests go through your server, so they show on its console under <strong>Sessions</strong> and <strong>Requests</strong>.</p></li>
+    </ol>
+  </section>
+  <section class="section wrap qs-steps-section" aria-labelledby="agent-only-next-title"><div class="section-heading"><p class="eyebrow">Next</p><h2 id="agent-only-next-title">Keep going.</h2></div>
+    <div class="detail-grid">
+      <article><h3>Review the session</h3><p>Open the session on your server's console and choose <strong>Review</strong> for checks and AI coaching on how the agent worked.</p><a href="/coaching.html">AI coaching →</a></article>
+      <article><h3>Run your own server</h3><p>To try the whole system on your own computer, with the console, a fleet machine and a local model, pick the Basic level.</p><a href="#basic">The Basic level →</a></article>
+    </div>
+  </section>
+  <section class="section wrap qs-remove-section" id="agent-only-remove" aria-labelledby="agent-only-remove-title">
+    <div class="qs-remove-copy"><p class="eyebrow">When you are done</p><h2 id="agent-only-remove-title">Stop or remove it.</h2><p>The uninstaller removes <code>agent</code> and <code>agent-proxy</code> from this computer. Your sessions stay on the server. Keeping data leaves your sign-in and settings for a later install; purging signs this computer out and deletes them.</p><p>To stop the local proxy without removing anything, run <code>agent proxy stop</code>. The next agent you start brings it back.</p></div>
+    <div class="quickstart-install">
+        <div class="code-window qs-box qs-remove-box"><div class="qs-toggles"><fieldset class="seg"><legend>Saved data</legend><input type="radio" name="o-data" id="o-keep" checked><label for="o-keep">Keep data</label><input type="radio" name="o-data" id="o-purge"><label for="o-purge">Purge data</label></fieldset></div><div class="code-toolbar"><span class="mono">REMOVE IT</span><button class="copy-button" type="button" data-copy-shown="qs-remove-cmd" hidden>Copy commands</button></div><pre class="qs-remove-cmd when-unix when-keep-data" tabindex="0" aria-label="Uninstall agent: Linux / macOS / FreeBSD, keep data"><code>curl -fsSL https://api.example.com/uninstall.sh | sh -s -- --only agent</code></pre><pre class="qs-remove-cmd when-unix when-purge-data" tabindex="0" aria-label="Uninstall agent: Linux / macOS / FreeBSD, purge data"><code>curl -fsSL https://api.example.com/uninstall.sh | sh -s -- --only agent --purge</code></pre><pre class="qs-remove-cmd when-windows when-keep-data" tabindex="0" aria-label="Uninstall agent: Windows PowerShell, keep data"><code>&amp; ([scriptblock]::Create((irm https://api.example.com/uninstall.ps1))) -Only agent</code></pre><pre class="qs-remove-cmd when-windows when-purge-data" tabindex="0" aria-label="Uninstall agent: Windows PowerShell, purge data"><code>&amp; ([scriptblock]::Create((irm https://api.example.com/uninstall.ps1))) -Only agent -Purge</code></pre><p class="qs-note">Replace https://api.example.com with your server's API address. Purge data revokes local sign-ins and deletes local settings.</p></div>
+        <p class="qs-note qs-remove-follows">The commands follow the choices you made in step 1.</p>
+        <p class="copy-status" role="status" aria-live="polite"></p>
     </div>
   </section>
 </div>
