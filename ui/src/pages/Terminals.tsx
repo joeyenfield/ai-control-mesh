@@ -84,6 +84,8 @@ export function TerminalsPage() {
   const all = terminals.data?.terminals ?? [];
   const running = all.filter((item) => !(item.ended_at ?? item.session_ended_at)).sort(byRecent);
   const disconnected = all.filter(removable);
+  // Not connected but still listed as running: these can move to the finished sessions.
+  const stranded = disconnected.filter((item) => !(item.ended_at ?? item.session_ended_at));
   const remove = useMutation({
     mutationFn: async (targets: TerminalSummary[]) => {
       const results = await Promise.allSettled(targets.map((terminal) => api.deleteSession(terminal.session_id)));
@@ -92,7 +94,7 @@ export function TerminalsPage() {
       return { removed: targets.length - failed, failed };
     },
     onSuccess: ({ removed, failed }) => {
-      notify(`Removed ${removed} ${removed === 1 ? "session" : "sessions"}${failed ? `; ${failed} couldn't be removed` : ""}`);
+      notify(`Deleted ${removed} ${removed === 1 ? "session" : "sessions"}${failed ? `; ${failed} couldn't be deleted` : ""}`);
       setRemoving(null);
       void client.invalidateQueries();
     },
@@ -107,17 +109,14 @@ export function TerminalsPage() {
     },
     onSuccess: ({ hidden, failed }) => {
       notify(`Moved ${hidden} ${hidden === 1 ? "session" : "sessions"} to finished; nothing was deleted${failed ? `. ${failed} couldn't be moved` : ""}`);
-      setRemoving(null);
       void client.invalidateQueries();
     },
+    onError: (error: Error) => notify(`Couldn't move to finished: ${error.message}`),
   });
   const ask = (targets: TerminalSummary[]) => {
     remove.reset();
-    hide.reset();
     setRemoving(targets);
   };
-  // Those still listed as running: ended ones are already among the finished.
-  const hideable = (removing ?? []).filter((terminal) => !(terminal.ended_at ?? terminal.session_ended_at));
 
   // The search narrows both lists; the state chips count within it.
   const text = query.trim().toLowerCase();
@@ -164,9 +163,14 @@ export function TerminalsPage() {
                   </button>
                 ))}
                 <span className="chip-gap" aria-hidden="true" />
+                {stranded.length > 1 && (
+                  <button type="button" disabled={hide.isPending} onClick={() => hide.mutate(stranded)}>
+                    Move {stranded.length} not connected to finished
+                  </button>
+                )}
                 {disconnected.length > 1 && (
                   <button type="button" onClick={() => ask(disconnected)}>
-                    Remove {disconnected.length} not connected
+                    Delete {disconnected.length} not connected
                   </button>
                 )}
                 <NotifyToggle />
@@ -176,7 +180,14 @@ export function TerminalsPage() {
           {shown.length ? (
             <ul className="agent-list" aria-label="Running agents">
               {shown.map(({ terminal, state }) => (
-                <AgentRow key={terminal.session_id} terminal={terminal} state={state} onRemove={() => ask([terminal])} />
+                <AgentRow
+                  key={terminal.session_id}
+                  terminal={terminal}
+                  state={state}
+                  onRemove={() => ask([terminal])}
+                  onFinish={() => hide.mutate([terminal])}
+                  finishing={hide.isPending}
+                />
               ))}
             </ul>
           ) : running.length ? (
@@ -212,35 +223,21 @@ export function TerminalsPage() {
 
       <ConfirmDialog
         open={removing !== null}
-        title={removing?.length === 1 ? "Remove this session?" : `Remove ${removing?.length ?? 0} sessions?`}
+        title={removing?.length === 1 ? "Delete this session?" : `Delete ${removing?.length ?? 0} sessions?`}
         confirmLabel="Delete"
-        busy={remove.isPending || hide.isPending}
-        error={(remove.error ?? hide.error)?.message ?? null}
+        busy={remove.isPending}
+        error={remove.error?.message ?? null}
         onConfirm={() => removing && remove.mutate(removing)}
         onCancel={() => setRemoving(null)}
-        secondary={
-          hideable.length
-            ? { label: hideable.length === 1 ? "Remove from list" : `Remove ${hideable.length} from list`, onClick: () => hide.mutate(hideable) }
-            : undefined
-        }
       >
         <p>
           {removing?.length === 1
             ? `${removing[0].agent_name}${removing[0].project ? ` in ${removing[0].project}` : ""} isn't connected.`
-            : "These agents' terminals aren't connected."}
+            : "These agents' terminals aren't connected."}{" "}
+          Deleting removes {removing?.length === 1 ? "the session" : "the sessions"} with everything recorded: the terminal output, requests,
+          traces and chats. It can't be undone.
         </p>
-        {hideable.length > 0 && (
-          <p>
-            <strong>Remove from list</strong> ends {hideable.length === 1 ? "the session" : "those sessions"} and keeps everything recorded.{" "}
-            {hideable.length === 1
-              ? "It moves to the finished sessions below and stays on the Sessions page."
-              : "They move to the finished sessions below and stay on the Sessions page."}
-          </p>
-        )}
-        <p>
-          <strong>Delete</strong> removes {removing?.length === 1 ? "the session" : "the sessions"} with everything recorded: the terminal output,
-          requests, traces and chats. It can't be undone.
-        </p>
+        <p className="subtle">To keep the record and only take it off the running list, use Move to finished instead.</p>
       </ConfirmDialog>
     </div>
   );
@@ -250,7 +247,20 @@ export function TerminalsPage() {
  * One agent: what it is and its state, what it's doing, then who started it, where, with which
  * model and how much it has sent. The row opens its terminal; its session is the link beside it.
  */
-function AgentRow({ terminal, state, onRemove }: { terminal: TerminalSummary; state: TerminalState; onRemove: () => void }) {
+function AgentRow({
+  terminal,
+  state,
+  onRemove,
+  onFinish,
+  finishing,
+}: {
+  terminal: TerminalSummary;
+  state: TerminalState;
+  onRemove: () => void;
+  /** Ends the session so it moves to the finished ones; only offered while it's still listed as running. */
+  onFinish?: () => void;
+  finishing?: boolean;
+}) {
   const id = encodeURIComponent(terminal.session_id);
   const who = startedBy(terminal);
   const provider = terminal.backend !== "direct" ? terminal.backend : "own account";
@@ -288,9 +298,14 @@ function AgentRow({ terminal, state, onRemove }: { terminal: TerminalSummary; st
         <Link to={`/sessions/${id}`} className="button">
           Session
         </Link>
+        {removable(terminal) && onFinish && !(terminal.ended_at ?? terminal.session_ended_at) && (
+          <button type="button" disabled={finishing} onClick={onFinish} title="End the session and keep everything recorded">
+            Move to finished
+          </button>
+        )}
         {removable(terminal) && (
           <button type="button" className="danger" onClick={onRemove}>
-            Remove
+            Delete
           </button>
         )}
       </div>
