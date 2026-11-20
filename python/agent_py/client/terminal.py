@@ -175,7 +175,8 @@ class Share:
             with self.history.changed:
                 cols, rows = self.cols, self.rows
             try:
-                conn.send(json.dumps({"type": "hello", "cols": cols, "rows": rows, "command": self.command}))
+                # "kill": this launcher ends the agent on a {"type": "kill"}; the server tells viewers of an older one it can't.
+                conn.send(json.dumps({"type": "hello", "cols": cols, "rows": rows, "command": self.command, "kill": True}))
             except ConnectionClosed:
                 # A refusing server may close before the hello is even read.
                 pass

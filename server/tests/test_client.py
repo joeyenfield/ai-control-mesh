@@ -424,7 +424,7 @@ def test_a_controlled_terminal_is_relayed_to_the_server(tmp_path, agent_binary):
         host_url = m.proxy.replace("http", "ws") + f"/api/terminals/{session_id}/host"
         # Playing the launcher's side of the protocol, through the agent-proxy.
         with connect(host_url, proxy=None) as host:
-            host.send(json.dumps({"type": "hello", "cols": 100, "rows": 30, "command": "claude"}))
+            host.send(json.dumps({"type": "hello", "cols": 100, "rows": 30, "command": "claude", "kill": True}))
             assert json.loads(host.recv(timeout=5)) == {"type": "resume", "from": 0}
             host.send(b"hello from the agent machine\r\n")
             deadline = time.monotonic() + 5

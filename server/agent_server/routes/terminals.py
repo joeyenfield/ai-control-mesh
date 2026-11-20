@@ -220,7 +220,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
                     if not allowed:
                         error = "This session is shared with you to watch, not to type into or end."
                     elif message["type"] == "kill":
-                        error = await hub.kill(terminal)
+                        error = await hub.kill(terminal, queue)
                     else:
                         error = await hub.send_input(terminal, message)
                     if error:
@@ -342,7 +342,7 @@ async def serve_guest_viewer(
                 if await permitted(control=True):
                     error = "This machine's terminals aren't shared to type into over this bridge."
                 elif message["type"] == "kill":
-                    error = await hub.kill(terminal)
+                    error = await hub.kill(terminal, queue)
                 else:
                     error = await hub.send_input(terminal, message)
                 if error:

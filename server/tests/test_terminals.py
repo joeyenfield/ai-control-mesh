@@ -44,10 +44,11 @@ def ws_connect(client: TestClient, path: str, **headers: str):
 
 
 @contextmanager
-def open_host(client: TestClient, session_id: str, cols: int = 100, rows: int = 30):
+def open_host(client: TestClient, session_id: str, cols: int = 100, rows: int = 30, kill: bool = True):
     """The launcher's side: says hello, then yields the socket and the proxy's resume message."""
     with ws_connect(client, f"/api/terminals/{session_id}/host") as ws:
-        ws.send_text(json.dumps({"type": "hello", "cols": cols, "rows": rows, "command": "claude"}))
+        hello = {"type": "hello", "cols": cols, "rows": rows, "command": "claude"}
+        ws.send_text(json.dumps({**hello, "kill": True} if kill else hello))
         yield ws, json.loads(ws.receive_text())
 
 
@@ -175,6 +176,29 @@ def test_a_reconnecting_viewer_gets_only_what_it_missed(tmp_path):
                 json.loads(viewer.receive_text())
                 assert json.loads(viewer.receive_text())["resumed"] is False
         assert state["type"] == "state"
+
+
+def test_kill_reaches_a_launcher_that_can_and_explains_when_an_older_one_ignores_it(tmp_path):
+    with local_client(tmp_path) as client:
+        client.app.state.runtime.terminals.kill_wait = 0.2
+        session_id = new_session(client)
+        with open_host(client, session_id) as (ws, _):
+            with ws_connect(client, f"/api/terminals/{session_id}/view") as viewer:
+                read_viewer_start(viewer)
+                viewer.send_text(json.dumps({"type": "kill"}))
+                assert json.loads(ws.receive_text()) == {"type": "kill"}
+        # A launcher from before 2.1.69 says nothing about kill. It still gets it (2.1.68 ends the agent),
+        # and if the agent is still running shortly after, the launcher was older and the viewer hears why.
+        older = new_session(client)
+        with open_host(client, older, kill=False) as (ws, _):
+            with ws_connect(client, f"/api/terminals/{older}/view") as viewer:
+                read_viewer_start(viewer)
+                viewer.send_text(json.dumps({"type": "kill"}))
+                assert json.loads(ws.receive_text()) == {"type": "kill"}
+                error = json.loads(viewer.receive_text())
+                assert error["type"] == "error" and "older than 2.1.68" in error["message"]
+                viewer.send_text(json.dumps({"type": "input", "keys": "y"}))
+                assert json.loads(ws.receive_text()) == {"type": "input", "parts": ["y"]}
 
 
 def test_viewer_input_without_a_host_explains_and_unknown_sessions_close(tmp_path):
