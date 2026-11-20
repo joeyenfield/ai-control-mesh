@@ -38,7 +38,8 @@ assert environment?.envVars?.get('MESH_CI_HOME')?.trim() : 'Set MESH_CI_HOME on 
 assert environment?.envVars?.get('MESH_DOWNLOADS_URL')?.trim() : 'Set MESH_DOWNLOADS_URL on the agent first'
 
 // Archive old standalone jobs rather than discarding their build records.
-def multibranch = { String name, String scriptPath, boolean verify ->
+// triggered: the branches that build by themselves on a new commit (a regex; '^$' for none, so manual only).
+def multibranch = { String name, String scriptPath, boolean verify, String triggered, String description ->
     def current = controller.getItem(name)
     if (current != null && !(current instanceof WorkflowMultiBranchProject)) {
         assert current instanceof WorkflowJob && !current.isBuilding()
@@ -61,9 +62,9 @@ def multibranch = { String name, String scriptPath, boolean verify ->
     source.setTraits(traits)
     def branchSource = new BranchSource(source)
     if (!verify) {
-        // Build master automatically; feature branches remain available for manual builds.
+        // Only the triggered branches build automatically; every other one remains available for manual builds.
         def automatic = new NoTriggerBranchProperty()
-        automatic.setTriggeredBranchesRegex('master')
+        automatic.setTriggeredBranchesRegex(triggered)
         branchSource.setStrategy(new DefaultBranchPropertyStrategy([automatic] as BranchProperty[]))
     }
     job.getSourcesList().replaceBy([branchSource])
@@ -72,14 +73,18 @@ def multibranch = { String name, String scriptPath, boolean verify ->
     job.setProjectFactory(factory)
     job.setOrphanedItemStrategy(new DefaultOrphanedItemStrategy(true, '14', '20'))
     job.addTrigger(new PeriodicFolderTrigger('5m'))
-    job.setDescription(verify ? 'Branch and PR checks from Git; no deployment.' : 'Versioned distributions from Git branches. Only master builds automatically.')
+    job.setDescription(description)
     job.save()
     job.scheduleBuild2(0)
     println('Configured multibranch job: ' + name)
 }
 
-multibranch('ai-control-mesh', 'pipelines/Jenkinsfile.build', false)
-multibranch('ai-control-mesh-verify', 'pipelines/Jenkinsfile.verify', true)
+multibranch('ai-control-mesh', 'pipelines/Jenkinsfile.build', false, 'master',
+    'Versioned distributions from Git branches. Only master builds automatically.')
+multibranch('ai-control-mesh-verify', 'pipelines/Jenkinsfile.verify', true, '.*',
+    'Branch and PR checks from Git; no deployment.')
+multibranch('ai-control-mesh-screenshots', 'pipelines/Jenkinsfile.screenshots', false, '^$',
+    'Recreates docs/screenshots for a branch from the demo. Manual only; PUSH commits them to the branch.')
 
 [
     'ai-control-mesh-test': ['pipelines/Jenkinsfile.test', [
