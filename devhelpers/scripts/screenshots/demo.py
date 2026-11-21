@@ -657,6 +657,10 @@ def wasteful_conversation(seed: Seeder, claude_headers: list) -> None:
     for pattern in ("checkout", "flaky", "test_checkout", "def test_", "retry", "sleep(", "freeze_time", "Cart(", "fixture", "order_total", "tax", "rounding"):
         step("Grep", {"pattern": pattern, "path": "."}, "\n".join(f"services/shop/module_{n}.py:{n * 7}: {pattern}" for n in range(40)))
         step("Glob", {"pattern": f"**/*{pattern.strip('(')}*.py"}, "tests/shop/test_checkout.py\nservices/shop/checkout.py")
+    # Made-up secrets, so the review's security score and "See what was exposed" have something to show.
+    step("Bash", {"command": "cat .env", "description": "Read the settings"},
+         "DATABASE_URL=postgresql://shop@db.internal/shop\nDATABASE_PASSWORD=Qm7vT2xK9pL4wR8z\nDEBUG=0")
+    step("Read", {"file_path": "tests/shop/fixtures/customers.csv"}, "name,email\nDana Reyes,dana.reyes@northwind-shop.io\nSam Okafor,sam.okafor@northwind-shop.io")
     for _ in range(5):
         step("Read", {"file_path": "services/shop/checkout.py"}, "class Checkout:\n    def total(self, cart):\n        ...\n" * 400)
     log = "\n".join(f"tests/shop/test_checkout.py::test_case_{n} PASSED [{n % 100:3d}%]" for n in range(2600))

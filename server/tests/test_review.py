@@ -323,6 +323,8 @@ def test_credentials_and_personal_data_are_found_masked_and_redacted():
         assert secret not in cleaned
     assert "export GITHUB_TOKEN=[github token removed]" in cleaned and "AKIAIOSFODNN7EXAMPLE" in cleaned
     # A real private key block, not just its header.
+    # A user in a URL or an ssh remote isn't an email address.
+    assert exposure.find("postgresql://shop@db.internal/shop and git@github.com:org/repo.git") == []
     assert [item.detector.id for item in exposure.find("-----BEGIN RSA PRIVATE KEY-----\n" + "MIIEow" * 12 + "\n")] == ["private-key"]
 
     assert exposure.sensitive_path("cat ~/.aws/credentials | head -5") == "~/.aws/credentials"

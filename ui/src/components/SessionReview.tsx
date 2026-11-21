@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, preferredModel, providerModels, type ModelTier, type ReviewExposure, type ReviewFinding, type Session, type SessionReview as Review } from "../api";
+import { api, preferredModel, providerModels, type ModelTier, type ReviewExposure, type ReviewFinding, type ReviewSecurity, type Session, type SessionReview as Review } from "../api";
 import { formatCompact, formatDate, formatDuration, formatNumber, formatUsd } from "../format";
 import { useModels, useToast } from "../hooks";
 import { reviewBusy, startReviewRun, stopReviewRun, useReviewPhase, useReviewRun, useReviewRunId } from "../reviewRuns";
@@ -85,6 +85,8 @@ export function SessionReview({ session }: { session: Session }) {
   const prompt = review.data?.prompts.find((item) => item.id === focus) ?? review.data?.prompts[0];
   const [question, setQuestion] = useState("");
   const [shown, setShown] = useState<string | null>(null);
+  // The list of what was sent that shouldn't have been, in a dialog.
+  const [exposed, setExposed] = useState(false);
   // Only the run's phase and session here: its text changes with every word, and LiveReview reads that.
   const phase = useReviewPhase(id);
   const runId = useReviewRunId(id);
@@ -128,7 +130,7 @@ export function SessionReview({ session }: { session: Session }) {
       <section className={`review-verdict grade-${GRADE_CLASS[grade ?? ""] ?? "none"}`} aria-label="The review in short">
         {score != null && (
           <div className="review-score" title="100, less 18 for each high finding, 9 for each medium and 3 for each low. Related findings (one cause seen by several checks) count in full once, the rest a third. The provider's own failures and slowness don't count, and security findings have a score of their own.">
-            <strong>{score}</strong>
+            <ScoreRing value={score} tone={GRADE_CLASS[grade ?? ""] ?? "none"} />
             <span>of 100</span>
           </div>
         )}
@@ -145,53 +147,6 @@ export function SessionReview({ session }: { session: Session }) {
             )}
             {breakdown.length > 0 && ` Most points went to ${breakdown.slice(0, 3).map((item) => `${item.label.toLowerCase()} (${item.points})`).join(", ")}.`}
           </p>
-          {areaScores.length > 0 && (
-            <div className="review-areas" role="group" aria-label="Scores by area">
-              {areaScores.map((item) => (
-                <button
-                  key={item.area}
-                  type="button"
-                  className={`review-area grade-${scoreClass(item.score)}`}
-                  aria-pressed={area === item.area}
-                  title={`${AREA[item.area]}: 100 less its findings' penalties. Show only its checks.`}
-                  onClick={() => {
-                    setArea(area === item.area ? "all" : item.area);
-                    jump("review-checks");
-                  }}
-                >
-                  <span>{AREA[item.area]}</span>
-                  <strong>{item.score}</strong>
-                </button>
-              ))}
-              {security?.score != null ? (
-                <button
-                  type="button"
-                  className={`review-area review-security grade-${securityClass(security.score)}`}
-                  aria-pressed={area === "security"}
-                  title={`Security: ${security.grade}. Scored apart from the session's score: credentials, personal data and files of secrets sent to the model. Show only its checks.`}
-                  onClick={() => {
-                    setArea(area === "security" ? "all" : "security");
-                    jump("review-checks");
-                  }}
-                >
-                  <span>Security</span>
-                  <strong>{security.score}</strong>
-                </button>
-              ) : (
-                <span
-                  className="review-area review-security"
-                  title={
-                    review.data.security_scan === "off"
-                      ? "The security scan is off on this server (Server settings, Review prompts)."
-                      : "Needs payload capture: only what was captured can be checked for credentials and personal data."
-                  }
-                >
-                  <span>Security</span>
-                  <strong>not checked</strong>
-                </span>
-              )}
-            </div>
-          )}
           <nav className="chip-bar" aria-label="Parts of the review">
             <button type="button" onClick={() => jump("review-checks")}>
               Checks{findings.length ? ` (${findings.length})` : ""}
@@ -204,7 +159,67 @@ export function SessionReview({ session }: { session: Session }) {
             </button>
           </nav>
         </div>
+        {areaScores.length > 0 && (
+          <div className="review-meters" role="group" aria-label="Scores by area">
+            {areaScores.map((item) => (
+              <button
+                key={item.area}
+                type="button"
+                className={`review-meter grade-${scoreClass(item.score)}`}
+                aria-pressed={area === item.area}
+                title={`${AREA[item.area]}: 100 less its findings' penalties. Show only its checks.`}
+                onClick={() => {
+                  setArea(area === item.area ? "all" : item.area);
+                  jump("review-checks");
+                }}
+              >
+                <span>{AREA[item.area]}</span>
+                <span className="review-meter-bar" aria-hidden="true">
+                  <i style={{ width: `${item.score}%` }} />
+                </span>
+                <strong>{item.score}</strong>
+              </button>
+            ))}
+            {security?.score != null ? (
+              <button
+                type="button"
+                className={`review-meter review-meter-security grade-${securityClass(security.score)}`}
+                aria-pressed={area === "security"}
+                title={`Security: ${security.grade}. Scored apart from the session's score: credentials, personal data and files of secrets sent to the model. Show only its checks.`}
+                onClick={() => {
+                  setArea(area === "security" ? "all" : "security");
+                  jump("review-checks");
+                }}
+              >
+                <span>Security</span>
+                <span className="review-meter-bar" aria-hidden="true">
+                  <i style={{ width: `${security.score}%` }} />
+                </span>
+                <strong>{security.score}</strong>
+              </button>
+            ) : (
+              <span
+                className="review-meter review-meter-security review-meter-off"
+                title={
+                  review.data.security_scan === "off"
+                    ? "The security scan is off on this server (Server settings, Review prompts)."
+                    : "Needs payload capture: only what was captured can be checked for credentials and personal data."
+                }
+              >
+                <span>Security</span>
+                <span className="review-meter-bar" aria-hidden="true" />
+                <strong>{review.data.security_scan === "off" ? "off" : "not checked"}</strong>
+              </span>
+            )}
+            {security && exposedCount(security) > 0 && (
+              <button type="button" className="review-exposed-button" onClick={() => setExposed(true)}>
+                See what was exposed ({formatNumber(exposedCount(security))})
+              </button>
+            )}
+          </div>
+        )}
       </section>
+      {security && <ExposedDialog security={security} open={exposed} onClose={() => setExposed(false)} />}
 
       <dl className="stat-cards review-stats" aria-label="What the review measured">
         <div>
@@ -313,6 +328,13 @@ export function SessionReview({ session }: { session: Session }) {
                   <p className="review-suggestion">
                     <strong>Try:</strong> {finding.suggestion}
                   </p>
+                  {finding.area === "security" && security && exposedCount(security) > 0 && (
+                    <p>
+                      <button type="button" onClick={() => setExposed(true)}>
+                        See what was exposed
+                      </button>
+                    </p>
+                  )}
                 </details>
               </li>
             ))}
@@ -701,12 +723,9 @@ function Evidence({ review }: { review: Review }) {
       )}
       {security && (security.exposures.length > 0 || security.sources.length > 0) && (
         <Table
-          title={`Sent to the model that shouldn't have been: ${formatNumber(security.credentials)} credentials, ${formatNumber(security.personal_data)} pieces of personal data, ${formatNumber(security.secret_sources)} files of secrets`}
+          title={`Sent to the model that shouldn't have been: ${count(security.credentials, "credential", "credentials")}, ${count(security.personal_data, "piece of personal data", "pieces of personal data")}, ${count(security.secret_sources, "file of secrets", "files of secrets")}`}
           head={["What", "Masked", "Where", "Tool or command", "Places"]}
-          rows={[
-            ...security.exposures.map((item) => [item.label, item.preview, WHERE[item.where], [item.tool, item.target].filter(Boolean).join(": "), formatNumber(item.times)]),
-            ...security.sources.map((item) => [item.source === "environment variables" ? "Environment variables" : "File of secrets", item.source, "A tool result", [item.tool, item.command].filter(Boolean).join(": "), formatNumber(item.times)]),
-          ]}
+          rows={exposureRows(security)}
           note={`The server masks every value it finds: this page and the AI review never get one. Rotate any credential listed here.$${security.level === "basic" ? " This server's scan looks for credentials only, not personal data." : ""}${security.scan_limited ? " The session was too large to read whole at this server's scan level, so there may be more." : ""}`}
         />
       )}
@@ -718,6 +737,84 @@ function Evidence({ review }: { review: Review }) {
         />
       )}
     </section>
+  );
+}
+
+/** The score as a ring: the arc is the score, its colour the grade's. */
+function ScoreRing({ value, tone }: { value: number; tone: string }) {
+  const circumference = 2 * Math.PI * 26;
+  return (
+    <span className={`review-ring grade-${tone}`}>
+      <svg viewBox="0 0 60 60" aria-hidden="true">
+        <circle cx="30" cy="30" r="26" className="review-ring-track" />
+        <circle cx="30" cy="30" r="26" className="review-ring-arc" strokeDasharray={`${(circumference * Math.max(0, Math.min(100, value))) / 100} ${circumference}`} />
+      </svg>
+      <strong>{value}</strong>
+    </span>
+  );
+}
+
+const count = (value: number, one: string, many: string) => `${formatNumber(value)} ${value === 1 ? one : many}`;
+
+const exposedCount = (security: ReviewSecurity) => security.exposures.length + security.sources.length;
+
+const exposureRows = (security: ReviewSecurity) => [
+  ...security.exposures.map((item) => [item.label, item.preview, WHERE[item.where], [item.tool, item.target].filter(Boolean).join(": "), formatNumber(item.times)]),
+  ...security.sources.map((item) => [
+    item.source === "environment variables" ? "Environment variables" : "File of secrets",
+    item.source,
+    "A tool result",
+    [item.tool, item.command].filter(Boolean).join(": "),
+    formatNumber(item.times),
+  ]),
+];
+
+/**
+ * What was sent that shouldn't have been, as the server listed it. Every value is already masked there:
+ * the server never keeps one, so there's nothing more to reveal here.
+ */
+function ExposedDialog({ security, open, onClose }: { security: ReviewSecurity; open: boolean; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (open && !dialog.current?.open) dialog.current?.showModal();
+    else if (!open) dialog.current?.close();
+  }, [open]);
+  return (
+    <dialog ref={dialog} className="confirm review-exposed" aria-labelledby="exposed-title" onClose={onClose}>
+      <form method="dialog">
+        <h2 id="exposed-title">What was exposed</h2>
+        <p className="subtle">
+          {count(security.credentials, "credential", "credentials")}, {count(security.personal_data, "piece of personal data", "pieces of personal data")} and{" "}
+          {count(security.secret_sources, "file of secrets", "files of secrets")} reached the model. Values are masked: the server never keeps one. Rotate every credential listed, and keep its source out of the next session.
+        </p>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                {["What", "Masked", "Where", "Tool or command", "Places"].map((name) => (
+                  <th key={name}>{name}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {exposureRows(security).map((row, index) => (
+                <tr key={index}>
+                  {row.map((cell, position) => (
+                    <td key={position}>{position === 1 ? <code>{cell}</code> : cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {security.scan_limited && <p className="subtle">The session was too large to read whole at this server's scan level, so there may be more.</p>}
+        <div className="row end">
+          <button type="submit" autoFocus>
+            Close
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 

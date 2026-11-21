@@ -195,7 +195,7 @@ DETECTORS: tuple[Detector, ...] = (
     _d("us-ssn", "US social security number", PII, "high", r"\b((?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4})\b", 1, None, _last(4, "•••-••-")),
     _d("iban", "Bank account (IBAN)", PII, "medium", r"\b([A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?)\b", 1, _iban,
        lambda value: value[:2] + "•• •••• " + value.replace(" ", "")[-4:]),
-    _d("email", "Email address", PII, "low", r"\b([A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24})\b", 1, _email, _masked_email),
+    _d("email", "Email address", PII, "low", r"(?<![\w/:.%+-])([A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24})\b", 1, _email, _masked_email),
     _d("phone", "Phone number", PII, "low", r"(?<![\w+])(\+[1-9][0-9 ().-]{8,18}[0-9])(?![\w])", 1, _phone, _last(2, "+•• ••• ••")),
 )
 BY_ID = {detector.id: detector for detector in DETECTORS}

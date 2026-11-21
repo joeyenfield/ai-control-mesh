@@ -25,7 +25,7 @@
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=3111536eae">
+  <link rel="stylesheet" href="/styles.css?v=a62c3b3054">
   <script src="/site.js?v=35d7912c1a" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"AI coaching and session review","url":"https://aicontrolmesh.com/coaching.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
@@ -66,11 +66,11 @@
       <li class="flow-arrow" aria-hidden="true">→</li>
       <li class="flow-step"><span class="flow-kicker">Your choice of model</span><h3>AI review</h3><p>Plain-words advice: the most valuable change first.</p></li>
     </ol>
-    <div class="coaching-evidence"><figure class="review-top"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=c75527601a" srcset="/assets/screens/session-review-800.webp?v=266fe1c0c4 800w, /assets/screens/session-review-1440.webp?v=c75527601a 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="Built-in session checks highlighting context size, model choices and repeated work in the current console."></a><figcaption><strong>The checks</strong><p>Synthetic demo data. <a href="/screenshots/session-review.png">Full capture →</a></p></figcaption></figure><figure class="review-bottom"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=c75527601a" srcset="/assets/screens/session-review-800.webp?v=266fe1c0c4 800w, /assets/screens/session-review-1440.webp?v=c75527601a 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="The AI review response in the current console, with a summary, suggestions and what went well. The response is simulated demo data."></a><figcaption><strong>The AI review</strong><p>Simulated response. <a href="/screenshots/session-review.png">Full capture →</a></p></figcaption></figure></div>
+    <div class="coaching-evidence"><figure class="review-top"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=2ea2b2e866" srcset="/assets/screens/session-review-800.webp?v=c10ce78049 800w, /assets/screens/session-review-1440.webp?v=2ea2b2e866 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="Built-in session checks highlighting context size, model choices and repeated work in the current console."></a><figcaption><strong>The checks</strong><p>Synthetic demo data. <a href="/screenshots/session-review.png">Full capture →</a></p></figcaption></figure><figure class="review-bottom"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=2ea2b2e866" srcset="/assets/screens/session-review-800.webp?v=c10ce78049 800w, /assets/screens/session-review-1440.webp?v=2ea2b2e866 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="The AI review response in the current console, with a summary, suggestions and what went well. The response is simulated demo data."></a><figcaption><strong>The AI review</strong><p>Simulated response. <a href="/screenshots/session-review.png">Full capture →</a></p></figcaption></figure></div>
   </section>
 
   <section class="section tinted" id="areas"><div class="wrap">
-    <div class="section-heading"><p class="eyebrow">What it looks at</p><h2>Five areas, each with its own score.</h2><p>A session can be tidy on tools and wasteful on context. Each area shows where the points went, and a separate security score flags credentials and personal data sent to the model.</p></div>
+    <div class="section-heading"><p class="eyebrow">What it looks at</p><h2>Five areas and security, each with its own score.</h2><p>A session can be tidy on tools and wasteful on context. Each area shows where the points went, and a separate security score flags credentials and personal data sent to the model.</p></div>
     <div class="areas-layout">
       <div class="area-grid">
         <article><h3>Context</h3><p>Is every call carrying too much? Large instructions, unused tools, a context that keeps growing.</p></article>
@@ -78,6 +78,7 @@
         <article><h3>How it went</h3><p>Was the task clear? How much steering, how long, how many sub-agents?</p></article>
         <article><h3>Reliability</h3><p>Calls that failed, were rate limited, were cut off or were slow to start.</p></article>
         <article><h3>Cost</h3><p>Frontier models for everyday work, and prompt caching that ran out or was missed.</p></article>
+        <article class="area-security"><h3>Security</h3><p>Credentials, personal data and files of secrets the model was sent. <a href="#security">Scored apart →</a></p></article>
       </div>
       <figure class="scorecard" aria-label="An example score: 72 overall, with a score for each area">
         <div class="scorecard-head"><span class="scorecard-score">72</span><span><strong>Some waste</strong><small>Example session</small></span></div>
@@ -87,8 +88,9 @@
           <li><span>How it went</span><span class="bar"><i style="width:91%"></i></span><b>91</b></li>
           <li><span>Reliability</span><span class="bar"><i style="width:100%"></i></span><b>100</b></li>
           <li><span>Cost</span><span class="bar"><i style="width:73%"></i></span><b>73</b></li>
+          <li class="scorecard-security"><span>Security</span><span class="bar"><i style="width:80%"></i></span><b>80</b></li>
         </ul>
-        <figcaption>Start at 100, lose points for each finding. One cause counts once, and the provider's own failures don't count against you.</figcaption>
+        <figcaption>Start at 100, lose points for each finding. One cause counts once, and the provider's own failures don't count against you. Security is scored apart: one <code>.env</code> file read into the context took it to 80.</figcaption>
       </figure>
     </div>
   </div></section>

@@ -598,6 +598,9 @@ h2 { font-size: clamp(28px, 3vw, 38px); }
 .scorecard .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .scorecard .bar i { display: block; height: 100%; background: var(--mint); }
 .scorecard figcaption { margin-top: 18px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.scorecard li.scorecard-security { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.scorecard li.scorecard-security .bar i { background: var(--lavender); }
+.area-security h3 { color: var(--lavender); }
 .security-card .scorecard-score { border-color: var(--lavender); color: var(--lavender); }
 .security-card li { grid-template-columns: 96px 1fr 40px; }
 .security-card li code { color: var(--text); font-size: 12px; overflow-wrap: anywhere; }
