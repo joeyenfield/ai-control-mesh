@@ -141,7 +141,11 @@ containers and volumes are removed after the run.
 
 Release requires a successful deployment-test result matching the source commit
 and distribution manifest, with no failed or skipped deployment checks. Pi
-releases reuse the existing backup and health checks; GitHub releases upload the
+releases reuse the existing backup and health checks. They update the server,
+the sign-in service, the console and the brochure site (`marketing-site`): the
+Pi's checkout moves to the build's commit, the console and the site are built
+there from it, and each must answer its health check (the site on loopback port
+8080). PostgreSQL is never recreated. GitHub releases upload the
 distribution archive and standalone installer files as a prerelease. Neither
 operation rebuilds source. Builds and verification never trigger production
 deployment or GitHub publication.

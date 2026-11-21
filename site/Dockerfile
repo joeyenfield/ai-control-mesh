@@ -8,3 +8,6 @@ COPY site/assets/ /usr/share/nginx/html/assets/
 COPY docs/screenshots/session-review.png docs/screenshots/terminal-grid-dark.png docs/screenshots/real-opencode.png docs/screenshots/real-copilot.png docs/screenshots/real-qwen.png docs/screenshots/live-dark.png docs/screenshots/terminal-phone.png docs/screenshots/overview-dark.png docs/screenshots/agents.png docs/screenshots/machines.png docs/screenshots/session-chat.png docs/screenshots/machine-mcp.png docs/screenshots/analytics.png docs/screenshots/terminal.png /usr/share/nginx/html/screenshots/
 # The quickstart page's steps, full size behind its links.
 COPY docs/screenshots/quickstart-*.png /usr/share/nginx/html/screenshots/
+# The checkout may have been made under a strict umask (the Pi deploy runs with 077), and COPY keeps
+# its modes: make every page and asset readable by nginx's unprivileged workers whatever they were.
+RUN chmod -R a+rX /usr/share/nginx/html
