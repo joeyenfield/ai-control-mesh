@@ -5,27 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101523">
   <title>AI coaching and session review — AIControlMesh</title>
-  <meta name="description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, then ask a model you choose how to do better next time.">
+  <meta name="description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, flag credentials and personal data sent to the model, then ask a model you choose how to do better next time.">
   <link rel="canonical" href="https://aicontrolmesh.com/coaching.html">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="AIControlMesh">
   <meta property="og:url" content="https://aicontrolmesh.com/coaching.html">
   <meta property="og:title" content="AI coaching and session review — AIControlMesh">
-  <meta property="og:description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, then ask a model you choose how to do better next time.">
+  <meta property="og:description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, flag credentials and personal data sent to the model, then ask a model you choose how to do better next time.">
   <meta property="og:image" content="https://aicontrolmesh.com/assets/social.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="AIControlMesh: Your AI agents. Your infrastructure. One control plane. Open source. Self-hosted. MIT licensed.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="AI coaching and session review — AIControlMesh">
-  <meta name="twitter:description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, then ask a model you choose how to do better next time.">
+  <meta name="twitter:description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, flag credentials and personal data sent to the model, then ask a model you choose how to do better next time.">
   <meta name="twitter:image" content="https://aicontrolmesh.com/assets/social.png">
   <meta name="twitter:image:alt" content="AIControlMesh: Your AI agents. Your infrastructure. One control plane.">
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=17337e14cf">
+  <link rel="stylesheet" href="/styles.css?v=3111536eae">
   <script src="/site.js?v=35d7912c1a" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"AI coaching and session review","url":"https://aicontrolmesh.com/coaching.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
@@ -52,7 +52,7 @@
     <p class="eyebrow">Session review and AI coaching</p>
     <h1>Learn from each session.<br><span>Give your next task a better start.</span></h1>
     <p class="hero-lede">Every agent session gets a score and a list of what wasted tokens, time or money. Then ask a model you choose how to do better next time.</p>
-    <div class="actions"><a class="button button-primary" href="/quickstart.html">Try locally →</a><a class="button button-outline" href="#areas">What it looks at →</a></div>
+    <div class="actions"><a class="button button-primary" href="/quickstart.html">Try locally →</a><a class="button button-outline" href="#areas">What it looks at →</a><a class="button button-outline" href="#security">Secrets and personal data →</a></div>
   </section>
 
   <section class="section wrap" id="workflow">
@@ -105,10 +105,31 @@
     <div class="sent-diagram" aria-label="What the reviewing model receives">
       <div class="sent-box sent-yes"><h3>Sent, up to 16,000 characters</h3><ul><li>Measurements and findings</li><li>The start of the system prompt</li><li>Tool, file and command names</li><li>The first few messages you typed</li></ul></div>
       <div class="sent-arrow" aria-hidden="true">→ <span>model</span></div>
-      <div class="sent-box sent-no"><h3>Never sent</h3><ul><li>The full transcript</li><li>File contents</li><li>Whole tool results</li></ul></div>
+      <div class="sent-box sent-no"><h3>Never sent</h3><ul><li>The full transcript</li><li>File contents</li><li>Whole tool results</li><li>Credentials and personal data: removed</li></ul></div>
     </div>
     <p class="callout">The advice is a suggestion to check against your project; it changes nothing by itself. Costs are estimates. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/session-review.md">The full session review guide →</a></p>
   </div></section>
+
+  <section class="section wrap" id="security">
+    <div class="section-heading"><p class="eyebrow">Secrets and personal data</p><h2>What the model saw that it shouldn't have.</h2><p>Agents read <code>.env</code> files, print the environment and paste customer data into their context. The review reads everything the model was sent and scores it apart: a leaked key isn't waste, and a tidy session can still leak one.</p></div>
+    <div class="areas-layout">
+      <div class="area-grid">
+        <article><h3>Credentials</h3><p>Private keys, cloud and provider API keys, tokens, passwords in URLs, <code>Authorization</code> headers, and secrets in code and <code>.env</code> lines.</p></article>
+        <article><h3>Personal data</h3><p>Email addresses, phone numbers, card numbers that pass the Luhn check, US social security numbers and IBANs.</p></article>
+        <article><h3>Files of secrets</h3><p>A tool that read <code>.env</code>, <code>id_rsa</code>, <code>*.pem</code> or cloud credentials, or a command that printed every environment variable.</p></article>
+        <article><h3>Where it came from</h3><p>Typed into the chat, a tool call, a tool result or the instruction files, so you know what to block or ignore next time.</p></article>
+      </div>
+      <figure class="scorecard security-card" aria-label="An example security score: 35, badly exposed, with masked findings">
+        <div class="scorecard-head"><span class="scorecard-score">35</span><span><strong>Badly exposed</strong><small>Security, scored apart</small></span></div>
+        <ul>
+          <li><span>GitHub token</span><code>ghp_… (40 characters)</code><b>high</b></li>
+          <li><span><code>.env</code> read</span><code>cat .env</code><b>med</b></li>
+          <li><span>Email</span><code>j•••@acme.io</code><b>low</b></li>
+        </ul>
+        <figcaption>Values are masked: neither the page nor an AI review ever gets one. Site admins choose how hard it looks: off, credentials only, standard, or thorough (plainer passwords and the model's own replies too).</figcaption>
+      </figure>
+    </div>
+  </section>
 </main>
   <footer class="site-footer wrap">
     <div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9"/><path d="M8 11h6l4 10h6"/></svg></span>AI Control Mesh</a><p>Open source. On your infrastructure.</p></div>
