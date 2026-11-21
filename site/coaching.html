@@ -5,27 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101523">
   <title>AI coaching and session review — AIControlMesh</title>
-  <meta name="description" content="Score coding-agent sessions with 24 built-in checks, then ask a model you choose for advice on prompts, instruction files, tool use, context and cost.">
+  <meta name="description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, then ask a model you choose how to do better next time.">
   <link rel="canonical" href="https://aicontrolmesh.com/coaching.html">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="AIControlMesh">
   <meta property="og:url" content="https://aicontrolmesh.com/coaching.html">
   <meta property="og:title" content="AI coaching and session review — AIControlMesh">
-  <meta property="og:description" content="Score coding-agent sessions with 24 built-in checks, then ask a model you choose for advice on prompts, instruction files, tool use, context and cost.">
+  <meta property="og:description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, then ask a model you choose how to do better next time.">
   <meta property="og:image" content="https://aicontrolmesh.com/assets/social.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="AIControlMesh: Your AI agents. Your infrastructure. One control plane. Open source. Self-hosted. MIT licensed.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="AI coaching and session review — AIControlMesh">
-  <meta name="twitter:description" content="Score coding-agent sessions with 24 built-in checks, then ask a model you choose for advice on prompts, instruction files, tool use, context and cost.">
+  <meta name="twitter:description" content="Score each coding-agent session across context, tools, workflow, reliability and cost, then ask a model you choose how to do better next time.">
   <meta name="twitter:image" content="https://aicontrolmesh.com/assets/social.png">
   <meta name="twitter:image:alt" content="AIControlMesh: Your AI agents. Your infrastructure. One control plane.">
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=6a9d475a20">
+  <link rel="stylesheet" href="/styles.css?v=17337e14cf">
   <script src="/site.js?v=35d7912c1a" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"AI coaching and session review","url":"https://aicontrolmesh.com/coaching.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
@@ -51,146 +51,63 @@
   <section class="page-intro wrap">
     <p class="eyebrow">Session review and AI coaching</p>
     <h1>Learn from each session.<br><span>Give your next task a better start.</span></h1>
-    <p class="hero-lede">See how your coding agent used its context, tools and models. Built-in checks score each session and point at wasted work. AI coaching turns those findings into practical suggestions for clearer prompts, leaner instructions and lower token use.</p>
-    <div class="actions"><a class="button button-primary" href="/quickstart.html">Try locally →</a><a class="button button-outline" href="#checks">See the checks →</a></div>
+    <p class="hero-lede">Every agent session gets a score and a list of what wasted tokens, time or money. Then ask a model you choose how to do better next time.</p>
+    <div class="actions"><a class="button button-primary" href="/quickstart.html">Try locally →</a><a class="button button-outline" href="#areas">What it looks at →</a></div>
   </section>
-  <nav class="page-nav wrap" aria-label="On this page"><a href="#workflow">How it works</a><a href="#checks">The checks</a><a href="#score">The score</a><a href="#measured">What is measured</a><a href="#reviews">Review topics</a><a href="#running">During a review</a><a href="#custom">Your own prompts</a><a href="#data">Models, data and costs</a></nav>
 
   <section class="section wrap" id="workflow">
-    <div class="section-heading"><p class="eyebrow">From evidence to advice</p><h2>Review what happened.<br>Choose what to improve.</h2><p>Every session an agent runs through the server can be reviewed. Open it from <strong>Sessions</strong> and choose <strong>Review</strong>. The tab has three parts: checks, the numbers behind them, and an AI review.</p></div>
-    <ol class="how-steps">
-      <li><span class="step-number" aria-hidden="true">1</span><div><h3>Read the checks</h3><p>The server runs a fixed set of checks as the tab opens and gives the session a score. No model is involved, so they are instant, free and the same every time. <strong>Check again</strong> updates a session that is still going.</p></div></li>
-      <li><span class="step-number" aria-hidden="true">2</span><div><h3>Ask a model for advice</h3><p>Pick a review topic, choose a provider and model, and optionally add your own question. The answer streams in: a summary, numbered suggestions with the most valuable first, and what went well.</p></div></li>
-      <li><span class="step-number" aria-hidden="true">3</span><div><h3>Try the useful suggestions</h3><p>Use a revised prompt, a shorter instruction file or a change to your tools. Review a similar task afterwards and compare the score, tokens and cost.</p></div></li>
+    <div class="section-heading"><p class="eyebrow">How it works</p><h2>From a session to advice.</h2></div>
+    <ol class="flow" aria-label="How a session review works">
+      <li class="flow-step"><span class="flow-kicker">Recorded</span><h3>Your session</h3><p>Every model call and tool call the agent made through the server.</p></li>
+      <li class="flow-arrow" aria-hidden="true">→</li>
+      <li class="flow-step"><span class="flow-kicker">Instant · free</span><h3>Built-in checks</h3><p>24 checks, no model involved. Same answer every time.</p></li>
+      <li class="flow-arrow" aria-hidden="true">→</li>
+      <li class="flow-step flow-hub"><span class="flow-kicker">Out of 100</span><h3>Score and findings</h3><p>What went wrong, what it cost and what to try.</p></li>
+      <li class="flow-arrow" aria-hidden="true">→</li>
+      <li class="flow-step"><span class="flow-kicker">Your choice of model</span><h3>AI review</h3><p>Plain-words advice: the most valuable change first.</p></li>
     </ol>
-<div class="coaching-evidence"><figure class="review-top"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=c75527601a" srcset="/assets/screens/session-review-800.webp?v=266fe1c0c4 800w, /assets/screens/session-review-1440.webp?v=c75527601a 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="Built-in session checks highlighting context size, model choices and repeated work in the current console."></a><figcaption><strong>See where the work went</strong><p>Current console, synthetic demo data. <a href="/screenshots/session-review.png">Open full capture →</a></p></figcaption></figure><figure class="review-bottom"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=c75527601a" srcset="/assets/screens/session-review-800.webp?v=266fe1c0c4 800w, /assets/screens/session-review-1440.webp?v=c75527601a 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="The AI review response in the current console, with a summary, suggestions and what went well. The response is simulated demo data."></a><figcaption><strong>Get specific advice for next time</strong><p>Current console, synthetic demo data. <a href="/screenshots/session-review.png">Open full capture →</a></p></figcaption></figure></div>
+    <div class="coaching-evidence"><figure class="review-top"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=c75527601a" srcset="/assets/screens/session-review-800.webp?v=266fe1c0c4 800w, /assets/screens/session-review-1440.webp?v=c75527601a 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="Built-in session checks highlighting context size, model choices and repeated work in the current console."></a><figcaption><strong>The checks</strong><p>Synthetic demo data. <a href="/screenshots/session-review.png">Full capture →</a></p></figcaption></figure><figure class="review-bottom"><a href="/screenshots/session-review.png"><img src="/assets/screens/session-review-1440.webp?v=c75527601a" srcset="/assets/screens/session-review-800.webp?v=266fe1c0c4 800w, /assets/screens/session-review-1440.webp?v=c75527601a 1440w" sizes="(max-width: 550px) calc(100vw - 32px), 45vw" width="1440" height="4261" loading="lazy" alt="The AI review response in the current console, with a summary, suggestions and what went well. The response is simulated demo data."></a><figcaption><strong>The AI review</strong><p>Simulated response. <a href="/screenshots/session-review.png">Full capture →</a></p></figcaption></figure></div>
   </section>
 
-  <section class="section tinted" id="checks"><div class="wrap">
-    <div class="section-heading"><p class="eyebrow">Built-in checks</p><h2>24 checks in five areas.<br>No model needed.</h2><p>Each finding has a level (high, medium, low or a note), what was seen and what to try. Where the server can work it out, it also says about how many tokens the problem cost over the session. Findings are listed worst first.</p></div>
-    <div class="detail-grid">
-      <article><h3>Context</h3><p>What every call carries before any work is done.</p><ul class="check-list">
-        <li><strong>Large system prompt:</strong> instructions of about 8,000 tokens or more on every call.</li>
-        <li><strong>Many tool definitions:</strong> tool descriptions of about 10,000 tokens or more.</li>
-        <li><strong>Most tools never used:</strong> 30 or more tools defined and under a quarter called, with the idle MCP servers named.</li>
-        <li><strong>Very large or fast-growing context:</strong> a call that read 70% of the model’s context, or a context that gained 5,000 tokens a call.</li>
-        <li><strong>Many images</strong> in the conversation.</li>
-      </ul></article>
-      <article><h3>Tools</h3><p>How efficiently the agent searched, read and ran commands.</p><ul class="check-list">
-        <li><strong>A lot of searching for files:</strong> searches and listings that make up over 35% of tool calls.</li>
-        <li><strong>The same files read again and again.</strong></li>
-        <li><strong>Very large tool results:</strong> about 10,000 tokens or more from one call.</li>
-        <li><strong>Many failed tool calls:</strong> a wrong path or command, a missing tool, edits that don’t apply.</li>
-        <li><strong>The same call repeated</strong> with the same input: often a looping agent.</li>
-      </ul></article>
-      <article><h3>How it went</h3><p>How the task was set and steered.</p><ul class="check-list">
-        <li><strong>A short first prompt for a long task:</strong> under 80 characters for 30 or more model calls.</li>
-        <li><strong>A lot of steering:</strong> 20 or more messages typed.</li>
-        <li><strong>A very long session:</strong> 150 or more model calls.</li>
-        <li><strong>The conversation was compacted</strong> into a summary.</li>
-        <li><strong>Many sub-agents.</strong></li>
-      </ul></article>
-      <article><h3>Reliability</h3><p>Calls that failed, stalled or stopped early.</p><ul class="check-list">
-        <li><strong>Model calls failed:</strong> 3 or more, over 5% of calls.</li>
-        <li><strong>Calls were rate limited</strong> with <code>429</code>.</li>
-        <li><strong>Replies were cut off</strong> before the model finished.</li>
-        <li><strong>Slow to start answering:</strong> half the calls waited over 15 seconds for the first token.</li>
-      </ul></article>
-      <article><h3>Cost</h3><p>Model choice and caching.</p><ul class="check-list">
-        <li><strong>Most calls went to a frontier model:</strong> 60% or more of the calls.</li>
-        <li><strong>Little of the prompt came from the cache:</strong> under half, on a provider that reports caching.</li>
-        <li><strong>The cache ran out while the session sat idle:</strong> calls more than 5 minutes apart that wrote most of the prompt to the cache again.</li>
-      </ul></article>
-      <article><h3>What the checks need</h3><p>Checks on tokens, failures, caching and timings always run, because the server records those for every request. Checks on the system prompt, the conversation and the tools read the session’s payloads, so they need payload capture: start the agent with <code>--trace</code>, or turn capture on for the session. Without payloads, a note says so and the session is checked on its numbers only.</p><p>Payload token counts are estimates at four characters a token. Call token counts are what the provider reported.</p></article>
-    </div>
-  </div></section>
-
-  <section class="section wrap" id="score">
-    <div class="section-heading"><p class="eyebrow">The score</p><h2>One number to compare sessions.<br>The findings say what to do.</h2></div>
-    <div class="detail-grid">
-      <article><h3>From 100, less each finding</h3><p>A session starts at 100 and loses 18 points for each high finding, 9 for each medium and 3 for each low. It reads <strong>Efficient</strong> from 85, <strong>Some waste</strong> from 65, <strong>Wasteful</strong> from 40 and <strong>Very wasteful</strong> below that. Each finding shows the points it took off.</p></article>
-      <article><h3>A score for each area</h3><p>Context, Tools, How it went, Reliability and Cost each get their own score, worked out the same way. A session can be tidy on tools and wasteful on context. Choose an area to see only its checks.</p></article>
-      <article><h3>One cause counts once</h3><p>Some checks see the same cause from different sides: context size, tool loops and caching. In each group the worst finding costs its full points and the others a third of theirs, so one problem doesn’t sink the score several times.</p></article>
-      <article><h3>The provider’s doing doesn’t count</h3><p>Slow first tokens and failures that were mostly the provider’s own (5xx errors) are shown and passed to the AI review, but take no points. Rate limits still count: they are often caused by too many agents at once or the organization’s limit.</p></article>
-      <article><h3>Model tiers</h3><p>Each call is placed in a tier from its model’s input price in the server’s price table: <strong>frontier</strong> from $4 per million input tokens, <strong>small</strong> under $1.50, <strong>mid-range</strong> between. Local models and models with no price are never counted as frontier. On a subscription, frontier calls use up the plan’s limits rather than money.</p></article>
-      <article><h3>Where the points went</h3><p>The top of the tab sums it up: the score, how many findings there are at each level, about how many tokens they add up to, and the main cause. The AI review receives the same summary, so it starts with what cost the most.</p></article>
-    </div>
-  </section>
-
-  <section class="section tinted" id="measured"><div class="wrap">
-    <div class="section-heading"><p class="eyebrow">What was measured</p><h2>The numbers behind every finding.<br>Check them yourself.</h2></div>
-    <div class="detail-grid">
-      <article><h3>Three charts</h3><ul class="check-list">
-        <li><strong>The context, call by call,</strong> for the main chat, so sub-agents don’t blur it.</li>
-        <li><strong>What the context holds:</strong> the system prompt, tool definitions, tool results, tool calls, replies, thinking, typed messages and notes the agent adds.</li>
-        <li><strong>Model calls by tier:</strong> frontier, mid-range, small, local and no price.</li>
-      </ul></article>
-      <article><h3>Tables that open</h3><ul class="check-list">
-        <li><strong>Models:</strong> calls, tokens read and written, and estimated cost for each.</li>
-        <li><strong>System prompt sections:</strong> the largest twelve with their sizes. Look here before trimming an instruction file.</li>
-        <li><strong>Tool definitions and MCP servers:</strong> the largest, and the ones never called.</li>
-        <li><strong>Tool calls and shell commands:</strong> how often, failures and result sizes.</li>
-        <li><strong>Failed tool calls,</strong> grouped by tool and error.</li>
-        <li><strong>Files</strong> changed, and files read three times or more.</li>
-        <li><strong>The main chat, step by step:</strong> each message typed, the tool calls that followed and the tokens they added.</li>
-        <li><strong>Sub-agents:</strong> what each was asked, its model and its calls.</li>
-      </ul></article>
+  <section class="section tinted" id="areas"><div class="wrap">
+    <div class="section-heading"><p class="eyebrow">What it looks at</p><h2>Five areas, each with its own score.</h2><p>A session can be tidy on tools and wasteful on context. Each area shows where the points went.</p></div>
+    <div class="areas-layout">
+      <div class="area-grid">
+        <article><h3>Context</h3><p>Is every call carrying too much? Large instructions, unused tools, a context that keeps growing.</p></article>
+        <article><h3>Tools</h3><p>Did the agent search, read and run commands efficiently, or repeat itself and fail?</p></article>
+        <article><h3>How it went</h3><p>Was the task clear? How much steering, how long, how many sub-agents?</p></article>
+        <article><h3>Reliability</h3><p>Calls that failed, were rate limited, were cut off or were slow to start.</p></article>
+        <article><h3>Cost</h3><p>Frontier models for everyday work, and prompt caching that ran out or was missed.</p></article>
+      </div>
+      <figure class="scorecard" aria-label="An example score: 72 overall, with a score for each area">
+        <div class="scorecard-head"><span class="scorecard-score">72</span><span><strong>Some waste</strong><small>Example session</small></span></div>
+        <ul>
+          <li><span>Context</span><span class="bar"><i style="width:64%"></i></span><b>64</b></li>
+          <li><span>Tools</span><span class="bar"><i style="width:82%"></i></span><b>82</b></li>
+          <li><span>How it went</span><span class="bar"><i style="width:91%"></i></span><b>91</b></li>
+          <li><span>Reliability</span><span class="bar"><i style="width:100%"></i></span><b>100</b></li>
+          <li><span>Cost</span><span class="bar"><i style="width:73%"></i></span><b>73</b></li>
+        </ul>
+        <figcaption>Start at 100, lose points for each finding. One cause counts once, and the provider's own failures don't count against you.</figcaption>
+      </figure>
     </div>
   </div></section>
 
   <section class="section wrap" id="reviews">
-    <div class="section-heading"><p class="eyebrow">Focused coaching</p><h2>Nine review topics.<br>Ask the question that matters.</h2><p>Each topic asks its own question, sends only the parts of the session it needs, and includes the findings of the checks in its area. <strong>What gets sent</strong> shows the exact data, checks and prompt before you start.</p></div>
-    <div class="detail-grid">
-      <article><h3>The whole session</h3><p>The few changes, up to six, that would save the most across everything.</p></article>
-      <article><h3>Context and prompt</h3><p>What could be removed, shortened or loaded only when needed, largest part first, and what each change would save per call.</p></article>
-      <article><h3>Instruction files</h3><p>An editor’s audit of the system prompt section by section: what belongs in every call, what should move out, and an outline of a shorter version.</p></article>
-      <article><h3>Tool use</h3><p>What to tell the agent or set up in the project so it makes fewer and smaller calls, quoting the command or search and its replacement.</p></article>
-      <article><h3>Prompts and workflow</h3><p>Whether the task was stated well, how much steering it took, where planning first or a new session would have helped, and a better version of a weak prompt.</p></article>
-      <article><h3>Where the context grew</h3><p>The moments the context jumped, what caused each and what it cost afterwards, and where to clear, compact or hand work to a sub-agent.</p></article>
-      <article><h3>Cost and caching</h3><p>Which habits or settings would lower the cost and by roughly how much, and whether a smaller model could have done part of the work. Savings depend on the task and provider.</p></article>
-      <article><h3>Failures and speed</h3><p>Failed tool calls grouped by cause, what most likely caused each failure or wait, and what to check.</p></article>
-      <article><h3>Lessons for the project</h3><p>The lines to add to your project’s instruction file, written out, from what the agent had to discover for itself, so future sessions start with that knowledge.</p></article>
-    </div>
-    <p class="callout">Every topic gives the model the same rules: work only from the data, say when it can’t tell, don’t repeat numbers back, be specific and don’t invent facts about the project.</p>
-  </section>
-
-  <section class="section tinted" id="running"><div class="wrap">
-    <div class="section-heading"><p class="eyebrow">During a review</p><h2>Watch it work.<br>Come back to it later.</h2></div>
-    <div class="detail-grid">
-      <article><h3>Clear progress</h3><p>A running review shows where it is and how long it has taken: <strong>Sent</strong> while the model reads the data, <strong>Thinking</strong> while a reasoning model works (its thinking shows as it arrives, with a token count, so a quiet minute isn’t mistaken for a hang), <strong>Writing</strong> as the answer arrives, then <strong>Finished</strong>. <strong>Stop</strong> ends it early.</p></article>
-      <article><h3>Keeps running while you browse</h3><p>Leave the tab or go anywhere else in the console, and the review carries on. <strong>Open as a session</strong> shows it in the chat view. Closing or reloading the console stops it, because the page reads the reply.</p></article>
-      <article><h3>Recorded like any agent call</h3><p>A review is a private session of its own with its payloads captured. It shows on Sessions, Traffic and Requests, counts toward your usage limits, and has a cost on a paid provider.</p></article>
-      <article><h3>Earlier reviews</h3><p>Finished reviews are listed under <strong>Earlier reviews</strong> to read again. A review lasts as long as its own session. Someone else’s review of a session you share shows only if they share the review’s session too.</p></article>
-    </div>
-  </div></section>
-
-  <section class="section wrap" id="custom">
-    <div class="section-heading"><p class="eyebrow">Your own prompts</p><h2>Review for what your team cares about.</h2><p>Site admins can replace the set of review topics on <strong>Server settings › Review prompts</strong>, as one YAML document. Each prompt chooses its question, the session data it sends and the checks whose findings go with it. <strong>Use the shipped prompts</strong> goes back to the nine above.</p></div>
-    <div class="code-window"><div class="code-toolbar"><span class="mono">SERVER SETTINGS / REVIEW PROMPTS</span></div><pre tabindex="0" aria-label="An example custom review prompt"><code>prompts:
-  - id: risky-commands
-    title: Risky commands
-    about: What the agent ran that deserves a second look.
-    focus: &gt;-
-      Look at the shell commands the agent ran. Say which could have changed
-      something outside the project folder, and what rule in the instruction
-      file would prevent each.
-    data: [session, commands, errors, edits]
-    metrics: [tool-errors, repeated-calls]
-    suggestions: 3</code></pre></div>
-    <div class="detail-grid">
-      <article><h3>Nineteen kinds of data to choose from</h3><p>Pick what a prompt sends, such as the session summary, tokens, cost, the context timeline, the system prompt outline, tool calls, shell commands, searches, edited files and errors. The server adds the shared rules and the shape of the answer around your question.</p></article>
-      <article><h3>From a script</h3><p><code>GET /api/sessions/&lt;id&gt;/review</code> returns the measurements, findings, score and prompts as JSON, so a script can check sessions after a run. The prompts are part of the server’s settings, so <code>agent-server config export</code> and <code>import</code> carry them.</p></article>
-    </div>
+    <div class="section-heading"><p class="eyebrow">Ask a model</p><h2>Pick what to review.</h2><p>Each review sends only what it needs and returns a summary, numbered suggestions and what went well. Site admins can add their own.</p></div>
+    <ul class="topic-chips">
+      <li>The whole session</li><li>Context and prompt</li><li>Instruction files</li><li>Tool use</li><li>Prompts and workflow</li><li>Where the context grew</li><li>Cost and caching</li><li>Failures and speed</li><li>Lessons for the project</li>
+    </ul>
   </section>
 
   <section class="section tinted" id="data"><div class="wrap">
-    <div class="section-heading"><p class="eyebrow">Your choice of reviewer</p><h2>Choose the model.<br>Understand what it receives.</h2></div>
-    <div class="detail-grid">
-      <article><h3>Local models or hosted APIs</h3><p>Choose any provider you can use that supports OpenAI Chat with the server’s own credentials: a model server on one of your machines, or a hosted API or gateway with a key stored on the server. Providers that need the agent’s own credentials are not offered. Larger models give better advice; small local ones tend to repeat the numbers back.</p></article>
-      <article><h3>Selected evidence, at most 16,000 characters</h3><p>The model receives only what the chosen topic lists: measurements and findings, the start of the system prompt and its section titles, the names of tools, MCP servers and files, short command lines and search patterns, the start of each kind of tool error, and the first few messages typed. It never receives the full transcript, file contents or whole tool results. Pick a provider you would send that to.</p></article>
+    <div class="section-heading"><p class="eyebrow">Your model, your data</p><h2>A short summary goes to the model. Not your code.</h2><p>Use a model on your own machines or a hosted API with the server's key. The review is recorded like any agent session.</p></div>
+    <div class="sent-diagram" aria-label="What the reviewing model receives">
+      <div class="sent-box sent-yes"><h3>Sent, up to 16,000 characters</h3><ul><li>Measurements and findings</li><li>The start of the system prompt</li><li>Tool, file and command names</li><li>The first few messages you typed</li></ul></div>
+      <div class="sent-arrow" aria-hidden="true">→ <span>model</span></div>
+      <div class="sent-box sent-no"><h3>Never sent</h3><ul><li>The full transcript</li><li>File contents</li><li>Whole tool results</li></ul></div>
     </div>
-    <p class="callout">The review suggests changes to your workflow; it does not change your code or settings. Check its advice against what you know about your project. Cost figures are estimates, and a session review is not a correctness or security audit of the code. Anyone who can see a session can review it.</p>
-    <a class="text-link" href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/session-review.md">Read the session review guide →</a>
+    <p class="callout">The advice is a suggestion to check against your project; it changes nothing by itself. Costs are estimates. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/session-review.md">The full session review guide →</a></p>
   </div></section>
 </main>
   <footer class="site-footer wrap">
