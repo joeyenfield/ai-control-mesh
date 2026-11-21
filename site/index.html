@@ -64,7 +64,7 @@
         <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Open source · MIT licensed · Self-hosted</p>
         <h1 id="hero-title">Your AI agents.<br>Your infrastructure.<br><span>One control plane.</span></h1>
         <p class="hero-lede">AI Control Mesh brings your coding agents, models and machines into one web console you host. Start and watch agents, answer their prompts from your phone, track usage and estimated costs, and review sessions with AI coaching.</p>
-        <ul class="agent-chips" aria-label="Agents it runs"><li>Claude Code</li><li>Codex</li><li>Copilot CLI</li><li>OpenCode</li><li>Qwen Code</li><li>Aider</li><li>Goose</li><li>Hermes Agent</li></ul>
+        <ul class="agent-chips" aria-label="Agents it runs"><li>Claude Code</li><li>Codex</li><li>Copilot CLI</li><li>OpenCode</li><li>Qwen Code</li><li>Aider</li><li>Goose</li><li>Hermes Agent</li><li>Antigravity CLI</li></ul>
         <div class="actions">
           <a class="button button-primary" href="/quickstart.html">Try locally <span aria-hidden="true">→</span></a>
           <a class="button button-outline" href="/teams.html">Explore team deployment <span aria-hidden="true">→</span></a>
@@ -119,7 +119,7 @@
       </div>
       <div class="any-grid">
         <article><h3>Start it where the work is</h3><p>Pick a machine and an agent on <strong>Start an agent</strong>. It starts in a folder the machine’s owner allows and appears in <strong>Live agent view</strong> next to your other agents.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/console.md#live-agent-view">The live agent view →</a></article>
-        <article><h3>Your plan or your models</h3><p>Claude Code, Codex and Copilot CLI can use your own plans. OpenCode, Qwen Code, Aider, Goose, Hermes Agent and others use Ollama, llama.cpp, Strata, LM Studio or vLLM on your machines, or a hosted API. Every request is recorded either way.</p><a href="#compatibility">Which agent works with what →</a></article>
+        <article><h3>Your plan or your models</h3><p>Claude Code, Codex, Copilot CLI and Antigravity CLI can use your own plans or Google account. OpenCode, Qwen Code, Aider, Goose, Hermes Agent, Antigravity CLI and others use Ollama, llama.cpp, Strata, LM Studio or vLLM on your machines, or a hosted API. Every request is recorded either way.</p><a href="#compatibility">Which agent works with what →</a></article>
         <article class="android-card"><span class="run-kind">ANDROID APP</span><h3>Your agents in your pocket</h3><p>The Android app opens each of your servers’ consoles full screen, on <strong>Running agents</strong>. Watch terminals, type into them and answer prompts from your phone. Each server offers its matching app at <code>/android</code>.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/accounts.md#the-android-app">About the Android app →</a></article>
       </div>
     </section>
@@ -141,7 +141,7 @@
     <section class="section wrap" id="platform" aria-labelledby="platform-title">
       <div class="section-heading"><p class="eyebrow">04 / Choose the model</p><h2 id="platform-title">Three routes to a model.<br>Mix them as you like.</h2><p id="use-cases">Use local models, a hosted API or a supported vendor account. Compatibility depends on the agent and provider; the table below shows the supported combinations. Track their activity in the same console.</p></div>
       <div class="trust-grid">
-        <article><span class="run-kind">YOUR ACCOUNTS</span><h3>The plans you already have</h3><p>Claude Code, Codex and Copilot CLI keep their own sign-in and vendor service. The server records their traffic in transit, for the launched agent only.</p><a href="/security.html#account-capture">How account capture works →</a></article>
+        <article><span class="run-kind">YOUR ACCOUNTS</span><h3>The plans you already have</h3><p>Claude Code, Codex, Copilot CLI and Antigravity CLI keep their own sign-in and vendor service. The server records their traffic in transit, for the launched agent only.</p><a href="/security.html#account-capture">How account capture works →</a></article>
         <article><span class="run-kind">OWN PROVIDER</span><h3>Providers of your own</h3><p>Whatever serves models on your machines: Ollama, llama.cpp, Strata, Docker Model Runner, LM Studio or vLLM, each added as a provider with one click. Ollama requests are also translated and tuned per model.</p><a href="#compatibility">Check the combinations →</a></article>
         <article><span class="run-kind">HOSTED APIS</span><h3>Any compatible API</h3><p>OpenAI, Anthropic, OpenRouter, LiteLLM and other OpenAI or Anthropic-compatible services. The key stays on the server, never on the agent’s computer.</p><a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/providers.md">Provider reference →</a></article>
       </div>
@@ -149,7 +149,7 @@
         <p>These are the shipped routes. A supported protocol doesn’t guarantee that every agent version, model or tool call works well, so test your combination.</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="Local model compatibility table"><table>
           <caption>1. Own-provider agents and which providers they can use</caption><thead><tr><th scope="col">Agent / protocol</th><th scope="col">Ollama</th><th scope="col">llama.cpp</th><th scope="col">Strata</th><th scope="col">Docker Model Runner*</th><th scope="col">API providers‡</th></tr></thead>
-          <tbody><tr><th scope="row">Qwen Code, OpenCode, Copilot CLI (BYOK), Hermes Agent<small>OpenAI Chat</small></th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes*</td><td>If it speaks Chat</td></tr>
+          <tbody><tr><th scope="row">Qwen Code, OpenCode, Copilot CLI (BYOK), Hermes Agent, Antigravity CLI<small>OpenAI Chat</small></th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes*</td><td>If it speaks Chat</td></tr>
           <tr><th scope="row">Claude Code<small>Anthropic Messages</small></th><td>Translated</td><td>Yes</td><td>Yes</td><td>Yes*</td><td>If it speaks Messages</td></tr>
           <tr><th scope="row">Codex<small>OpenAI Responses</small></th><td>Pass-through†</td><td>Yes</td><td>Yes</td><td>Yes*</td><td>If it speaks Responses</td></tr>
           <tr><th scope="row">Aider, Goose<small>Native Ollama</small></th><td>Yes</td><td>No</td><td>No</td><td>Yes*</td><td>No</td></tr></tbody>
@@ -157,7 +157,7 @@
         <p>* Docker Model Runner integration is implemented but verified here against mocks, not a real Model Runner: treat it as experimental for evaluation. † Codex needs Ollama’s Responses support; per-request Ollama tuning is not applied on this route. Set context on the model server. llama.cpp uses <code>llama-server</code> in router mode. ‡ OpenAI and Anthropic-compatible APIs: hosted (OpenAI, Anthropic, OpenRouter, LiteLLM Proxy, Groq, DeepSeek, Azure OpenAI, ...) or on your machines (LM Studio, vLLM, SGLang). Each is set up with the protocols it speaks; requests pass through untranslated. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/providers.md#compatibility">Compatibility notes →</a></p>
         <div class="route-grid"><article><h3>2. Hosted API forwarding</h3><p><code>claude-subscription</code> forwards Claude Code’s Anthropic API calls using the agent’s own credentials. Other traffic, such as OAuth and telemetry, can go directly to the vendor. This is not a general gateway for every cloud API.</p></article>
         <article><h3>3. Vendor-account capture</h3><p><code>claude-account</code>, <code>codex-account</code> and <code>copilot-account</code> keep using their vendor services. The server decrypts permitted proxied traffic using a CA trusted by the launched process tree. <a href="/security.html#account-capture">Review that trust boundary</a>.</p></article></div>
-        <p>Local model routing does not make the whole agent offline. Agents and tools can still contact external services. MCP support also varies: Aider and Hermes Agent cannot attach shared MCP servers. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/running-agents.md">Agent setup →</a> · <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/providers.md">Provider reference →</a></p>
+        <p>Local model routing does not make the whole agent offline. Agents and tools can still contact external services. MCP support also varies: Aider, Hermes Agent and Antigravity CLI cannot attach shared MCP servers. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/running-agents.md">Agent setup →</a> · <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/providers.md">Provider reference →</a></p>
       </details>
     </section>
     <section class="product-section section" id="product" aria-labelledby="product-title">
