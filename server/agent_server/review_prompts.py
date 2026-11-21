@@ -44,6 +44,7 @@ DATA = {
     "searches": "What the agent searched for",
     "edits": "The files it changed",
     "errors": "Failed tool calls and their errors",
+    "security": "Credentials, personal data and files of secrets sent to the model (masked)",
 }
 
 # What each check is called. One entry per check in review.CHECKS.
@@ -55,9 +56,10 @@ METRICS = {
     "repeated-calls": "Repeated tool calls", "subagents": "Sub-agents", "short-prompt": "First prompt", "steering": "Messages typed",
     "failed-calls": "Failed model calls", "rate-limited": "Rate limits", "incomplete": "Replies cut off", "model-tiers": "Model tiers", "caching": "Cache use",
     "idle-cache": "Cache lost to idle time", "slow": "Time to first token", "untraced": "Payload capture",
+    "credentials": "Credentials sent", "personal-data": "Personal data sent", "secret-files": "Files of secrets read",
 }
 
-PREAMBLE = """You review one recorded session of an AI coding agent, to help the engineer who ran it get more from coding agents: fewer tokens, less waiting, lower cost, better results.
+PREAMBLE = """You review one recorded session of an AI coding agent, to help the engineer who ran it get more from coding agents: fewer tokens, less waiting, lower cost, better results, and no secrets or personal data sent where they shouldn't go.
 
 You are given measurements of the session and what automatic checks found, not its transcript. Work only from them, and say so when they can't tell. Don't repeat the numbers back: say what they mean and what to change. Be specific: name the tool, the file, the command, the setting or the habit. Don't invent facts about the project, and don't suggest changing anything the data doesn't mention. Every figure you give must come from the data: where it gives none for a saving, describe the saving in words instead of estimating one. Token counts of payloads are estimates."""
 

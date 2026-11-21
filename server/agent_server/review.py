@@ -7,6 +7,14 @@ sub-agent, and the main chat step by step. It then runs a fixed list of checks (
 finding says what was seen, why it matters and what to do about it, and where it can, about how
 many tokens it cost. No model is involved in any of that.
 
+The same payloads are read for what shouldn't have been sent at all (_security, exposure.py):
+credentials, personal data, and files and commands that hold secrets. Those findings are in the
+security area and make a score of their own (SECURITY_PENALTIES, SECURITY_GRADES), apart from the
+efficiency score: a leaked key isn't waste, and a tidy session can still have leaked one. No
+finding or brief ever carries a value found, only its kind and a masked preview. How hard it looks
+is a setting (security_scan, SCAN_LEVELS): off, credentials only, everything, or everything loosely
+and in the model's replies too.
+
 brief() writes part of the report as the messages a model is asked to review, by one of the
 server's prompts (review_prompts.py, a stored setting): each prompt has its own question, the
 parts of the report it is sent (the functions in SECTIONS, by the names in review_prompts.DATA)
@@ -24,12 +32,13 @@ import json
 import re
 import statistics
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
 
-from . import api_providers, pricing
+from . import api_providers, defaults, exposure, pricing
 from .chat import _is_model_call, _plain, response_turn
-from .config import Backend, Settings, serves
+from .config import Backend, Settings, checked_security_scan, serves
 from .review_prompts import DATA, METRICS, Prompt
 from .sessions import Session, SessionStore
 
@@ -56,6 +65,44 @@ GROUP_SHARE = 1 / 3
 AREAS = ("context", "tools", "flow", "reliability", "cost")
 # Findings that are the provider's doing, not the session's: shown, and passed to the AI review, but not scored.
 UNSCORED = {"slow"}
+# What was sent that shouldn't have been. Its findings make the security score instead of counting in the score above.
+SECURITY = "security"
+# A security finding's points: its severity's, and SECURITY_EXTRA more for each item after the first, up to its cap.
+SECURITY_PENALTIES = {"high": 40, "medium": 20, "low": 5, "info": 0}
+SECURITY_EXTRA = 5
+SECURITY_CAPS = {"high": 60, "medium": 30, "low": 10, "info": 0}
+SECURITY_GRADES = ((100, "Nothing found"), (80, "Minor exposure"), (50, "Exposed"), (0, "Badly exposed"))
+# Distinct pieces of personal data that make a finding medium, then high: a few addresses in a git log
+# are one thing, a customer table read into the context another.
+PII_ITEMS = (10, 50)
+# How many of the items found a report lists, and how much distinct text a session's scan reads at most
+# (about half a second a megabyte: the Review tab waits for it).
+EXPOSURES_LISTED = 40
+
+
+@dataclass(frozen=True)
+class ScanLevel:
+    """How hard the security scan looks (the security_scan setting)."""
+    # The kinds of detector run (exposure.CREDENTIAL, exposure.PII).
+    kinds: frozenset[str]
+    # Distinct text read at most, in characters.
+    limit: int
+    # Guessed secrets found loosely (exposure._loose): more found, more false alarms.
+    loose: bool = False
+    # The model's own replies read too: what it echoed back, or wrote into a file, is sent again next call.
+    replies: bool = False
+
+
+# off: no security score; basic: credentials and files of secrets, no personal data; standard: everything;
+# thorough: everything, loosely, and the model's replies too, with four times the text.
+SCAN_LEVELS: dict[str, ScanLevel | None] = {
+    "off": None,
+    "basic": ScanLevel(frozenset({exposure.CREDENTIAL}), 8_000_000),
+    "standard": ScanLevel(frozenset({exposure.CREDENTIAL, exposure.PII}), 16_000_000),
+    "thorough": ScanLevel(frozenset({exposure.CREDENTIAL, exposure.PII}), 64_000_000, loose=True, replies=True),
+}
+assert tuple(SCAN_LEVELS) == defaults.SECURITY_SCANS
+SCAN_LIMIT = SCAN_LEVELS[defaults.SECURITY_SCAN].limit  # type: ignore[union-attr]
 
 # Where a check starts to say something, and where it says it louder. Tokens in payloads are
 # estimated at four characters each: close enough to tell 2,000 from 20,000.
@@ -129,12 +176,14 @@ CATEGORIES = (
 )
 
 
-def report(sessions: SessionStore, chats: Any, session: Session, records: list[dict[str, Any]], prices: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def report(sessions: SessionStore, chats: Any, session: Session, records: list[dict[str, Any]], prices: list[dict[str, Any]] | None = None,
+           scan: str = defaults.SECURITY_SCAN) -> dict[str, Any]:
     """The session measured and checked: traffic and the timeline (from its records, always), and prompt,
     context, conversation and tools (only for model calls whose payloads were captured), then the findings,
     worst first, and the score they leave. prices is the server's price table (Settings.prices()), which
-    says each model's tier."""
+    says each model's tier; scan is the security scan's level (SCAN_LEVELS)."""
     calls = sorted((record for record in records if _is_model_call(record)), key=lambda record: str(record.get("request_id") or ""))
+    level = SCAN_LEVELS[checked_security_scan(scan)]
     traffic = _traffic(records, calls, prices if prices is not None else pricing.DEFAULT_PRICES)
     threads = chats.conversations(session, records) if calls else []
     main = next((item for item in threads if item["main"]), None)
@@ -144,24 +193,33 @@ def report(sessions: SessionStore, chats: Any, session: Session, records: list[d
         request = trace.get("request") if isinstance(trace.get("request"), dict) else {}
     tools = _tools(threads)
     prompt = _prompt(request, tools) if request else None
+    traced = sum(len(item["requests"]) for item in threads)
     # The main chat's calls where they're known: sub-agents and background calls have contexts of their own.
     mine = set(main["requests"]) if main else None
     measured = {
-        "traced_calls": sum(len(item["requests"]) for item in threads),
+        "traced_calls": traced,
         "traffic": traffic,
         "timeline": _timeline([record for record in calls if mine is None or str(record.get("request_id")) in mine]),
         "prompt": prompt,
         "context": _composition(main, prompt) if main and prompt else None,
         "conversation": _conversation(threads) if threads else None,
         "tools": tools if threads else None,
+        # Only what was captured can be read for secrets: None when no payload was, or the scan is off.
+        "security": _security(threads, _system_text(request) if request else "", level, scan) if traced and level else None,
     }
     found = [finding for check in CHECKS for finding in [check(measured)] if finding]
     # Worst first, and within a level the one that cost most.
     found.sort(key=lambda item: (SEVERITIES.index(item["severity"]), -(item["impact_tokens"] or 0)))
     breakdown = _score(found)
+    if measured["security"] is not None:
+        lost = _security_score(found)
+        measured["security"]["score"] = max(0, 100 - lost)
+        measured["security"]["grade"] = next(label for floor, label in SECURITY_GRADES if measured["security"]["score"] >= floor)
     score = max(0, 100 - sum(item["points"] for item in breakdown)) if calls else None
     return {
         "session_id": session.session_id, **measured, "findings": found, "checks": len(CHECKS), "score": score,
+        # The security scan's level: with "off", security is None however much was captured.
+        "security_scan": checked_security_scan(scan),
         "grade": next(label for floor, label in GRADES if score >= floor) if score is not None else None,
         "score_breakdown": breakdown if calls else [],
         "area_scores": [
@@ -179,6 +237,9 @@ def _score(found: list[dict[str, Any]]) -> list[dict[str, Any]]:
     lost: dict[str, dict[str, Any]] = {}
     # found is worst first, so a group's first finding is the one that costs in full.
     for finding in found:
+        if finding["area"] == SECURITY:
+            # Scored apart (_security_score).
+            continue
         full = 0 if finding["id"] in UNSCORED else PENALTIES[finding["severity"]]
         if finding.pop("provider_side", False):
             full = 0
@@ -192,6 +253,19 @@ def _score(found: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif not entry["checks"] and group is None:
             del lost[key]
     return sorted((item for item in lost.values() if item["points"]), key=lambda item: -item["points"])
+
+
+def _security_score(found: list[dict[str, Any]]) -> int:
+    """Sets each security finding's penalty, and returns the points they take off the security score."""
+    lost = 0
+    for finding in found:
+        if finding["area"] != SECURITY:
+            continue
+        severity = finding["severity"]
+        extra = SECURITY_EXTRA * max(0, int(finding.pop("items", 1)) - 1)
+        finding["penalty"] = min(SECURITY_CAPS[severity], SECURITY_PENALTIES[severity] + extra)
+        lost += finding["penalty"]
+    return lost
 
 
 def _tier(record: dict[str, Any], prices: list[dict[str, Any]]) -> str:
@@ -311,13 +385,7 @@ def _timeline(calls: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _prompt(request: dict[str, Any], tools: dict[str, Any]) -> dict[str, Any]:
     """What the main chat's newest call sends before the conversation: its system prompt and tool definitions."""
-    parts = [_plain(request.get("system")), _plain(request.get("instructions"))]
-    sent = request.get("messages") or request.get("input")
-    for message in sent if isinstance(sent, list) else []:
-        if not isinstance(message, dict) or message.get("role") not in ("system", "developer"):
-            break
-        parts.append(_plain(message.get("content")))
-    system = "\n".join(part for part in parts if part)
+    system = _system_text(request)
     defined = [item for item in request.get("tools") or [] if isinstance(item, dict)]
     sizes = [
         (str(item.get("name") or (item.get("function") or {}).get("name") or item.get("type") or ""), len(json.dumps(item, ensure_ascii=False)) // CHARS_PER_TOKEN)
@@ -344,6 +412,17 @@ def _prompt(request: dict[str, Any], tools: dict[str, Any]) -> dict[str, Any]:
         "unused_tool_tokens": sum(tokens for name, tokens in sizes if name not in used),
         "mcp_servers": sorted(servers.values(), key=lambda item: -item["tools"]),
     }
+
+
+def _system_text(request: dict[str, Any]) -> str:
+    """A call's system prompt: its system field, its instructions, and the system and developer messages it starts with."""
+    parts = [_plain(request.get("system")), _plain(request.get("instructions"))]
+    sent = request.get("messages") or request.get("input")
+    for message in sent if isinstance(sent, list) else []:
+        if not isinstance(message, dict) or message.get("role") not in ("system", "developer"):
+            break
+        parts.append(_plain(message.get("content")))
+    return "\n".join(part for part in parts if part)
 
 
 def _sections(system: str) -> list[dict[str, Any]]:
@@ -515,6 +594,94 @@ def _call(block: dict[str, Any]) -> dict[str, Any]:
         "name": name, "category": category, "target": target, "result_chars": 0, "error": False, "command": " ".join(command.split()) if shell else "",
         "key": name + " " + json.dumps(block.get("input"), sort_keys=True, ensure_ascii=False, default=str),
     }
+
+
+# Where something was sent from, as a finding says it.
+WHERE = {
+    "typed": "typed into the chat", "added": "added to the chat by the agent", "tool-call": "in a tool call",
+    "tool-result": "in a tool result", "system-prompt": "in the system prompt", "reply": "in the model's reply",
+}
+
+
+def _security(threads: list[dict[str, Any]], system: str, level: ScanLevel, name: str) -> dict[str, Any]:
+    """What the model was sent that it shouldn't have been: credentials and personal data in any text it read
+    (exposure.find), and tool calls that read a file of secrets or printed the environment and got an answer.
+    Each item once, with where it was first seen and in how many places; masked, never the value."""
+    items: dict[tuple[str, str], dict[str, Any]] = {}
+    sources: dict[str, dict[str, Any]] = {}
+    # Agents send their history again with every call, and a text seen once is enough.
+    read: set[int] = set()
+    budget = level.limit
+
+    def scan(text: Any, where: str, tool: str = "", target: str = "") -> None:
+        nonlocal budget
+        if not isinstance(text, str) or not text or budget <= 0 or hash(text) in read:
+            return
+        read.add(hash(text))
+        text = text[:budget]
+        budget -= len(text)
+        for found in exposure.find(text, level.kinds, level.loose):
+            entry = items.setdefault((found.detector.id, found.value), {
+                "type": found.detector.id, "label": found.detector.label, "kind": found.detector.kind, "severity": found.detector.severity,
+                "preview": exposure.masked(found), "where": where, "tool": tool, "target": exposure.redact(target)[:160], "times": 0,
+            })
+            entry["times"] += 1
+
+    scan(system, "system-prompt")
+    for item in threads:
+        calls: dict[str, dict[str, Any]] = {}
+        for turn in item["turns"] or []:
+            if turn.get("inherited"):
+                continue
+            for block in turn["blocks"]:
+                if block["type"] == "text" and turn["role"] != "assistant":
+                    scan(block.get("text"), "system-prompt" if turn["role"] == "system" else "typed" if block.get("author") == "person" else "added")
+                elif block["type"] == "text" and level.replies:
+                    scan(block.get("text"), "reply")
+                elif block["type"] == "tool_use":
+                    call = calls[block.get("id") or ""] = _call(block)
+                    for text in _strings(block.get("input")):
+                        scan(text, "tool-call", call["name"], call["command"] or call["target"])
+                elif block["type"] == "tool_result":
+                    call = calls.get(block.get("tool_use_id") or "")
+                    scan(block.get("text"), "tool-result", call["name"] if call else "", (call["command"] or call["target"]) if call else "")
+                    source = _secret_source(call) if call and not block.get("is_error") and (block.get("text") or "").strip() else None
+                    if source:
+                        entry = sources.setdefault(source, {"source": source, "tool": call["name"], "command": exposure.redact(call["command"] or call["target"])[:160], "times": 0})
+                        entry["times"] += 1
+    found = sorted(items.values(), key=lambda entry: (entry["kind"] != exposure.CREDENTIAL, SEVERITIES.index(entry["severity"]), -entry["times"]))
+    credentials = [entry for entry in found if entry["kind"] == exposure.CREDENTIAL]
+    personal = [entry for entry in found if entry["kind"] == exposure.PII]
+    return {
+        "score": None, "grade": None, "level": name,
+        "credentials": len(credentials), "credentials_high": sum(entry["severity"] == "high" for entry in credentials),
+        "personal_data": len(personal), "personal_data_high": sum(entry["severity"] == "high" for entry in personal),
+        "secret_sources": len(sources),
+        # Text past the level's limit wasn't read: the counts are a floor.
+        "scan_limited": budget <= 0,
+        "exposures": found[:EXPOSURES_LISTED],
+        "sources": sorted(sources.values(), key=lambda entry: -entry["times"])[:EXPOSURES_LISTED],
+    }
+
+
+def _strings(value: Any) -> list[str]:
+    """Every string in a tool call's arguments: the command, the file's new contents, the request body."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [text for item in value.values() for text in _strings(item)]
+    if isinstance(value, list):
+        return [text for item in value for text in _strings(item)]
+    return []
+
+
+def _secret_source(call: dict[str, Any]) -> str | None:
+    """The file of secrets a tool call read, or "environment variables" for a command that printed them all."""
+    if call["category"] == "edit":
+        return None
+    if call["command"]:
+        return "environment variables" if exposure.dumps_environment(call["command"]) else exposure.sensitive_path(call["command"])
+    return exposure.sensitive_path(call["target"])
 
 
 def _finding(check: str, area: str, severity: str, title: str, detail: str, suggestion: str, impact: int | None = None) -> dict[str, Any]:
@@ -854,13 +1021,77 @@ def _untraced(m: dict[str, Any]) -> dict[str, str] | None:
     )
 
 
+def _where(entry: dict[str, Any]) -> str:
+    called = " ".join(part for part in (entry["tool"], entry["target"]) if part)
+    return WHERE[entry["where"]] + (f" ({called})" if called else "")
+
+
+def _credentials(m: dict[str, Any]) -> dict[str, Any] | None:
+    security = m.get("security")
+    if not security or not security["credentials"]:
+        return None
+    shown = [entry for entry in security["exposures"] if entry["kind"] == exposure.CREDENTIAL]
+    finding = _finding(
+        "credentials", SECURITY, "high" if security["credentials_high"] else "medium",
+        "A credential was sent to the model" if security["credentials"] == 1 else "Credentials were sent to the model",
+        f"{_count(security['credentials'], 'credential')} went to the model: "
+        + "; ".join(f"{entry['label']} {entry['preview']}, {_where(entry)}" for entry in shown[:4])
+        + (f", and {_n(security['credentials'] - 4)} more" if security["credentials"] > 4 else "")
+        + ". The provider may keep what it's sent, and anything in the context can turn up in the agent's output, a log or a commit.",
+        "Treat each one as leaked and rotate it. Then keep secrets out of what the agent reads: load them from a secrets manager or variables its "
+        "commands don't print, deny it .env and key files, and never paste a token into the chat.",
+    )
+    finding["items"] = security["credentials"]
+    return finding
+
+
+def _personal_data(m: dict[str, Any]) -> dict[str, Any] | None:
+    security = m.get("security")
+    if not security or not security["personal_data"]:
+        return None
+    count, sensitive = security["personal_data"], security["personal_data_high"]
+    level = "high" if sensitive >= 3 or count >= PII_ITEMS[1] else "medium" if sensitive or count >= PII_ITEMS[0] else "low"
+    kinds = Counter(entry["label"] for entry in security["exposures"] if entry["kind"] == exposure.PII)
+    examples = [entry for entry in security["exposures"] if entry["kind"] == exposure.PII and entry["severity"] != "low"][:3]
+    only_emails = set(kinds) == {"Email address"}
+    finding = _finding(
+        "personal-data", SECURITY, level, "Personal data was sent to the model",
+        f"{_count(count, 'piece')} of personal data went to the model: "
+        + ", ".join(f"{_n(times)} × {label.lower()}" for label, times in kinds.most_common())
+        + ("" if not examples else " (" + "; ".join(f"{entry['preview']} {_where(entry)}" for entry in examples) + ")") + "."
+        + (" Email addresses often come from git logs and commit authors, which matters less than customer data." if only_emails else ""),
+        "Work on made-up or masked data: seeded fixtures or a scrubbed copy of the database rather than real rows, and show the agent the schema, "
+        "not the data. Check that this data may go to this provider at all.",
+    )
+    finding["items"] = count
+    return finding
+
+
+def _secret_files(m: dict[str, Any]) -> dict[str, Any] | None:
+    security = m.get("security")
+    if not security or not security["secret_sources"]:
+        return None
+    sources = security["sources"]
+    finding = _finding(
+        "secret-files", SECURITY, "medium", "The agent read files that hold secrets",
+        "What came back went to the model: " + "; ".join(f"{entry['source']} ({entry['tool']}" + (f": {entry['command']}" if entry["command"] else "") + ")" for entry in sources[:4])
+        + (f", and {_n(len(sources) - 4)} more" if len(sources) > 4 else "") + ". Whatever such a file holds is in the context, even where the checks don't recognise it as a key.",
+        "Deny the agent these paths in its permission settings or ignore file, and give it an example file (.env.example) to learn the names from. "
+        "If a command needs a secret, let it read it from the environment without printing it.",
+    )
+    finding["items"] = security["secret_sources"]
+    return finding
+
+
 # The list, in the order the areas read: what fills the context, how the tools were used, how the session
-# went, what failed, what it cost. Each takes the measurements and returns a finding or None.
+# went, what failed, what it cost, and what was sent that shouldn't have been. Each takes the measurements
+# and returns a finding or None.
 CHECKS: tuple[Callable[[dict[str, Any]], dict[str, str] | None], ...] = (
     _system_prompt, _tool_definitions, _unused_tools, _peak_context, _context_growth, _images, _compactions, _long_session,
     _searching, _rereads, _large_results, _tool_errors, _repeated_calls,
     _subagents, _short_prompt, _steering,
     _failed_calls, _rate_limited, _incomplete, _model_tiers, _caching, _idle_cache, _slow, _untraced,
+    _credentials, _personal_data, _secret_files,
 )
 
 def _session_lines(session: Session, found: dict[str, Any]) -> list[str]:
@@ -871,6 +1102,7 @@ def _session_lines(session: Session, found: dict[str, Any]) -> list[str]:
         f"Score from the automatic checks: {found['score']} of 100 ({found['grade']})." if found.get("score") is not None else "",
         _breakdown_line(found),
         ("Scores by area: " + ", ".join(f"{item['area']} {item['score']}" for item in found["area_scores"]) + ".") if found.get("area_scores") else "",
+        f"Security score, scored apart: {found['security']['score']} of 100 ({found['security']['grade']})." if (found.get("security") or {}).get("score") is not None else "",
     ]
 
 
@@ -1054,13 +1286,31 @@ def _error_lines(session: Session, found: dict[str, Any]) -> list[str]:
             *(f"- {item['name']} {item['target']} ({item['times']}): {item['error']}" for item in tools["error_samples"])]
 
 
+def _security_lines(session: Session, found: dict[str, Any]) -> list[str]:
+    security = found.get("security")
+    if not security:
+        return ["No payloads were captured, so what was sent couldn't be checked for credentials or personal data."]
+    lines = [
+        (f"Security score: {security['score']} of 100 ({security['grade']}). " if security.get("score") is not None else "")
+        + f"Credentials sent: {security['credentials']}. Pieces of personal data sent: {security['personal_data']}. "
+        f"Files of secrets or environment dumps read: {security['secret_sources']}. Values are masked here.",
+    ]
+    if security["exposures"]:
+        lines += ["What was found (what, masked, where it was first seen, places seen):",
+                  *(f"- {entry['label']}, {entry['preview']}, {_where(entry)}, {entry['times']}" for entry in security["exposures"][:20])]
+    if security["sources"]:
+        lines += ["Files and commands that hold secrets, read with an answer (what, tool, command, times):",
+                  *(f"- {entry['source']}, {entry['tool']}, {entry['command'] or 'none'}, {entry['times']}" for entry in security["sources"][:10])]
+    return lines
+
+
 # The lines behind each name a prompt can list (review_prompts.DATA has the names and what they're called).
 SECTIONS: dict[str, Callable[[Session, dict[str, Any]], list[str]]] = {
     "session": _session_lines, "tokens": _token_lines, "cost": _cost_lines, "reliability": _reliability_lines,
     "timeline": _timeline_lines, "context": _composition_lines, "prompt": _prompt_lines, "system-outline": _outline_lines,
     "tool-definitions": _definition_lines, "conversation": _conversation_lines, "threads": _thread_lines, "typed": _typed_lines,
     "steps": _step_lines, "tools": _tool_lines, "files": _file_lines, "commands": _command_lines, "searches": _search_lines,
-    "edits": _edit_lines, "errors": _error_lines,
+    "edits": _edit_lines, "errors": _error_lines, "security": _security_lines,
 }
 assert set(SECTIONS) == set(DATA)
 
@@ -1081,7 +1331,9 @@ def brief(session: Session, found: dict[str, Any], prompt: Prompt, question: str
         lines.append(f"- [{item['severity']}] {item['title']}: {item['detail']}{cost}")
     if not findings:
         lines.append("- nothing in this area")
-    text = "\n".join(lines)[:BRIEF_LIMIT]
+    # The brief quotes commands, messages typed and the start of the system prompt: a secret the session leaked
+    # mustn't go on to the reviewing model too.
+    text = exposure.redact("\n".join(lines))[:BRIEF_LIMIT]
     asked = " ".join(str(question or "").split())[:QUESTION_LIMIT]
     if asked:
         text += f"\n\nThe engineer also asks: {asked}"

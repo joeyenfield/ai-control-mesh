@@ -28,6 +28,7 @@
 #                  searches       what the agent searched for
 #                  edits          the files it changed, and how often
 #                  errors         failed tool calls with the start of each error
+#                  security       credentials and personal data found in what was sent (masked), files of secrets read
 #   metrics      the checks whose findings go with it, by id, or "all" (docs/session-review.md lists them)
 #   suggestions  how many suggestions to ask for at most (1 to 10, default 4)
 
@@ -40,7 +41,7 @@ prompts:
       save the most, in tokens, time or money, and leave out what barely matters. Where two findings
       share a cause, name the cause once.
     summary: how the session went and where most of its tokens and time were spent.
-    data: [session, tokens, cost, reliability, context, prompt, conversation, typed, steps, tools, files, errors]
+    data: [session, tokens, cost, reliability, context, prompt, conversation, typed, steps, tools, files, errors, security]
     metrics: all
     suggestions: 6
 
@@ -134,6 +135,22 @@ prompts:
     summary: what failed or was slow, and how much of the session that cost.
     data: [session, reliability, tokens, tools, errors, commands, files]
     metrics: [failed-calls, rate-limited, incomplete, slow, tool-errors, repeated-calls]
+
+  - id: security
+    title: Secrets and personal data
+    about: Credentials, personal data and files of secrets the model was sent, and how to keep them out.
+    focus: >-
+      Look only at what the model was sent that it shouldn't have been: credentials, personal data,
+      and files or commands that hold secrets. For each, say where it came from (a file the agent
+      read, a command's output, something typed, the instruction files) and what to change so the
+      next session doesn't send it: a permission or ignore rule for the path, a narrower command, a
+      secret loaded without being printed, masked or made-up data. Say which credentials to rotate
+      first. The values are masked: never ask for them, and never guess them. If nothing was found,
+      say so in one sentence, and say what payload capture covered.
+    summary: what was sent that shouldn't have been, and how serious it is.
+    data: [session, security, commands, files, typed, system-outline]
+    metrics: [credentials, personal-data, secret-files, untraced]
+    suggestions: 5
 
   - id: project
     title: Lessons for the project

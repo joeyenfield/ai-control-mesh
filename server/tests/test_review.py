@@ -6,9 +6,10 @@ import json
 from pathlib import Path
 
 import httpx
+import pytest
 from oidc_helpers import access_token, authenticated_client as TestClient
 
-from agent_server import review, review_prompts
+from agent_server import exposure, review, review_prompts
 from agent_server.app import create_app
 from agent_server.config import Backend, Settings
 
@@ -186,7 +187,7 @@ def test_checks_fire_at_their_thresholds():
     }
     assert [check(quiet) for check in review.CHECKS if check(quiet)] == []
     # Every check has a name the prompts can list.
-    assert set(found) | {"system-prompt", "rereads", "large-results", "failed-calls", "untraced"} == set(review_prompts.METRICS)
+    assert set(found) | {"system-prompt", "rereads", "large-results", "failed-calls", "untraced", "credentials", "personal-data", "secret-files"} == set(review_prompts.METRICS)
 
 
 def test_model_calls_are_counted_by_tier_and_a_session_all_on_frontier_models_is_a_high_finding():
@@ -248,7 +249,7 @@ def test_each_prompt_sends_its_own_data_and_findings():
                  {"id": "untraced", "severity": "info", "title": "Payloads weren't captured", "detail": "None."},
              ]}
     shipped = review_prompts.prompts(review_prompts.DEFAULT_PROMPTS)
-    assert [prompt.id for prompt in shipped] == ["overall", "context", "instructions", "tools", "prompting", "growth", "cost", "reliability", "project"]
+    assert [prompt.id for prompt in shipped] == ["overall", "context", "instructions", "tools", "prompting", "growth", "cost", "reliability", "security", "project"]
     # Every name a prompt can list has lines behind it, and every check a name.
     assert set(review.SECTIONS) == set(review_prompts.DATA)
     for prompt in shipped:
@@ -295,6 +296,146 @@ def test_one_cause_seen_by_several_checks_costs_once():
     assert lines[4] == "Scores by area: context 79."
 
 
+# Made-up values in the shapes the detectors look for: none of them is a real key or a real person's.
+TOKEN = "ghp_" + "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bC1dF3hJ5"
+CARD = "4539 1488 0343 6467"
+
+
+def test_credentials_and_personal_data_are_found_masked_and_redacted():
+    text = "\n".join([
+        f"export GITHUB_TOKEN={TOKEN}", 'key = "AKIAIOSFODNN7EXAMPLE"', "aws AKIAZ7XQ3KJ4M2N8P5RT", 'password = "hunter2"',
+        'db_password: "Xk9#mP2$vL8qR4wZ"', 'api_key = settings.api_key', "db=postgresql://app:S3cr3t-Pa55w0rd@db.internal/app",
+        "dev=postgresql+psycopg://postgres:testpass@127.0.0.1:55432/postgres", "-----BEGIN PRIVATE KEY-----",
+        "Mail jane.doe@acme.io, git@github.com, logo@2x.png, noreply@anthropic.com or a@example.com",
+        f"card {CARD}, Stripe's test card 4242 4242 4242 4242, a timestamp 1732190000000",
+        "ssn 123-45-6789, phone +1 415 555 0132, iban GB33BUKB20201555555555",
+    ])
+    found = {item.detector.id: exposure.masked(item) for item in exposure.find(text)}
+    # A placeholder, a weak or test password, an identifier, a header with no key after it, and example or
+    # machine addresses aren't findings.
+    assert found == {
+        "github-token": "ghp_… (40 characters)", "aws-access-key": "AKIA… (20 characters)", "secret-assignment": "… (16 characters)",
+        "url-password": "… (15 characters)", "card-number": "•••• 6467", "us-ssn": "•••-••-6789", "iban": "GB•• •••• 5555",
+        "email": "j•••@acme.io", "phone": "+•• ••• ••32",
+    }
+    cleaned = exposure.redact(text)
+    for secret in (TOKEN, "AKIAZ7XQ3KJ4M2N8P5RT", "Xk9#mP2$vL8qR4wZ", "S3cr3t-Pa55w0rd", CARD, "jane.doe@acme.io", "123-45-6789"):
+        assert secret not in cleaned
+    assert "export GITHUB_TOKEN=[github token removed]" in cleaned and "AKIAIOSFODNN7EXAMPLE" in cleaned
+    # A real private key block, not just its header.
+    assert [item.detector.id for item in exposure.find("-----BEGIN RSA PRIVATE KEY-----\n" + "MIIEow" * 12 + "\n")] == ["private-key"]
+
+    assert exposure.sensitive_path("cat ~/.aws/credentials | head -5") == "~/.aws/credentials"
+    assert exposure.sensitive_path("src/.env") == "src/.env" and exposure.sensitive_path("deploy/key.pem") == "deploy/key.pem"
+    assert exposure.sensitive_path(".env.example") is None and exposure.sensitive_path("~/.ssh/id_ed25519.pub") is None
+    assert exposure.dumps_environment("env | sort") and exposure.dumps_environment("cd x && printenv")
+    assert not exposure.dumps_environment("set -e") and not exposure.dumps_environment("env FOO=1 make")
+
+
+def test_what_was_sent_that_should_not_have_been_has_a_score_of_its_own(tmp_path):
+    app, client, old = make_app(tmp_path, answer(prompt_tokens=2_000, completion_tokens=40))
+    try:
+        session = client.post("/api/sessions", json={"client": "test", "backend": "test", "trace": True}).json()
+        history = [{"role": "system", "content": "# Rules\nBe brief."}, {"role": "user", "content": f"Use my token {TOKEN} to push"}]
+        history += call(1, "bash", {"command": "cat .env"}, "DATABASE_PASSWORD=Xk9mP2vL8qR4wZt7\nDEBUG=1")
+        history += call(2, "bash", {"command": "env | sort"}, "HOME=/home/me\nPATH=/usr/bin")
+        history += call(3, "read_file", {"path": "data/customers.csv"}, "name,email\nJane,jane.doe@acme.io\nRaj,raj@widgets.co.uk")
+        history += call(4, "read_file", {"path": ".env.example"}, "DATABASE_PASSWORD=")
+        ask(client, session["session_id"], history)
+
+        found = client.get(f"/api/sessions/{session['session_id']}/review").json()
+        security = found["security"]
+        assert (security["credentials"], security["credentials_high"], security["personal_data"], security["secret_sources"]) == (2, 1, 2, 2)
+        where = {item["type"]: (item["where"], item["tool"], item["target"]) for item in security["exposures"]}
+        assert where["github-token"] == ("typed", "", "") and where["secret-env"] == ("tool-result", "bash", "cat .env")
+        assert where["email"] == ("tool-result", "read_file", "data/customers.csv")
+        assert [item["source"] for item in security["sources"]] == [".env", "environment variables"]
+        # Nothing the review returns holds a value it found.
+        sent = json.dumps(security)
+        assert TOKEN not in sent and "Xk9mP2vL8qR4wZt7" not in sent and "jane.doe@acme.io" not in sent
+
+        findings = {item["id"]: item for item in found["findings"]}
+        assert findings["credentials"]["severity"] == "high" and findings["credentials"]["area"] == "security"
+        assert findings["secret-files"]["severity"] == "medium" and findings["personal-data"]["severity"] == "low"
+        # 40 + 5 for the second credential, 20 + 5 for the second source, 5 + 5 for the second address.
+        assert [findings[name]["penalty"] for name in ("credentials", "secret-files", "personal-data")] == [45, 25, 10]
+        assert security["score"] == 20 and security["grade"] == "Badly exposed"
+        # Scored apart: the efficiency score and its areas don't count them.
+        assert found["score"] == 100 - sum(item["penalty"] for item in found["findings"] if item["area"] != "security")
+        assert "security" not in {item["area"] for item in found["area_scores"]}
+        assert all(item["checks"] != ["credentials"] for item in found["score_breakdown"])
+
+        # The AI review gets the findings masked, and nothing it quotes (the message typed, the commands) holds the token.
+        made = client.post(f"/api/sessions/{session['session_id']}/reviews", json={"backend": "test", "model": "m", "prompt": "security"}).json()
+        brief = made["messages"][1]["content"]
+        assert "Security score: 20 of 100 (Badly exposed)" in brief and "GitHub token ghp_… (40 characters), typed into the chat" in brief
+        assert "[github token removed]" in brief and TOKEN not in brief and "jane.doe@acme.io" not in brief
+        everything = client.post(f"/api/sessions/{session['session_id']}/reviews", json={"backend": "test", "model": "m", "prompt": "overall"}).json()
+        assert TOKEN not in everything["messages"][1]["content"] and "Security score, scored apart: 20 of 100" in everything["messages"][1]["content"]
+    finally:
+        close_app(app, client, old)
+
+
+def test_a_session_without_payloads_has_no_security_score(tmp_path):
+    app, client, old = make_app(tmp_path, answer())
+    try:
+        session = client.post("/api/sessions", json={"client": "test", "backend": "test"}).json()
+        ask(client, session["session_id"], [{"role": "user", "content": f"Use {TOKEN}"}])
+        found = client.get(f"/api/sessions/{session['session_id']}/review").json()
+        assert found["security"] is None and not any(item["area"] == "security" for item in found["findings"])
+    finally:
+        close_app(app, client, old)
+
+
+def test_how_hard_the_security_scan_looks_is_a_setting(tmp_path):
+    from agent_server import config_io
+
+    app, client, old = make_app(tmp_path, answer())
+    try:
+        settings = app.state.runtime.settings
+        session = client.post("/api/sessions", json={"client": "test", "backend": "test", "trace": True}).json()
+        history = [{"role": "user", "content": f"Push with {TOKEN}"}]
+        history += call(1, "read_file", {"path": "data/customers.csv"}, "name,email\nJane,jane.doe@acme.io")
+        history += call(2, "read_file", {"path": "config.py"}, 'password = "hunter22"')
+        history += [{"role": "assistant", "content": "I'll use the key AKIAZ7XQ3KJ4M2N8P5RT for the upload."}, {"role": "user", "content": "Go on"}]
+        ask(client, session["session_id"], history)
+        base = f"/api/sessions/{session['session_id']}"
+
+        def scanned() -> dict:
+            return client.get(f"{base}/review").json()["security"]
+
+        assert client.get("/api/config/review-prompts").json()["security_scan"] == "standard"
+        standard = scanned()
+        assert standard["level"] == "standard" and {item["type"] for item in standard["exposures"]} == {"github-token", "email"}
+
+        # basic: credentials only; thorough: a plainer password, and what the model wrote in its reply.
+        assert client.put("/api/config/security-scan", json={"security_scan": "basic"}).json()["security_scan"] == "basic"
+        assert {item["type"] for item in scanned()["exposures"]} == {"github-token"} and scanned()["personal_data"] == 0
+        client.put("/api/config/security-scan", json={"security_scan": "thorough"})
+        thorough = {item["type"]: item["where"] for item in scanned()["exposures"]}
+        assert thorough == {"github-token": "typed", "aws-access-key": "reply", "secret-assignment": "tool-result", "email": "tool-result"}
+        assert config_io.export(settings)["security_scan"] == "thorough"
+
+        # off: no security score and no security findings; a brief is still redacted.
+        client.put("/api/config/security-scan", json={"security_scan": "off"})
+        found = client.get(f"{base}/review").json()
+        assert found["security"] is None and not any(item["area"] == "security" for item in found["findings"])
+        made = client.post(f"{base}/reviews", json={"backend": "test", "model": "m", "prompt": "overall"}).json()
+        assert TOKEN not in made["messages"][1]["content"]
+
+        refused = client.put("/api/config/security-scan", json={"security_scan": "paranoid"})
+        assert refused.status_code == 400 and "one of off, basic, standard, thorough" in refused.json()["detail"]
+        assert client.put("/api/config/security-scan", json={"security_scan": None}).json()["security_scan"] == "standard"
+        store = app.state.runtime.auth.store
+        store.add_org("acme", "Acme")
+        store.add_user("dave", "test-only-password", role="admin", tenant="acme")
+        assert client.put("/api/config/security-scan", json={"security_scan": "off"}, headers={"x-ai-proxy-token": access_token(app, "dave")}).status_code == 403
+        with pytest.raises(ValueError, match="security_scan is one of"):
+            config_io.apply(settings, {"security_scan": "everything"})
+    finally:
+        close_app(app, client, old)
+
+
 def test_review_prompts_are_a_setting_site_admins_change(tmp_path):
     from agent_server import config_io
 
@@ -302,7 +443,7 @@ def test_review_prompts_are_a_setting_site_admins_change(tmp_path):
     try:
         settings = app.state.runtime.settings
         shipped = client.get("/api/config/review-prompts").json()
-        assert shipped["custom"] is False and len(shipped["prompts"]) == 9 and "timeline" in shipped["data"] and "caching" in shipped["metrics"]
+        assert shipped["custom"] is False and len(shipped["prompts"]) == 10 and "timeline" in shipped["data"] and "caching" in shipped["metrics"]
         assert "id: overall" in client.get("/api/config/review-prompts?format=yaml").text
 
         mine = """
@@ -360,7 +501,7 @@ prompts:
         assert client.get("/api/config/review-prompts", headers=dave).status_code == 403
         assert client.put("/api/config/review-prompts", content=mine, headers=dave).status_code == 403
         assert client.put("/api/config/review-prompts", json={"prompts": None}).json()["custom"] is False
-        assert len(client.get(f"{base}/review").json()["prompts"]) == 9
+        assert len(client.get(f"{base}/review").json()["prompts"]) == 10
     finally:
         close_app(app, client, old)
 

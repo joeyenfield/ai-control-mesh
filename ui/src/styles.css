@@ -418,6 +418,11 @@ h3 { font-weight: 650; }
 .review-area.grade-fair strong { color: var(--accent-ink); }
 .review-area.grade-poor strong, .review-area.grade-bad strong { color: var(--bad); }
 .review-area[aria-pressed="true"] { border-color: var(--accent); }
+/* Security is scored apart from the session's score: set off from the areas that make it up. */
+.review-security { margin-left: 10px; position: relative; }
+.review-security::before { content: ""; position: absolute; left: -9px; top: 4px; bottom: 4px; border-left: 1px solid var(--line-strong); }
+span.review-security { align-items: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-small); color: var(--steel); }
+span.review-security strong { font-weight: 500; }
 .review-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .review-part { scroll-margin-top: 16px; }
 .review-run { border-left: 3px solid var(--line-strong); }
@@ -496,6 +501,10 @@ h3 { font-weight: 650; }
 .review-table td { padding: 4px 10px 4px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; vertical-align: top; }
 .review-table td:not(:first-child), .review-table th:not(:first-child) { white-space: nowrap; }
 .review-table td:last-child { white-space: normal; }
+.review-scan { margin-bottom: 12px; }
+.review-scan label { gap: 8px; align-items: center; font-weight: 600; }
+.review-scan select { max-width: 100%; }
+.review-scan p { margin: 6px 0 0; }
 .review-names { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; font-size: 13px; }
 .review-names summary { cursor: pointer; font-weight: 600; }
 .review-names dl { margin: 8px 0 0; display: grid; gap: 4px; }

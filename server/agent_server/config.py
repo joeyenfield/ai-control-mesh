@@ -262,6 +262,8 @@ class Settings:
     model_prices: list[dict[str, Any]] | None = None
     # The AI reviews a session's Review tab offers (review_prompts.py); None means the shipped set.
     review_prompts: list[dict[str, Any]] | None = None
+    # How hard a session review looks for credentials and personal data (defaults.SECURITY_SCANS, review.SCAN_LEVELS).
+    security_scan: str = defaults.SECURITY_SCAN
     # The open database (open_database). Settings.load() reads its settings from it; Settings built
     # in code write theirs into it instead, so a test says what it wants and the database follows.
     db: Database | None = field(default=None, repr=False, compare=False)
@@ -410,6 +412,10 @@ class Settings:
             self.review_prompts = review_prompts.checked_prompts(stored) if stored is not None else None
         except ValueError:
             self.review_prompts = None
+        try:
+            self.security_scan = checked_security_scan(document.get("security_scan"))
+        except ValueError:
+            self.security_scan = defaults.SECURITY_SCAN
 
     def _store_config(self, connection: Any) -> None:
         """Settings built in code: their values become the database's."""
@@ -429,6 +435,7 @@ class Settings:
             kv.put(connection, schema.settings, "model_prices", pricing.checked_prices(self.model_prices))
         if self.review_prompts is not None:
             kv.put(connection, schema.settings, "review_prompts", review_prompts.checked_prompts(self.review_prompts))
+        kv.put(connection, schema.settings, "security_scan", checked_security_scan(self.security_scan))
         _replace_backends(connection, {name: backend.public() for name, backend in self.backends.items()})
         definitions = defaults.agents() if self.agents is None else self.agents
         connection.execute(schema.agents.delete())
@@ -715,6 +722,15 @@ class Settings:
         self.changed("review_prompts")
         return self.reviews()
 
+    def set_security_scan(self, value: Any) -> str:
+        """How hard a session review looks for credentials and personal data; reviews made after it follow it."""
+        level = checked_security_scan(value)
+        with self.open_database().write() as connection:
+            kv.put(connection, schema.settings, "security_scan", level)
+        self.security_scan = level
+        self.changed("security_scan")
+        return level
+
     def _forget_shares(self) -> None:
         """A removed backend's share goes with it, so a new backend of the same name never inherits it."""
         kept = {name: models for name, models in self.shared_models.items() if name in self.backends}
@@ -754,6 +770,15 @@ class Settings:
         self.request_log = value
         self.changed("request_log")
         return value
+
+
+def checked_security_scan(value: Any) -> str:
+    """The security_scan setting (defaults.SECURITY_SCANS), the shipped level when unset, or ValueError."""
+    if value is None or value == "":
+        return defaults.SECURITY_SCAN
+    if not isinstance(value, str) or value not in defaults.SECURITY_SCANS:
+        raise ValueError(f"security_scan is one of {', '.join(defaults.SECURITY_SCANS)}")
+    return value
 
 
 def checked_request_log(data: Any) -> dict[str, Any]:
@@ -796,7 +821,8 @@ def stored_config(connection: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     """The stored network settings (shaped as backends.yaml was) and model tuning."""
     document: dict[str, Any] = {
         key: kv.get(connection, schema.settings, key)
-        for key in ("proxy", "default_backend", "intercept", "retention_days", "request_log", "shared_models", "model_prices", "review_prompts")
+        for key in ("proxy", "default_backend", "intercept", "retention_days", "request_log", "shared_models", "model_prices", "review_prompts",
+                    "security_scan")
     }
     rows = connection.execute(select(schema.backends).order_by(schema.backends.c.position, schema.backends.c.name)).mappings()
     document["backends"] = {

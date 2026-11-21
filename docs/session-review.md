@@ -10,11 +10,11 @@ A session's **Review** tab looks at what one agent session spent its tokens, tim
 
 Open a session from **Sessions** and choose **Review**. The checks run when the tab opens; **Check again** runs them once more on a session that is still going.
 
-The top of the tab says it in short: the score, how many of the checks found something at each level, about how many tokens the findings add up to, where most of the points went, and a score for each area (**Context**, **Tools**, **How it went**, **Reliability**, **Cost**); choose an area's score to see only its checks. The buttons under it jump to **Checks**, **What was measured** and **AI review**.
+The top of the tab says it in short: the score, how many of the checks found something at each level, about how many tokens the findings add up to, where most of the points went, and a score for each area (**Context**, **Tools**, **How it went**, **Reliability**, **Cost**), then the **Security** score, which is kept apart (see [What was sent that shouldn't have been](#what-was-sent-that-shouldnt-have-been)); choose an area's score to see only its checks. The buttons under it jump to **Checks**, **What was measured** and **AI review**.
 
 ## What the checks need
 
-The checks on a session's numbers (tokens, failures, caching, timings) always run: the server records those for every request. The checks on the system prompt, the conversation and the tools read the session's payloads, so they need payload capture: start the agent with `--trace`, or turn on **Capture full request and response payloads** on the session. A session without payloads says so in a note, and is checked on its numbers only.
+The checks on a session's numbers (tokens, failures, caching, timings) always run: the server records those for every request. The checks on the system prompt, the conversation, the tools and security read the session's payloads, so they need payload capture: start the agent with `--trace`, or turn on **Capture full request and response payloads** on the session. A session without payloads says so in a note, and is checked on its numbers only. Its security score shows **not checked**.
 
 Token counts of payloads (the system prompt, tool definitions, tool results) are estimates, at four characters a token. Token counts of calls are what the provider reported.
 
@@ -22,7 +22,7 @@ Token counts of payloads (the system prompt, tool definitions, tool results) are
 
 Each finding has a level (**High**, **Medium**, **Low**, or a **Note**), what was seen, and what to try. Where the server can work it out, a finding also says about how many tokens it cost over the session: a system prompt's tokens beyond 8,000 on every call, unused tool definitions on every call, the size of the large results, the tokens written to the cache again after idle gaps.
 
-Findings are listed worst first, and within a level the one that cost most first. High findings start open; choose any other to open it, or **Expand all**. With findings in more than one area, the buttons above the list show one area at a time: **Context**, **Tools**, **How it went**, **Reliability** or **Cost**.
+Findings are listed worst first, and within a level the one that cost most first. High findings start open; choose any other to open it, or **Expand all**. With findings in more than one area, the buttons above the list show one area at a time: **Context**, **Tools**, **How it went**, **Reliability**, **Cost** or **Security**.
 
 **The score** starts at 100 and loses 18 for each high finding, 9 for each medium and 3 for each low: **Efficient** from 85, **Some waste** from 65, **Wasteful** from 40, **Very wasteful** below. It compares sessions roughly; the findings say what to do. Each finding shows the points it took off.
 
@@ -58,10 +58,42 @@ The AI review is told where the points went, the main cause first, and each area
 | **The cache ran out while the session sat idle** | Twice or more a call came over 5 minutes after the one before and wrote most of its prompt to the cache again (medium from 6) | Come back to a waiting agent within minutes, or start a new session later |
 | **Slow to start answering** | Half the calls waited over 15 seconds for the first token | On a local model: fewer tools, a shorter prompt, shorter sessions |
 | **Payloads weren't captured** | Some or all model calls have no payloads (a note) | Turn on payload capture |
+| **Credentials were sent to the model** | A key, token, private key or password was in anything the model was sent (high for a provider key, token or private key; medium for a password in a URL, an `Authorization` header, a JSON web token or a secret in code or a `.env` line) | Rotate it; load secrets without printing them; deny the agent `.env` and key files |
+| **Personal data was sent to the model** | Email addresses or phone numbers (low), a payment card, US social security number or IBAN (medium, high from 3), or 10 or more pieces in all (medium, high from 50) | Work on made-up or masked data; show the agent the schema, not the rows |
+| **The agent read files that hold secrets** | A tool read a file of secrets and got an answer (`.env`, `id_rsa`, `*.pem`, `.npmrc`, `~/.aws/credentials`, `terraform.tfstate` and the like), or a command printed every environment variable (`env`, `printenv`) | Deny the agent these paths; give it a `.env.example` |
 
 **Model tiers.** Each model call is put in a tier by its model's list price for a million input tokens in the server's price table (**Server settings** › **Model prices**): **frontier** from $4, **small** under $1.50, **mid-range** between. With the shipped prices, Claude Fable, Mythos and Opus and GPT-5.5 are frontier; Claude Sonnet and GPT-5.4 are mid-range; Claude Haiku and the mini and nano models are small. A machine's own model is **local**, and a paid model the table has no price for is **no price**; neither counts as frontier. An account agent's calls are sorted the same way: on a subscription a frontier model uses up the plan's limits rather than money.
 
 Searches and reads made through a shell count as what they do: `rg`, `grep`, `find` and `ls` are searches, `cat`, `head` and `tail` are reads. A sub-agent's copy of its parent's conversation is counted once, in the parent.
+
+## What was sent that shouldn't have been
+
+The last three checks are about security, not waste. They read everything the model was sent: the messages typed, what the agent added, the arguments of every tool call, what each tool returned and the system prompt. They look for:
+
+- **Credentials**: private key blocks; AWS, GitHub, GitLab, Slack, Anthropic, OpenAI-style, Google, Stripe live, npm and Hugging Face keys and tokens; JSON web tokens; passwords in URLs; `Authorization` headers; and passwords, secrets and API keys in code, config and `.env` lines.
+- **Personal data**: email addresses, phone numbers in international form, payment card numbers (that pass the Luhn check, of a known card network), US social security numbers and IBANs (that pass their check digits).
+- **Files of secrets**: a tool call that read one and got an answer, or a command that printed the environment. What such a file holds went to the model even where no pattern recognises it.
+
+They skip what looks like a placeholder, a test value or a documentation example: `AKIAIOSFODNN7EXAMPLE`, `${DB_PASSWORD}`, `password = "changeme"`, `postgres:testpass@127.0.0.1`, addresses at `example.com` or `noreply`, the card networks' test numbers. They are patterns, not a full secret scanner: a clean result means none of these shapes was seen, not that nothing sensitive was sent.
+
+**Nothing found is ever shown or sent on.** The server keeps only what kind of thing it was, a masked preview (`ghp_… (40 characters)`, `•••• 6467`, `j•••@acme.io`), where it was first seen and in how many places. **What was measured** lists them under **Sent to the model that shouldn't have been**. Every brief for an AI review is redacted the same way before it's sent, so a token in a command or a message typed reaches the reviewing model as `[github token removed]`.
+
+**The security score** is kept apart from the session's score: a leaked key isn't waste, and a tidy session can still leak one. It starts at 100. A high finding takes 40, a medium 20 and a low 5, and each item after the first 5 more, up to 60, 30 and 10. **Nothing found** at 100, **Minor exposure** from 80, **Exposed** from 50, **Badly exposed** below. A finding shows the security points it took off. With only some payloads captured, the score covers those calls. The scan reads a session's distinct text up to its level's limit; past that, the table says so and the counts are a floor.
+
+The provider has already seen anything these checks find. Rotate a credential listed here, whatever the score says.
+
+### How hard the scan looks
+
+Site admins choose the level under **Server settings** → **Review prompts** → **Security scan** (the `security_scan` setting, `PUT /api/config/security-scan`). It applies to the next review of any session; nothing is stored per session.
+
+| Level | Looks for | Reads at most |
+| --- | --- | --- |
+| **Off** | Nothing: no security score, and the Review tab says the scan is off. | |
+| **Basic** | Credentials and files of secrets. Personal data isn't checked. | 8 MB |
+| **Standard** (the default) | Credentials, personal data and files of secrets. | 16 MB |
+| **Thorough** | The same, and shorter, plainer passwords too (`password = "hunter22"`), and the model's own replies: what it echoed back or wrote into a file is sent again with the next call. More found, more false alarms, and a longer wait. | 64 MB |
+
+The scan reads about half a second a megabyte, so a long session at **Thorough** can take tens of seconds. Whatever the level, even **Off**, a brief for an AI review is redacted, with the looser rules of **Thorough**.
 
 ## What was measured
 
@@ -77,6 +109,7 @@ Under the checks are the numbers they were made from. Three pictures: **the cont
 - **Files**: the ones changed, and the ones read three times or more.
 - **The main chat, step by step**: each message typed, then the tool calls the agent made before the next one and the tokens their results added (the first 20 steps).
 - **Sub-agents and side conversations**: what each was asked, its model, and its model and tool calls.
+- **Sent to the model that shouldn't have been**: each credential and piece of personal data, masked, where it was first seen and the tool or command, then the files of secrets read.
 
 ## The AI review
 
@@ -103,12 +136,13 @@ Each prompt asks its own question, is sent only the parts of the session it list
 | **Where the context grew** | The moments the context jumped, what caused each and what it cost afterwards, and where to clear, compact or delegate |
 | **Cost and caching** | Which habits or settings would lower the cost and by how much, and whether a smaller model would have done for part of it |
 | **Failures and speed** | Failed tool calls grouped by cause, what most likely caused each failure or wait, and what to check |
+| **Secrets and personal data** | Where each credential, piece of personal data or file of secrets came from, what to change so the next session doesn't send it, and which credentials to rotate first |
 | **Lessons for the project** | The lines to add to the project's instruction file, written out, from what the agent had to find out for itself |
 
 Every prompt tells the model the same rules: work only from the data, say when it can't tell, don't repeat numbers back, be specific, and don't invent facts about the project.
 
 - **Which providers.** Any provider you can use that takes OpenAI Chat with the server's own sign-in: the model servers on your machines, and hosted APIs and gateways with a key stored on the server. A provider that needs the agent's own credentials (the Anthropic pass-through, an API provider with sign-in **agent**) isn't offered. A larger model gives better advice: small local ones tend to repeat the numbers back.
-- **What the model gets.** Only what the chosen prompt lists, at most 16,000 characters: measurements and findings, the first 1,200 characters of the system prompt and its section titles, the names of tools, MCP servers and files, command lines and search patterns (160 characters each), the first 240 characters of each kind of tool error, and messages typed (the first six, 300 characters each; 200 in the step-by-step list). It never gets the transcript, file contents or whole tool results. Pick a provider you would send that to.
+- **What the model gets.** Only what the chosen prompt lists, at most 16,000 characters: measurements and findings, the first 1,200 characters of the system prompt and its section titles, the names of tools, MCP servers and files, command lines and search patterns (160 characters each), the first 240 characters of each kind of tool error, and messages typed (the first six, 300 characters each; 200 in the step-by-step list). It never gets the transcript, file contents or whole tool results, and any credential or personal data the checks recognise in it is replaced by what kind it was (`[github token removed]`). Pick a provider you would send that to.
 - **It is a session of its own.** The review goes through the server like any agent's call: a session of client `console-review`, private to you, with its payloads captured. It counts toward your usage limits, has a cost on a paid provider, and shows on **Sessions**, **Traffic** and **Requests**. **Open as a session** opens it.
 - **Earlier reviews** lists the reviews you can see of this session; choose one to read it again. A review is kept as long as its own session is: deleting that session, or [retention](retention.md), removes it. Someone else's review of a session you share shows only if they share the review's session.
 
@@ -156,8 +190,9 @@ prompts:
 | `searches` | What the agent searched for |
 | `edits` | The files it changed |
 | `errors` | Failed tool calls with how each error starts |
+| `security` | The security score, and the credentials, personal data and files of secrets found, masked |
 
-The `metrics` names are the checks: `system-prompt`, `tool-definitions`, `unused-tools`, `peak-context`, `context-growth`, `images`, `compactions`, `long-session`, `searching`, `rereads`, `large-results`, `tool-errors`, `repeated-calls`, `subagents`, `short-prompt`, `steering`, `failed-calls`, `rate-limited`, `incomplete`, `model-tiers`, `caching`, `idle-cache`, `slow`, `untraced`.
+The `metrics` names are the checks: `system-prompt`, `tool-definitions`, `unused-tools`, `peak-context`, `context-growth`, `images`, `compactions`, `long-session`, `searching`, `rereads`, `large-results`, `tool-errors`, `repeated-calls`, `subagents`, `short-prompt`, `steering`, `failed-calls`, `rate-limited`, `incomplete`, `model-tiers`, `caching`, `idle-cache`, `slow`, `untraced`, `credentials`, `personal-data`, `secret-files`.
 
 ## From the API
 

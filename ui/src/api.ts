@@ -257,15 +257,47 @@ export interface SessionCost {
 /** One thing a session's review found: what was seen, and what to do about it. */
 export interface ReviewFinding {
   id: string;
-  area: "context" | "tools" | "flow" | "reliability" | "cost";
+  /** security findings make the security score, not the session's score. */
+  area: "context" | "tools" | "flow" | "reliability" | "cost" | "security";
   severity: "high" | "medium" | "low" | "info";
   title: string;
   detail: string;
   suggestion: string;
   /** About how many tokens it cost over the session, where the server can say. */
   impact_tokens: number | null;
-  /** The points it took off the score: less than its severity's when a related finding already counted, 0 when it was the provider's doing. */
+  /** The points it took off the score (the security score for a security finding): less than its severity's when a related finding already counted, 0 when it was the provider's doing. */
   penalty: number;
+}
+
+/** One credential or piece of personal data the model was sent: masked, never the value. */
+export interface ReviewExposure {
+  type: string;
+  label: string;
+  kind: "credential" | "pii";
+  severity: "high" | "medium" | "low";
+  preview: string;
+  where: "typed" | "added" | "tool-call" | "tool-result" | "system-prompt" | "reply";
+  tool: string;
+  target: string;
+  /** In how many places it was seen. */
+  times: number;
+}
+
+export interface ReviewSecurity {
+  score: number | null;
+  grade: string | null;
+  credentials: number;
+  credentials_high: number;
+  personal_data: number;
+  personal_data_high: number;
+  secret_sources: number;
+  /** The scan's level when it ran. */
+  level: SecurityScan;
+  /** The session's text went past what the scan level reads (8, 16 or 64 MB): the counts are a floor. */
+  scan_limited: boolean;
+  exposures: ReviewExposure[];
+  /** Files of secrets read, or "environment variables" for a command that printed them, with an answer. */
+  sources: { source: string; tool: string; command: string; times: number }[];
 }
 
 /** A model's tier by its list price for input, as the server sorts it; local is a machine's own model, unpriced a paid one with no price. */
@@ -294,11 +326,16 @@ export interface ReviewPrompt {
 }
 
 /** The server's review prompts as stored (Server settings, Review prompts), with the names a prompt may list. */
+/** How hard a review looks for credentials and personal data (Server settings, Review prompts). */
+export type SecurityScan = "off" | "basic" | "standard" | "thorough";
+
 export interface ReviewPromptTable {
   prompts: { id: string; title: string; about: string; focus: string; summary: string; data: string[]; metrics: string[]; suggestions: number }[];
   custom: boolean;
   data: Record<string, string>;
   metrics: Record<string, string>;
+  security_scan: SecurityScan;
+  security_scans: SecurityScan[];
 }
 
 /** A session measured and checked by the server. prompt, context, conversation and tools are null when no payloads were captured. */
@@ -310,8 +347,11 @@ export interface SessionReview {
   grade: string | null;
   /** Where the points went, the costliest first: a group of related checks (group set) or one finding. */
   score_breakdown: { group: string | null; label: string; checks: string[]; points: number }[];
-  /** Each area scored like the whole, from its own findings; empty with no model calls. */
+  /** Each area scored like the whole, from its own findings; empty with no model calls. Security isn't one: it has its own score. */
   area_scores: { area: ReviewFinding["area"]; score: number; findings: number }[];
+  /** Credentials, personal data and files of secrets in what was sent, scored apart; null when no payloads were captured. Values are masked by the server. */
+  security: ReviewSecurity | null;
+  security_scan: SecurityScan;
   traffic: {
     requests: number;
     model_calls: number;
@@ -2637,6 +2677,8 @@ export const api = {
   /** The prompts as a YAML document ({prompts: [...]}); null goes back to the shipped set. */
   saveReviewPrompts: (yaml: string | null) =>
     request<ReviewPromptTable>("/api/config/review-prompts", { method: "PUT", body: yaml ?? "prompts: null", headers: { "content-type": "application/yaml" } }),
+  saveSecurityScan: (level: SecurityScan) =>
+    request<ReviewPromptTable>("/api/config/security-scan", { method: "PUT", body: JSON.stringify({ security_scan: level }), headers: { "content-type": "application/json" } }),
   saveModelTuning: (yaml: string) =>
     request<ModelTuning>("/api/config/models", { method: "PUT", body: yaml, headers: { "content-type": "application/yaml" } }),
   // OpenAI- and Anthropic-compatible APIs (site admins). Keys go in write-only and never come back.

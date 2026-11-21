@@ -14,7 +14,7 @@ from urllib.parse import quote, urlparse
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
-from .. import access, api_providers, auth, config_io, mcp, pricing, remote, review, review_prompts, strata, version
+from .. import access, api_providers, auth, config_io, defaults, mcp, pricing, remote, review, review_prompts, strata, version
 from ..agents import stored_agents
 from ..db import redacted
 from ..config import DIRECT_BACKEND, LOCAL_PROXY_URL, ModelProfile, serves, shared_model
@@ -470,6 +470,8 @@ def register(app: FastAPI, runtime: Runtime) -> None:
             "prompts": settings.reviews(), "custom": settings.review_prompts is not None,
             # What a prompt's data and metrics may name, with what each is called.
             "data": review_prompts.DATA, "metrics": review_prompts.METRICS,
+            # How hard a review looks for credentials and personal data (PUT /api/config/security-scan).
+            "security_scan": settings.security_scan, "security_scans": list(defaults.SECURITY_SCANS),
         }
 
     @app.get("/api/config/review-prompts")
@@ -491,6 +493,20 @@ def register(app: FastAPI, runtime: Runtime) -> None:
                 raise ValueError('Send {"prompts": [...]}, or {"prompts": null} for the shipped set')
             async with runtime.config_lock:
                 await asyncio.to_thread(settings.set_review_prompts, document["prompts"])
+        except (ValueError, TypeError, UnicodeError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return prompt_table()
+
+    @app.put("/api/config/security-scan")
+    async def put_security_scan(request: Request) -> dict[str, Any]:
+        """How hard a session review looks for credentials and personal data sent to the model:
+        {"security_scan": "off" | "basic" | "standard" | "thorough"}; null goes back to standard."""
+        try:
+            data = await request.json()
+            if not isinstance(data, dict) or "security_scan" not in data:
+                raise ValueError('Send {"security_scan": "off", "basic", "standard" or "thorough"}')
+            async with runtime.config_lock:
+                await asyncio.to_thread(settings.set_security_scan, data["security_scan"])
         except (ValueError, TypeError, UnicodeError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return prompt_table()
@@ -531,7 +547,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
         reviewers are the backends an AI review can be sent to, and reviews the ones made so far."""
         session = viewable(session_id, request)
         # Off the event loop: it reads the session's conversations from its traces.
-        found = await asyncio.to_thread(lambda: review.report(runtime.sessions, runtime.chats, session, runtime.records(session), settings.prices()))
+        found = await asyncio.to_thread(lambda: review.report(runtime.sessions, runtime.chats, session, runtime.records(session), settings.prices(), settings.security_scan))
         return {
             **found, "reviewers": review.reviewers(settings, usable(request)),
             "prompts": [prompt.public() for prompt in review_prompts.prompts(settings.reviews())],
@@ -564,7 +580,7 @@ def register(app: FastAPI, runtime: Runtime) -> None:
         limit = runtime.fleet.model_limit(identity, backend)
         if limit is not None and not shared_model(limit, model):
             raise HTTPException(status_code=403, detail=f"{model} isn't shared with your organization on {name}")
-        found = await asyncio.to_thread(lambda: review.report(runtime.sessions, runtime.chats, session, runtime.records(session), settings.prices()))
+        found = await asyncio.to_thread(lambda: review.report(runtime.sessions, runtime.chats, session, runtime.records(session), settings.prices(), settings.security_scan))
         try:
             # Private to whoever asked, whatever the reviewed session's sharing: it holds excerpts of it.
             tags = {**access.sharing_tags(identity, {}), review.REVIEW_TAG: session.session_id, "review_prompt": prompt.title}

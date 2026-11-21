@@ -24,6 +24,12 @@ RETENTION_DAYS: int | None = None
 # and response bodies too, kept only `payload_days`. Server settings -> Storage, the API log page, or
 # PUT /api/config/storage change it; `config export|import` carry it.
 REQUEST_LOG: dict[str, Any] = {"enabled": False, "days": 7, "payloads": False, "payload_days": 1}
+# How hard a session review looks for credentials and personal data sent to the model (review.SCAN_LEVELS):
+# off (no security score), basic (credentials and files of secrets only), standard (credentials and personal
+# data), thorough (both, with looser guesses at secrets and the model's replies read too: more found, more
+# false alarms, slower). Server settings -> Review prompts, or PUT /api/config/security-scan.
+SECURITY_SCANS = ("off", "basic", "standard", "thorough")
+SECURITY_SCAN = "standard"
 
 MODELS_YAML = r"""
 # The Ollama model tuning a new server starts with: settings the proxy applies

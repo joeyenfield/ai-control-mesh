@@ -123,6 +123,7 @@ Open a session’s **Review** tab to see built-in checks and the measurements be
 - **Tool use and failures:** repeated searches, large results, failed commands and slow calls.
 - **Cost and caching:** opportunities to reuse cached context or use a smaller model for part of the work.
 - **Lessons for the project:** suggested lines to add to your project’s instruction file.
+- **Secrets and personal data:** credentials, personal data and files of secrets sent to the model, with a security score of its own. Values are masked, and removed from what an AI review is sent.
 
 Detailed checks need captured payloads. AI reviews send selected measurements and excerpts to the chosen model; paid providers charge for the review. Cost figures and possible savings are estimates. Review suggestions before applying them.
 

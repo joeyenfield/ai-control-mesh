@@ -1,7 +1,23 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiError, api } from "../api";
+import { ApiError, api, type SecurityScan } from "../api";
 import { ConfirmDialog } from "./ConfirmDialog";
+
+const SCAN_LABEL: Record<SecurityScan, string> = {
+  off: "Off",
+  basic: "Basic: credentials only",
+  standard: "Standard: credentials and personal data",
+  thorough: "Thorough: looser, and the model's replies too",
+};
+
+// What each level of the security scan reads for (review.SCAN_LEVELS on the server).
+const SCAN_ABOUT: Record<SecurityScan, string> = {
+  off: "Reviews don't look for credentials or personal data, and show no security score. What an AI review is sent is still redacted.",
+  basic: "Reviews look for credentials and files of secrets in what the model was sent, up to 8 MB of text a session. Personal data isn't checked.",
+  standard: "Reviews look for credentials, personal data and files of secrets in what the model was sent, up to 16 MB of text a session.",
+  thorough:
+    "Also counts shorter, plainer passwords and reads the model's own replies, up to 64 MB of text a session. Finds more, with more false alarms, and the Review tab takes longer.",
+};
 
 /**
  * Server settings, Review prompts: the AI reviews a session's Review tab offers, edited as one YAML
@@ -28,6 +44,11 @@ export function ReviewPromptsSettings() {
     onSuccess: () => saved("Saved; the next review uses them."),
     onError: (error) => setMessage({ text: error.message, tone: "bad" }),
   });
+  const scan = useMutation({
+    mutationFn: (level: SecurityScan) => api.saveSecurityScan(level),
+    onSuccess: (table) => saved(`Security scan: ${SCAN_LABEL[table.security_scan].toLowerCase()}. The next review uses it.`),
+    onError: (error) => setMessage({ text: error.message, tone: "bad" }),
+  });
   const reset = useMutation({
     mutationFn: () => api.saveReviewPrompts(null),
     onSuccess: () => saved("Back to the prompts the server ships with."),
@@ -48,6 +69,28 @@ export function ReviewPromptsSettings() {
         added by the server. The first prompt is the one chosen to begin with.
       </p>
       {table.isError && <p className="bad">{table.error.message}</p>}
+      {table.data && (
+        <div className="panel review-scan">
+          <label className="row wrap">
+            <span>Security scan</span>
+            <select
+              value={table.data.security_scan}
+              disabled={scan.isPending}
+              onChange={(event) => {
+                setMessage(null);
+                scan.mutate(event.target.value as SecurityScan);
+              }}
+            >
+              {table.data.security_scans.map((level) => (
+                <option key={level} value={level}>
+                  {SCAN_LABEL[level]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="subtle">{SCAN_ABOUT[table.data.security_scan]}</p>
+        </div>
+      )}
       <form
         className="stored-editor panel"
         onSubmit={(event) => {

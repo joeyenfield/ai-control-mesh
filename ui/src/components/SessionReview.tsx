@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, preferredModel, providerModels, type ModelTier, type ReviewFinding, type Session, type SessionReview as Review } from "../api";
+import { api, preferredModel, providerModels, type ModelTier, type ReviewExposure, type ReviewFinding, type Session, type SessionReview as Review } from "../api";
 import { formatCompact, formatDate, formatDuration, formatNumber, formatUsd } from "../format";
 import { useModels, useToast } from "../hooks";
 import { reviewBusy, startReviewRun, stopReviewRun, useReviewPhase, useReviewRun, useReviewRunId } from "../reviewRuns";
@@ -23,7 +23,21 @@ const AREA: Record<ReviewFinding["area"], string> = {
   flow: "How it went",
   reliability: "Reliability",
   cost: "Cost",
+  security: "Security",
 };
+
+// Where the server first saw a credential or piece of personal data.
+const WHERE: Record<ReviewExposure["where"], string> = {
+  typed: "Typed into the chat",
+  added: "Added by the agent",
+  "tool-call": "A tool call",
+  "tool-result": "A tool result",
+  "system-prompt": "The system prompt",
+  reply: "The model's reply",
+};
+
+/** The security score's bands: anything found takes it below 100. */
+const securityClass = (value: number) => (value >= 100 ? "good" : value >= 80 ? "fair" : value >= 50 ? "poor" : "bad");
 
 const TIER: Record<ModelTier, { label: string; pill: string; color: string }> = {
   frontier: { label: "Frontier", pill: "pill bad", color: "var(--bad)" },
@@ -95,6 +109,7 @@ export function SessionReview({ session }: { session: Session }) {
   if (review.isError) return <p className="bad">{review.error.message}</p>;
   if (!review.data) return <p className="empty">Checking the session…</p>;
   const { traffic, prompt: sent, tools, findings, reviews, prompts, score, grade, checks, score_breakdown: breakdown, area_scores: areaScores } = review.data;
+  const security = review.data.security ?? null;
   if (!traffic.model_calls) return <p className="empty">No model calls yet. A review needs some: come back once the agent has talked to its model.</p>;
   const value = choice ? `${choice.backend}\n${choice.model}` : "";
   // A note (payloads not captured) isn't a finding against the session.
@@ -112,7 +127,7 @@ export function SessionReview({ session }: { session: Session }) {
     <div className="review">
       <section className={`review-verdict grade-${GRADE_CLASS[grade ?? ""] ?? "none"}`} aria-label="The review in short">
         {score != null && (
-          <div className="review-score" title="100, less 18 for each high finding, 9 for each medium and 3 for each low. Related findings (one cause seen by several checks) count in full once, the rest a third. The provider's own failures and slowness don't count.">
+          <div className="review-score" title="100, less 18 for each high finding, 9 for each medium and 3 for each low. Related findings (one cause seen by several checks) count in full once, the rest a third. The provider's own failures and slowness don't count, and security findings have a score of their own.">
             <strong>{score}</strong>
             <span>of 100</span>
           </div>
@@ -148,6 +163,33 @@ export function SessionReview({ session }: { session: Session }) {
                   <strong>{item.score}</strong>
                 </button>
               ))}
+              {security?.score != null ? (
+                <button
+                  type="button"
+                  className={`review-area review-security grade-${securityClass(security.score)}`}
+                  aria-pressed={area === "security"}
+                  title={`Security: ${security.grade}. Scored apart from the session's score: credentials, personal data and files of secrets sent to the model. Show only its checks.`}
+                  onClick={() => {
+                    setArea(area === "security" ? "all" : "security");
+                    jump("review-checks");
+                  }}
+                >
+                  <span>Security</span>
+                  <strong>{security.score}</strong>
+                </button>
+              ) : (
+                <span
+                  className="review-area review-security"
+                  title={
+                    review.data.security_scan === "off"
+                      ? "The security scan is off on this server (Server settings, Review prompts)."
+                      : "Needs payload capture: only what was captured can be checked for credentials and personal data."
+                  }
+                >
+                  <span>Security</span>
+                  <strong>not checked</strong>
+                </span>
+              )}
             </div>
           )}
           <nav className="chip-bar" aria-label="Parts of the review">
@@ -262,7 +304,7 @@ export function SessionReview({ session }: { session: Session }) {
                     <span className={SEVERITY[finding.severity].pill}>{SEVERITY[finding.severity].label}</span>
                     <strong>{finding.title}</strong>
                     <span className="subtle">
-                      {finding.severity !== "info" && (finding.penalty ? `−${finding.penalty} points · ` : "no points off · ")}
+                      {finding.severity !== "info" && (finding.penalty ? `−${finding.penalty} ${finding.area === "security" ? "security " : ""}points · ` : "no points off · ")}
                       {finding.impact_tokens ? `about ${formatCompact(finding.impact_tokens)} tokens · ` : ""}
                       {AREA[finding.area]}
                     </span>
@@ -276,7 +318,10 @@ export function SessionReview({ session }: { session: Session }) {
             ))}
           </ul>
         ) : (
-          <p className="empty">Nothing stood out. The checks look at the context's size, how tools were used, how the session went, failures, caching and which models did the work.</p>
+          <p className="empty">
+            Nothing stood out. The checks look at the context's size, how tools were used, how the session went, failures, caching, which models did the work, and
+            credentials or personal data sent to the model.
+          </p>
         )}
       </section>
 
@@ -518,6 +563,7 @@ function LiveReview({ reviewed }: { reviewed: string }) {
 /** The numbers behind the checks, as the server measured them: where the context went and what the agent did. */
 function Evidence({ review }: { review: Review }) {
   const { timeline, context, prompt, tools, conversation, traffic } = review;
+  const security = review.security ?? null;
   const points = timeline.points;
   const top = Math.max(...points.map((point) => point.tokens), traffic.context_window ?? 0, 1);
   // The context's size call by call, as a line across a 600 by 120 box.
@@ -651,6 +697,17 @@ function Evidence({ review }: { review: Review }) {
             Object.entries(step.by_kind).map(([kind, count]) => `${kind} ${count}`).join(", "),
             formatNumber(step.result_tokens),
           ])}
+        />
+      )}
+      {security && (security.exposures.length > 0 || security.sources.length > 0) && (
+        <Table
+          title={`Sent to the model that shouldn't have been: ${formatNumber(security.credentials)} credentials, ${formatNumber(security.personal_data)} pieces of personal data, ${formatNumber(security.secret_sources)} files of secrets`}
+          head={["What", "Masked", "Where", "Tool or command", "Places"]}
+          rows={[
+            ...security.exposures.map((item) => [item.label, item.preview, WHERE[item.where], [item.tool, item.target].filter(Boolean).join(": "), formatNumber(item.times)]),
+            ...security.sources.map((item) => [item.source === "environment variables" ? "Environment variables" : "File of secrets", item.source, "A tool result", [item.tool, item.command].filter(Boolean).join(": "), formatNumber(item.times)]),
+          ]}
+          note={`The server masks every value it finds: this page and the AI review never get one. Rotate any credential listed here.$${security.level === "basic" ? " This server's scan looks for credentials only, not personal data." : ""}${security.scan_limited ? " The session was too large to read whole at this server's scan level, so there may be more." : ""}`}
         />
       )}
       {conversation && conversation.threads.length > 0 && (
