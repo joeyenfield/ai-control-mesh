@@ -91,15 +91,18 @@ class ScanLevel:
     loose: bool = False
     # The model's own replies read too: what it echoed back, or wrote into a file, is sent again next call.
     replies: bool = False
+    # Base64 and escaped text decoded and read again (exposure._decoded): a key in a Kubernetes secret, a password
+    # in JSON inside JSON.
+    decode: bool = False
 
 
-# off: no security score; basic: credentials and files of secrets, no personal data; standard: everything;
-# thorough: everything, loosely, and the model's replies too, with four times the text.
+# off: no security score; basic: credentials and files of secrets, no personal data, nothing decoded; standard:
+# everything, decoded too; thorough: everything, loosely, and the model's replies too, with four times the text.
 SCAN_LEVELS: dict[str, ScanLevel | None] = {
     "off": None,
     "basic": ScanLevel(frozenset({exposure.CREDENTIAL}), 8_000_000),
-    "standard": ScanLevel(frozenset({exposure.CREDENTIAL, exposure.PII}), 16_000_000),
-    "thorough": ScanLevel(frozenset({exposure.CREDENTIAL, exposure.PII}), 64_000_000, loose=True, replies=True),
+    "standard": ScanLevel(frozenset({exposure.CREDENTIAL, exposure.PII}), 16_000_000, decode=True),
+    "thorough": ScanLevel(frozenset({exposure.CREDENTIAL, exposure.PII}), 64_000_000, loose=True, replies=True, decode=True),
 }
 assert tuple(SCAN_LEVELS) == defaults.SECURITY_SCANS
 SCAN_LIMIT = SCAN_LEVELS[defaults.SECURITY_SCAN].limit  # type: ignore[union-attr]
@@ -620,7 +623,7 @@ def _security(threads: list[dict[str, Any]], system: str, level: ScanLevel, name
         read.add(hash(text))
         text = text[:budget]
         budget -= len(text)
-        for found in exposure.find(text, level.kinds, level.loose):
+        for found in exposure.find(text, level.kinds, level.loose, level.decode):
             entry = items.setdefault((found.detector.id, found.value), {
                 "type": found.detector.id, "label": found.detector.label, "kind": found.detector.kind, "severity": found.detector.severity,
                 "preview": exposure.masked(found), "where": where, "tool": tool, "target": exposure.redact(target)[:160], "times": 0,

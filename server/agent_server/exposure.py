@@ -12,18 +12,25 @@ redact() replaces every match in a text, for what the server passes on to a mode
 
 The detectors are patterns, not a scanner of record: they look for the common shapes (provider key
 prefixes, private key blocks, passwords in URLs and assignments, emails, cards that pass Luhn, IBANs
-that pass mod 97), and skip what looks like a placeholder or a documentation example. This module
-imports nothing of the server's.
+that pass mod 97), and skip what looks like a placeholder or a documentation example. gitleaks'
+provider rules (exposure_rules.py, generated) add about two hundred services. With decode, base64
+runs and escaped text are decoded and read again. No key is ever tried against its provider: that
+would send it on once more. This module imports nothing of the server's but its rules.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import bisect
 import math
 import re
+import urllib.parse
 from collections import Counter
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Iterator
+
+from . import exposure_rules
 
 CREDENTIAL = "credential"
 PII = "pii"
@@ -64,12 +71,21 @@ class Detector:
     group: int = 0
     check: Callable[[str], bool] | None = None
     mask: Callable[[str], str] | None = None
+    # Words one of which the text must hold (in lower case) for the pattern to be tried at all: what keeps two
+    # hundred provider patterns cheap on text that names none of them.
+    keywords: tuple[str, ...] = ()
+    # A whole match that makes the find not one (an imported rule's allowlist).
+    allowed_match: tuple[re.Pattern[str], ...] = ()
 
 
 @dataclass(frozen=True)
 class Found:
     detector: Detector
     value: str
+    # How the value was hidden in the text, when it was: "base64", or "escaped" (\u0041, %41, \" and the like).
+    encoding: str = ""
+    # What the text held for a base64 value: the encoded run, which is what redact() replaces.
+    encoded: str = ""
 
 
 def entropy(value: str) -> float:
@@ -162,8 +178,9 @@ def _d(id: str, label: str, kind: str, severity: str, pattern: str, group: int =
     return Detector(id, label, kind, severity, re.compile(pattern, flags), group, check, mask)
 
 
-# Most specific first: a value one detector took isn't counted again by a later one.
-DETECTORS: tuple[Detector, ...] = (
+# Most specific first: a value one detector took isn't counted again by a later one. These are the keys this
+# module knows best, with a preview of the prefix that says what they are.
+OWN: tuple[Detector, ...] = (
     _d("private-key", "Private key", CREDENTIAL, "high",
        r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----(?:\s|\\n|\\r)*(?:[A-Za-z-]+:[^\n]*(?:\s|\\n)+)*[A-Za-z0-9+/=]{40,}",
        mask=lambda value: "-----BEGIN … PRIVATE KEY-----"),
@@ -181,6 +198,10 @@ DETECTORS: tuple[Detector, ...] = (
     _d("npm-token", "npm token", CREDENTIAL, "high", r"\b(npm_[A-Za-z0-9]{36})\b", 1, _real, _prefix(4)),
     _d("huggingface-token", "Hugging Face token", CREDENTIAL, "high", r"\b(hf_[A-Za-z0-9]{34,})\b", 1, _real, _prefix(3)),
     _d("jwt", "JSON web token", CREDENTIAL, "medium", r"\b(eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})", 1, None, _prefix(3)),
+)
+# The shapes of a secret whatever the service: after every provider's own pattern, so a key a provider's pattern
+# knows is counted as that provider's.
+GENERIC: tuple[Detector, ...] = (
     _d("url-password", "Password in a URL", CREDENTIAL, "medium",
        r"\b[a-zA-Z][a-zA-Z0-9+.-]{1,20}://[^\s:/@\"'<>]{1,64}:([^\s@/\"'<>]{8,128})@[^\s/\"'<>]+", 1, _random, _hidden),
     _d("auth-header", "Authorization header", CREDENTIAL, "medium",
@@ -191,6 +212,8 @@ DETECTORS: tuple[Detector, ...] = (
     _d("secret-env", "Secret in an environment file", CREDENTIAL, "medium",
        r"(?m)^[ \t]*(?:export[ \t]+)?[A-Z][A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_KEY|APIKEY|ACCESS_KEY|PRIVATE_KEY)[A-Z0-9_]*[ \t]*=[ \t]*([^\s\"'#$]{8,200})",
        1, _random, _hidden),
+)
+PERSONAL: tuple[Detector, ...] = (
     _d("card-number", "Payment card number", PII, "high", r"(?<![\d-])((?:\d[ -]?){14,15}\d)(?![\d-])", 1, _card, _last(4, "•••• ")),
     _d("us-ssn", "US social security number", PII, "high", r"\b((?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4})\b", 1, None, _last(4, "•••-••-")),
     _d("iban", "Bank account (IBAN)", PII, "medium", r"\b([A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?)\b", 1, _iban,
@@ -198,47 +221,181 @@ DETECTORS: tuple[Detector, ...] = (
     _d("email", "Email address", PII, "low", r"(?<![\w/:.%+-])([A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,24})\b", 1, _email, _masked_email),
     _d("phone", "Phone number", PII, "low", r"(?<![\w+])(\+[1-9][0-9 ().-]{8,18}[0-9])(?![\w])", 1, _phone, _last(2, "+•• ••• ••")),
 )
+ALLOWED = tuple(re.compile(pattern) for pattern in exposure_rules.ALLOWED)
+
+
+def _imported_check(bits: float, allowed: tuple[str, ...], stopwords: tuple[str, ...]) -> Callable[[str], bool]:
+    rule_allowed = tuple(re.compile(pattern) for pattern in allowed)
+    words = tuple(word.lower() for word in stopwords + exposure_rules.STOPWORDS)
+
+    def check(value: str) -> bool:
+        lower = value.lower()
+        return _real(value) and entropy(value) >= bits \
+            and not any(pattern.search(value) for pattern in ALLOWED + rule_allowed) and not any(word in lower for word in words)
+    return check
+
+
+def _imported() -> tuple[Detector, ...]:
+    """The provider patterns of gitleaks (exposure_rules.py, imported by devhelpers/scripts/secrets/import-gitleaks.py)."""
+    out = []
+    for rule_id, label, severity, pattern, group, bits, keywords, allowed, allowed_match, stopwords in exposure_rules.RULES:
+        out.append(Detector(
+            rule_id, label, CREDENTIAL, severity, re.compile(pattern), group, _imported_check(bits, allowed, stopwords), _hidden,
+            keywords, tuple(re.compile(item) for item in allowed_match),
+        ))
+    return tuple(out)
+
+
+IMPORTED = _imported()
+DETECTORS: tuple[Detector, ...] = OWN + IMPORTED + GENERIC + PERSONAL
 BY_ID = {detector.id: detector for detector in DETECTORS}
+assert len(BY_ID) == len(DETECTORS), "a detector id is used twice"
+# A run that may be base64: long enough to hold a key, and no longer than a config file (an image isn't worth decoding).
+BASE64 = re.compile(r"(?<![A-Za-z0-9+/=_-])([A-Za-z0-9+/_-]{24,65536}={0,2})(?![A-Za-z0-9+/=_-])")
+# How an escaped string spells a character: JSON's and C's backslashes (and a URL's percent signs, PERCENT).
+BACKSLASH = re.compile(r"\\(?:u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|([nrt\"'\\/]))")
+PERCENT = re.compile(r"%[0-9a-fA-F]{2}")
+BACKSLASHED = {"n": "\n", "r": "\r", "t": "\t"}
+# How far from one of its keywords an imported pattern is tried (_near): a name can come up to fifty characters
+# before the service's word, and a key a few thousand after it (a 1Password service account token is long).
+KEYWORD_BEFORE = 256
+KEYWORD_AFTER = 4096
+# A decoded run is text, not bytes that happened to decode: nearly every character printable.
+PRINTABLE = 0.95
 
 
-def find(text: str, kinds: frozenset[str] | set[str] | None = None, loose: bool = False) -> list[Found]:
+def _near(detector: Detector, text: str, lower: str) -> Iterator[re.Match[str]]:
+    """detector's matches in the parts of text around its keywords. Most imported patterns start by allowing fifty
+    characters of name before the service's (`[\\w.-]{0,50}?twitter`), which costs as much at every position of the
+    text as a real match does: tried only near the word, two hundred of them cost less than one tried everywhere."""
+    windows: list[list[int]] = []
+    for word in detector.keywords:
+        position = lower.find(word)
+        while position >= 0:
+            windows.append([max(0, position - KEYWORD_BEFORE), min(len(text), position + len(word) + KEYWORD_AFTER)])
+            position = lower.find(word, position + 1)
+    windows.sort()
+    merged: list[list[int]] = []
+    for window in windows:
+        if merged and window[0] <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], window[1])
+        else:
+            merged.append(window)
+    for start, end in merged:
+        yield from detector.pattern.finditer(text, start, end)
+
+
+def _group(detector: Detector, match: re.Match[str]) -> int:
+    if detector.group >= 0:
+        return detector.group
+    # An imported rule's secret is its first group that matched (gitleaks' rule), else the whole match.
+    return next((index for index, value in enumerate(match.groups(), 1) if value), 0)
+
+
+def find(text: str, kinds: frozenset[str] | set[str] | None = None, loose: bool = False, decode: bool = False) -> list[Found]:
     """Everything the detectors recognise in text, each value once, in the order of DETECTORS. kinds keeps to
-    those kinds (CREDENTIAL, PII); loose takes guessed secrets that are shorter and plainer (_loose)."""
+    those kinds (CREDENTIAL, PII); loose takes guessed secrets that are shorter and plainer (_loose); decode also
+    looks inside base64 and escaped text (_decoded), for what the text doesn't show in the clear."""
     found: list[Found] = []
     # The spans earlier detectors took, sorted and apart: a dump of thousands of addresses stays linear-ish.
     starts: list[int] = []
     ends: list[int] = []
     seen: set[tuple[str, str]] = set()
+    lower: str | None = None
     for detector in DETECTORS:
         if kinds is not None and detector.kind not in kinds:
             continue
+        if detector.keywords:
+            lower = text.lower() if lower is None else lower
+            matches = _near(detector, text, lower)
+        else:
+            matches = detector.pattern.finditer(text)
         check = _loose if loose and detector.check is _random else detector.check
-        for match in detector.pattern.finditer(text):
-            value = match.group(detector.group)
-            start, end = match.span(detector.group)
+        for match in matches:
+            group = _group(detector, match)
+            value = match.group(group)
+            start, end = match.span(group)
             index = bisect.bisect_right(starts, start)
             if (index and ends[index - 1] > start) or (index < len(starts) and starts[index] < end):
                 continue
             if check and not check(value):
+                continue
+            if any(pattern.search(match.group(0)) for pattern in detector.allowed_match):
                 continue
             starts.insert(index, start)
             ends.insert(index, end)
             if (detector.id, value) not in seen:
                 seen.add((detector.id, value))
                 found.append(Found(detector, value))
+    if decode:
+        for item in _decoded(text, kinds, loose):
+            if (item.detector.id, item.value) not in seen:
+                seen.add((item.detector.id, item.value))
+                found.append(item)
     return found
+
+
+def _unescaped(text: str) -> str:
+    """text with JSON's and C's escapes and a URL's percent signs turned back into the characters they spell."""
+    def character(match: re.Match[str]) -> str:
+        code, byte, plain = match.groups()
+        if code or byte:
+            return chr(int(code or byte, 16))
+        return BACKSLASHED.get(plain, plain)
+    text = BACKSLASH.sub(character, text) if "\\" in text else text
+    return urllib.parse.unquote(text, errors="replace") if PERCENT.search(text) else text
+
+
+def _base64(run: str) -> str | None:
+    """run decoded, when it's base64 of text; None for anything else (a word, a hash, an image)."""
+    if len(run.rstrip("=")) % 4 == 1:
+        return None
+    padded = run + "=" * (-len(run) % 4)
+    try:
+        data = base64.b64decode(padded, altchars=b"-_", validate=True) if ("-" in run or "_" in run) else base64.b64decode(padded, validate=True)
+        decoded = data.decode("utf-8")
+    except (binascii.Error, ValueError):
+        return None
+    printable = sum(char.isprintable() or char in "\n\r\t" for char in decoded)
+    return decoded if decoded and printable >= PRINTABLE * len(decoded) else None
+
+
+def _decoded(text: str, kinds: frozenset[str] | set[str] | None, loose: bool) -> list[Found]:
+    """What find() sees once escaped text is unescaped and base64 runs decoded: a password in `{\\"password\\": ...}`,
+    a key in a Kubernetes secret or an encoded .env file. One level deep: what was decoded isn't decoded again."""
+    out: list[Found] = []
+    # Only the lines with an escape in them are read again: most of a session's text has none, and reading all of it
+    # twice would double what the scan costs.
+    escaped = [line for line in text.splitlines() if "\\" in line or "%" in line]
+    plain = "\n".join(_unescaped(line) for line in escaped)
+    if plain != "\n".join(escaped):
+        out += [Found(item.detector, item.value, "escaped") for item in find(plain, kinds, loose)]
+    for source in (text, plain):
+        for match in BASE64.finditer(source):
+            decoded = _base64(match.group(1))
+            if decoded:
+                out += [Found(item.detector, item.value, "base64", match.group(1)) for item in find(decoded, kinds, loose)]
+    return out
 
 
 def masked(item: Found) -> str:
     """What a finding shows of its value: never the value itself."""
-    return item.detector.mask(item.value) if item.detector.mask else _hidden(item.value)
+    shown = item.detector.mask(item.value) if item.detector.mask else _hidden(item.value)
+    return f"{shown}, {'base64-encoded' if item.encoding == 'base64' else 'escaped'}" if item.encoding else shown
 
 
 def redact(text: str) -> str:
-    """text with every credential and piece of personal data the detectors find replaced by its label. It finds
-    loosely whatever the scan's level: removing too much from a brief costs nothing, too little leaks."""
-    for item in find(text, loose=True):
-        text = text.replace(item.value, f"[{item.detector.label.lower()} removed]")
+    """text with every credential and piece of personal data the detectors find replaced by its label, encoded or
+    not. It finds loosely whatever the scan's level: removing too much from a brief costs nothing, too little leaks."""
+    for item in find(text, loose=True, decode=True):
+        removed = f"[{item.detector.label.lower()} removed]"
+        if item.encoded and item.encoded in text:
+            text = text.replace(item.encoded, removed)
+        elif item.value in text:
+            text = text.replace(item.value, removed)
+        else:
+            # Only the unescaped text spells it out: the brief gets that text, without it.
+            text = _unescaped(text).replace(item.value, removed)
     return text
 
 

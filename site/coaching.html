@@ -116,7 +116,7 @@
     <div class="section-heading"><p class="eyebrow">Secrets and personal data</p><h2>What the model saw that it shouldn't have.</h2><p>Agents read <code>.env</code> files, print the environment and paste customer data into their context. The review reads everything the model was sent and scores it apart: a leaked key isn't waste, and a tidy session can still leak one.</p></div>
     <div class="areas-layout">
       <div class="area-grid">
-        <article><h3>Credentials</h3><p>Private keys, cloud and provider API keys, tokens, passwords in URLs, <code>Authorization</code> headers, and secrets in code and <code>.env</code> lines.</p></article>
+        <article><h3>Credentials</h3><p>Private keys, tokens and API keys for over 200 services (with gitleaks' rules), passwords in URLs, <code>Authorization</code> headers, and secrets in code and <code>.env</code> lines, in the clear, in base64 or escaped.</p></article>
         <article><h3>Personal data</h3><p>Email addresses, phone numbers, card numbers that pass the Luhn check, US social security numbers and IBANs.</p></article>
         <article><h3>Files of secrets</h3><p>A tool that read <code>.env</code>, <code>id_rsa</code>, <code>*.pem</code> or cloud credentials, or a command that printed every environment variable.</p></article>
         <article><h3>Where it came from</h3><p>Typed into the chat, a tool call, a tool result or the instruction files, so you know what to block or ignore next time.</p></article>

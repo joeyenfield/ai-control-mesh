@@ -70,11 +70,12 @@ Searches and reads made through a shell count as what they do: `rg`, `grep`, `fi
 
 The last three checks are about security, not waste. They read everything the model was sent: the messages typed, what the agent added, the arguments of every tool call, what each tool returned and the system prompt. They look for:
 
-- **Credentials**: private key blocks; AWS, GitHub, GitLab, Slack, Anthropic, OpenAI-style, Google, Stripe live, npm and Hugging Face keys and tokens; JSON web tokens; passwords in URLs; `Authorization` headers; and passwords, secrets and API keys in code, config and `.env` lines.
+- **Credentials**: private key blocks; AWS, GitHub, GitLab, Slack, Anthropic, OpenAI-style, Google, Stripe live, npm and Hugging Face keys and tokens; JSON web tokens; passwords in URLs; `Authorization` headers; and passwords, secrets and API keys in code, config and `.env` lines. On top of these, the provider rules of [gitleaks](https://github.com/gitleaks/gitleaks) (MIT licensed): about 200 more services, from 1Password, Azure and Cloudflare to SendGrid, Twilio and Vault, each with its own name.
+- **What's hidden by encoding**, at **Standard** and **Thorough**: base64 runs are decoded and read again (a key in a Kubernetes secret, an encoded `.env` file), and so is escaped text (`\u0067hp_…`, `%67hp_…`, a password in JSON inside JSON). Such a finding says so: `sk_live_… (32 characters), base64-encoded`.
 - **Personal data**: email addresses, phone numbers in international form, payment card numbers (that pass the Luhn check, of a known card network), US social security numbers and IBANs (that pass their check digits).
 - **Files of secrets**: a tool call that read one and got an answer, or a command that printed the environment. What such a file holds went to the model even where no pattern recognises it.
 
-They skip what looks like a placeholder, a test value or a documentation example: `AKIAIOSFODNN7EXAMPLE`, `${DB_PASSWORD}`, `password = "changeme"`, `postgres:testpass@127.0.0.1`, addresses at `example.com` or `noreply`, the card networks' test numbers. They are patterns, not a full secret scanner: a clean result means none of these shapes was seen, not that nothing sensitive was sent.
+They skip what looks like a placeholder, a test value or a documentation example: `AKIAIOSFODNN7EXAMPLE`, `${DB_PASSWORD}`, `password = "changeme"`, `postgres:testpass@127.0.0.1`, addresses at `example.com` or `noreply`, the card networks' test numbers. They are patterns, not a full secret scanner: a clean result means none of these shapes was seen, not that nothing sensitive was sent. Unlike TruffleHog, the scan never tries a key against its provider to see whether it still works: that would send the key on to the provider again, so a finding means a key was sent, not that it's live.
 
 **Nothing found is ever shown or sent on.** The server keeps only what kind of thing it was, a masked preview (`ghp_… (40 characters)`, `•••• 6467`, `j•••@acme.io`), where it was first seen and in how many places. **See what was exposed** (at the top of the tab, and on each security finding) lists them in a dialog, and **What was measured** under **Sent to the model that shouldn't have been**. Neither can show more than the masked preview: the server never keeps a value. Every brief for an AI review is redacted the same way before it's sent, so a token in a command or a message typed reaches the reviewing model as `[github token removed]`.
 
@@ -89,8 +90,8 @@ Site admins choose the level under **Server settings** → **Review prompts** �
 | Level | Looks for | Reads at most |
 | --- | --- | --- |
 | **Off** | Nothing: no security score, and the Review tab says the scan is off. | |
-| **Basic** | Credentials and files of secrets. Personal data isn't checked. | 8 MB |
-| **Standard** (the default) | Credentials, personal data and files of secrets. | 16 MB |
+| **Basic** | Credentials and files of secrets. Personal data isn't checked, and nothing is decoded. | 8 MB |
+| **Standard** (the default) | Credentials, personal data and files of secrets, in the clear, in base64 or escaped. | 16 MB |
 | **Thorough** | The same, and shorter, plainer passwords too (`password = "hunter22"`), and the model's own replies: what it echoed back or wrote into a file is sent again with the next call. More found, more false alarms, and a longer wait. | 64 MB |
 
 The scan reads about half a second a megabyte, so a long session at **Thorough** can take tens of seconds. Whatever the level, even **Off**, a brief for an AI review is redacted, with the looser rules of **Thorough**.

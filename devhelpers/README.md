@@ -99,6 +99,7 @@ find the repository themselves):
 | `screenshots/demo.py` | A self-contained demo server with made-up data on http://127.0.0.1:8199 for checking the console: sign in as demo-admin / demo-admin-screenshot-password (a site admin) or demo / demo-screenshot-password. `--capture [names]` takes `docs/screenshots/` and stops; `--stop` stops one left running. |
 | `screenshots/` | Also `capture.mjs` (the console's screenshots), `quickstart-steps.mjs` (the quickstart guide's), `site-images.py` and `traffic.py`. |
 | `site/` | Checks (`check.mjs`), previews and fingerprints the brochure site. |
+| `secrets/import-gitleaks.py` | Writes `server/agent_server/exposure_rules.py`, the session review's provider key patterns, from a gitleaks release (`import-gitleaks.py v8.30.1`). Run the server's tests after. |
 | `https/` | nginx with Let's Encrypt in front of a server (`setup-https.ps1`). |
 | `start-ollama.sh` | Starts Ollama listening on every address. |
 

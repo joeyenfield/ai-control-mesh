@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -334,6 +335,53 @@ def test_credentials_and_personal_data_are_found_masked_and_redacted():
     assert not exposure.dumps_environment("set -e") and not exposure.dumps_environment("env FOO=1 make")
 
 
+# Keys built here rather than written out, so no scanner of this repository takes them for real ones.
+RANDOM = "Qm7vT2xK9pL4wR8zNc3bY6hJ1sD5fG0a"
+SENDGRID = "SG." + RANDOM[:22] + "." + (RANDOM + RANDOM)[3:46]
+STRIPE = "sk_" + "live_" + RANDOM[:24]
+
+
+def test_provider_keys_from_gitleaks_and_what_base64_or_escapes_hide():
+    from agent_server import exposure_rules
+
+    # Every gitleaks rule is in, under an id of its own, after this module's own detectors.
+    assert len(exposure.IMPORTED) == len(exposure_rules.RULES) >= 150
+    assert exposure.DETECTORS.index(exposure.BY_ID["sendgrid-api-token"]) < exposure.DETECTORS.index(exposure.BY_ID["secret-assignment"])
+    found = exposure.find(f"SENDGRID_KEY={SENDGRID}\npypi-AgEIcHlwaS5vcmc{RANDOM * 2}{RANDOM[:6]}")
+    assert [(item.detector.id, item.detector.label, exposure.masked(item)) for item in found] == [
+        ("pypi-upload-token", "PyPI upload token", "… (90 characters)"),
+        ("sendgrid-api-token", "SendGrid API token", f"… ({len(SENDGRID)} characters)"),
+    ]
+    # A keyword elsewhere in a long text doesn't hide a key, and a key's own allowlist and placeholders still count.
+    assert [item.detector.id for item in exposure.find("twitter " + "x " * 5000 + f"SENDGRID={SENDGRID}")] == ["sendgrid-api-token"]
+    assert exposure.find("vault token s.abcdefghijklmnopqrstuvwx") == []
+    assert exposure.find("heroku_api_key = 00000000-0000-0000-0000-000000000000") == []
+
+    # Base64: an encoded .env file or Kubernetes secret, the encoded run what redaction removes.
+    encoded = base64.b64encode(f"DATABASE_PASSWORD=Xk9mP2vL8qR4wZt7\nSTRIPE={STRIPE}\n".encode()).decode()
+    secret = f"apiVersion: v1\nkind: Secret\ndata:\n  app.env: {encoded}\n"
+    assert exposure.find(secret) == []
+    assert {(item.detector.id, item.encoding, exposure.masked(item)) for item in exposure.find(secret, decode=True)} == {
+        ("stripe-key", "base64", "sk_live_… (32 characters), base64-encoded"),
+        ("secret-env", "base64", "… (16 characters), base64-encoded"),
+    }
+    assert encoded not in exposure.redact(secret) and "[stripe live key removed]" in exposure.redact(secret)
+    # Words, hashes and images aren't text once decoded.
+    plain = "sha256 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08 and SomeVeryLongIdentifierNameHere"
+    assert exposure.find(plain, decode=True) == []
+
+    # Escapes: JSON inside JSON hides an assignment, \u and % spell a key out.
+    nested = json.dumps(json.dumps({"password": "Xk9mP2vL8qR4wZt7"}))
+    assert exposure.find(nested) == []
+    assert [(item.detector.id, item.encoding) for item in exposure.find(nested, decode=True)] == [("secret-assignment", "escaped")]
+    assert "Xk9mP2vL8qR4wZt7" not in exposure.redact(nested)
+    spelled = "\\u0067" + TOKEN[1:]
+    for text in (f'{{"token": "{spelled}"}}', "https://x.io/?t=%67" + TOKEN[1:]):
+        assert exposure.find(text) == []
+        assert [(item.detector.id, item.encoding) for item in exposure.find(text, decode=True)] == [("github-token", "escaped")]
+        assert TOKEN[1:] not in exposure.redact(text)
+
+
 def test_what_was_sent_that_should_not_have_been_has_a_score_of_its_own(tmp_path):
     app, client, old = make_app(tmp_path, answer(prompt_tokens=2_000, completion_tokens=40))
     try:
@@ -399,6 +447,7 @@ def test_how_hard_the_security_scan_looks_is_a_setting(tmp_path):
         history = [{"role": "user", "content": f"Push with {TOKEN}"}]
         history += call(1, "read_file", {"path": "data/customers.csv"}, "name,email\nJane,jane.doe@acme.io")
         history += call(2, "read_file", {"path": "config.py"}, 'password = "hunter22"')
+        history += call(3, "bash", {"command": "kubectl get secret app -o yaml"}, "data:\n  key: " + base64.b64encode(STRIPE.encode()).decode())
         history += [{"role": "assistant", "content": "I'll use the key AKIAZ7XQ3KJ4M2N8P5RT for the upload."}, {"role": "user", "content": "Go on"}]
         ask(client, session["session_id"], history)
         base = f"/api/sessions/{session['session_id']}"
@@ -408,14 +457,15 @@ def test_how_hard_the_security_scan_looks_is_a_setting(tmp_path):
 
         assert client.get("/api/config/review-prompts").json()["security_scan"] == "standard"
         standard = scanned()
-        assert standard["level"] == "standard" and {item["type"] for item in standard["exposures"]} == {"github-token", "email"}
+        assert standard["level"] == "standard" and {item["type"] for item in standard["exposures"]} == {"github-token", "stripe-key", "email"}
 
-        # basic: credentials only; thorough: a plainer password, and what the model wrote in its reply.
+        # basic: credentials only, nothing decoded; thorough: a plainer password, and what the model wrote in its reply.
         assert client.put("/api/config/security-scan", json={"security_scan": "basic"}).json()["security_scan"] == "basic"
         assert {item["type"] for item in scanned()["exposures"]} == {"github-token"} and scanned()["personal_data"] == 0
         client.put("/api/config/security-scan", json={"security_scan": "thorough"})
         thorough = {item["type"]: item["where"] for item in scanned()["exposures"]}
-        assert thorough == {"github-token": "typed", "aws-access-key": "reply", "secret-assignment": "tool-result", "email": "tool-result"}
+        assert thorough == {"github-token": "typed", "aws-access-key": "reply", "stripe-key": "tool-result", "secret-assignment": "tool-result",
+                            "email": "tool-result"}
         assert config_io.export(settings)["security_scan"] == "thorough"
 
         # off: no security score and no security findings; a brief is still redacted.
