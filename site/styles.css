@@ -703,3 +703,23 @@ h2 { font-size: clamp(28px, 3vw, 38px); }
 .coaching-evidence figcaption p { font-size: 12px; margin-top: 6px; }
 .coaching-evidence figcaption a { display: inline-flex; min-height: 44px; align-items: center; color: var(--mint); }
 @media (max-width: 550px) { .coaching-evidence { grid-template-columns: 1fr; } .coaching-evidence figure > a { height: 320px; } }
+
+/* Screenshot viewer (site.js): the full capture over the page, scrolling inside, closed with ×, Escape or Back. */
+.has-viewer, .has-viewer body { overflow: hidden; }
+.shot-viewer { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; color: var(--text); background: transparent; }
+.shot-viewer::backdrop { background: #070a12e6; backdrop-filter: blur(3px); }
+.shot-viewer[open] { display: flex; flex-direction: column; }
+.shot-viewer-bar { display: flex; align-items: center; gap: 16px; padding: 10px 12px 10px 20px; border-bottom: 1px solid var(--line); background: #0e1420f2; }
+.shot-viewer-title { flex: 1; min-width: 0; overflow: hidden; font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.shot-viewer-open { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.shot-viewer-close { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 50%; color: var(--text); background: var(--surface); font-size: 28px; line-height: 1; }
+.shot-viewer-close:hover { color: var(--bg); border-color: var(--mint); background: var(--mint); }
+.shot-viewer-body { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 24px; text-align: center; }
+.shot-viewer-body img { display: block; width: auto; max-width: min(100%, 1440px); height: auto; margin: 0 auto; border-radius: 8px; box-shadow: 0 20px 60px #0009; cursor: zoom-in; }
+.shot-viewer.is-zoomed .shot-viewer-body img { max-width: none; cursor: zoom-out; }
+@media (max-width: 550px) {
+  .shot-viewer-bar { padding-left: 16px; }
+  .shot-viewer-open { display: none; }
+  .shot-viewer-body { padding: 12px 0; }
+  .shot-viewer-body img { border-radius: 0; }
+}

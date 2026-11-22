@@ -70,3 +70,76 @@ function pickLevel() {
 }
 window.addEventListener('hashchange', pickLevel);
 pickLevel();
+
+// Screenshots open in a viewer over the page instead of a new page: the full capture, scrollable,
+// with a close button. Without JS (or with a modifier key, for a new tab) the links still open the PNG.
+const shotLinks = [...document.querySelectorAll('a[href^="/screenshots/"][href$=".png"]')];
+if (shotLinks.length && typeof HTMLDialogElement === 'function') {
+  const viewer = document.createElement('dialog');
+  viewer.className = 'shot-viewer';
+  viewer.setAttribute('aria-label', 'Screenshot');
+  viewer.innerHTML = `
+    <div class="shot-viewer-bar">
+      <p class="shot-viewer-title"></p>
+      <a class="shot-viewer-open" target="_blank" rel="noopener">Open in new tab ↗</a>
+      <button type="button" class="shot-viewer-close" aria-label="Close">×</button>
+    </div>
+    <div class="shot-viewer-body"><img alt=""></div>`;
+  document.body.append(viewer);
+  const body = viewer.querySelector('.shot-viewer-body');
+  const image = viewer.querySelector('img');
+  const title = viewer.querySelector('.shot-viewer-title');
+  const openTab = viewer.querySelector('.shot-viewer-open');
+  let opener = null;
+
+  // Back (a phone's back gesture too) closes the viewer rather than leaving the page.
+  const close = () => {
+    if (history.state?.shotViewer) history.back();
+    else viewer.close();
+  };
+  window.addEventListener('popstate', () => { if (viewer.open) viewer.close(); });
+  viewer.addEventListener('close', () => {
+    document.documentElement.classList.remove('has-viewer');
+    if (history.state?.shotViewer) history.back();
+    image.removeAttribute('src');
+    opener?.focus({ preventScroll: true });
+  });
+  viewer.querySelector('.shot-viewer-close').addEventListener('click', close);
+  // A click on the dimmed area around the image closes it.
+  body.addEventListener('click', (event) => { if (event.target === body) close(); });
+  // Click the image to switch between fitting the window's width and full resolution.
+  image.addEventListener('click', () => {
+    if (image.naturalWidth > body.clientWidth || viewer.classList.contains('is-zoomed')) viewer.classList.toggle('is-zoomed');
+  });
+
+  for (const link of shotLinks) {
+    link.addEventListener('click', (event) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      opener = link;
+      const figure = link.closest('figure');
+      const preview = figure?.querySelector('img');
+      // A gallery card's heading, else the link's label without its "Open the full screenshot:".
+      const heading = figure?.querySelector('h3, figcaption strong')?.textContent;
+      const label = (figure?.querySelector('a[aria-label]') ?? link).getAttribute('aria-label');
+      const name = (heading ?? label?.replace(/^Open the full (\w+:\s*)?/, ''))?.trim();
+      title.textContent = name || 'Screenshot';
+      viewer.setAttribute('aria-label', name || 'Screenshot');
+      image.alt = preview?.alt ?? '';
+      // Show the web-sized copy at once, then the full capture when it arrives.
+      image.src = preview?.currentSrc || link.href;
+      if (preview) {
+        const full = new Image();
+        full.onload = () => { if (viewer.open && opener === link) image.src = link.href; };
+        full.src = link.href;
+      }
+      openTab.href = link.href;
+      viewer.classList.remove('is-zoomed');
+      viewer.showModal();
+      document.documentElement.classList.add('has-viewer');
+      body.scrollTop = 0;
+      body.scrollLeft = 0;
+      history.pushState({ shotViewer: true }, '');
+    });
+  }
+}

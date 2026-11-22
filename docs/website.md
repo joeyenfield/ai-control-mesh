@@ -1,6 +1,6 @@
 # Marketing website
 
-The public [AIControlMesh website](https://aicontrolmesh.com/) lives in `site/`, separate from the React console in `ui/`. It is buildless HTML/CSS with a small `site.js` for the mobile menu and command copying. It has no analytics, third-party assets, or application API calls. Navigation, commands, and screenshot links work without JavaScript.
+The public [AIControlMesh website](https://aicontrolmesh.com/) lives in `site/`, separate from the React console in `ui/`. It is buildless HTML/CSS with a small `site.js` for the mobile menu, command copying and the screenshot viewer (a screenshot link opens the full capture over the page, scrollable, closed with ×, Escape or Back; click the image for full resolution). It has no analytics, third-party assets, or application API calls. Navigation, commands, and screenshot links work without JavaScript.
 
 ## Preview and verify
 
