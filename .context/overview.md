@@ -32,11 +32,11 @@ flowchart LR
 - **Server**: the hub. It owns all configuration, accounts, agent definitions, backend choice and recordings, and keeps them in one database (PostgreSQL in production, a SQLite file by default).
 - **Agents** connect to it through their computer's `agent-proxy`.
 - **Machines** supply every local provider (an OpenAI-compatible server found on a machine, such as LM Studio or vLLM, is an `api` backend with a `machine`). Hosted APIs (`anthropic`, and `api` backends without a machine) are the only providers not on a machine.
-- **Auth issuer** (`agent-auth`, `server/agent_server/issuer.py`, a separate process at `auth.aicontrolmesh.com`) issues OAuth access tokens through Authlib: device codes for `agent login` and `agent-machine login`, PKCE for the console, client credentials for provisioned service clients. It reads the server's accounts (read-only, through its own database role on PostgreSQL) but never changes them. The server introspects every token there and has no unauthenticated mode: all API traffic, including loopback and agent sessions, needs a token. Pairing and the access key are gone. See `auth.md`.
+- **Auth issuer** (`agent-auth`, `server/agent_server/issuer.py`, a separate process at `auth.aicontrolmesh.com`) issues OAuth access tokens through Authlib: device codes for `agent login` and `agent-machine login`, PKCE for the console, client credentials for provisioned service clients. It reads the server's accounts (read-only, through its own database role on PostgreSQL) but never changes them. The server introspects every token there and has no unauthenticated mode: all API traffic, including loopback and agent sessions, needs a token. Pairing and the access key are gone. See `.context/auth/`.
 
 ## One server, one process or many
 
-The server is one program. Small installs run it as one process, which keeps its live state in memory. Large ones run several, each with some of its roles (`api`, `gateway`, `mcp`, `intercept`, `fleet`, `realtime`, `worker`), sharing PostgreSQL and Redis and reaching each other on an internal port (`server.md`, Several processes; `docs/scaling.md`; `deploy/helm/agent-mesh/`). Clients and machines can't tell the difference: they still talk to one address.
+The server is one program. Small installs run it as one process, which keeps its live state in memory. Large ones run several, each with some of its roles (`api`, `gateway`, `mcp`, `intercept`, `fleet`, `realtime`, `worker`), sharing PostgreSQL and Redis and reaching each other on an internal port (`.context/server/processes.md`; `docs/scaling.md`; `deploy/helm/agent-mesh/`). Clients and machines can't tell the difference: they still talk to one address.
 
 ## Design principles (apply to every component)
 
@@ -60,7 +60,7 @@ The server is one program. Small installs run it as one process, which keeps its
 
 ## Peering: servers linked with servers
 
-Two servers' site admins **link** them (`links.py`); an organization on each then opens a **bridge** (`bridges.py`) and each says what it lets out and in. The servers are the only parties that talk: agents, agent-proxies and machines never reach the other server. Each server has a mesh id and Ed25519 link keys (secret `link-keys`); every request between servers is signed (method, path, time, nonce, body digest, assertion) and checked by `Links.verify`, never by the issuer. The side that reached the other while joining dials a WebSocket (`/api/links/connect`) and sends its requests directly; the other side sends its requests framed over that socket (`links.Channel`), and both run them through their own app, so every request meets the same checks. Someone of the other server is a `bridges.Guest`, which no existing permission helper accepts. See `server.md` (Peering) and `auth.md` (Guests), and `docs/peering.md`.
+Two servers' site admins **link** them (`links.py`); an organization on each then opens a **bridge** (`bridges.py`) and each says what it lets out and in. The servers are the only parties that talk: agents, agent-proxies and machines never reach the other server. Each server has a mesh id and Ed25519 link keys (secret `link-keys`); every request between servers is signed (method, path, time, nonce, body digest, assertion) and checked by `Links.verify`, never by the issuer. The side that reached the other while joining dials a WebSocket (`/api/links/connect`) and sends its requests directly; the other side sends its requests framed over that socket (`links.Channel`), and both run them through their own app, so every request meets the same checks. Someone of the other server is a `bridges.Guest`, which no existing permission helper accepts. See `.context/server/features.md` (Peering) and `.context/auth/tenants.md` (Guests), and `docs/peering.md`.
 
 ## A launch, across components
 
@@ -113,7 +113,7 @@ For development: 19999/20000 `agent-server local` (`local.py`), and the quicksta
 ## Cross-component changes
 
 - **API between client/machine and server**: change the server, Go, *and* `python/`, and cover it in `server/tests/test_client.py`.
-- **New provider type**: server config and compat, agent-machine providers, console view, docs, the demo. Follow the checklist in `server.md` (Extending).
+- **New provider type**: server config and compat, agent-machine providers, console view, docs, the demo. Follow the checklist in `.context/server/extending-and-tests.md`.
 - **New fleet message**: `Fleet` on the server, `presence` in Go and Python.
 - **Incompatible protocol change**: raise `PROTOCOL` everywhere.
-- **Sign-in or credentials**: the issuer and `auth.py` on the server, `agent login` and `agent-machine login` in Go and `python/`, the console and the Android app. Read `auth.md` first.
+- **Sign-in or credentials**: the issuer and `auth.py` on the server, `agent login` and `agent-machine login` in Go and `python/`, the console and the Android app. Read `.context/auth/` first.

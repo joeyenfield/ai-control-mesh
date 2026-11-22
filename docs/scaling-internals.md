@@ -75,7 +75,7 @@ Every process has an id (`AI_PROXY_POD_ID`, else the host name, with the process
 
 ### How a process finds what another holds
 
-This is the rule from `.context/server.md`: any new per-process state must say how another process finds it.
+This is the rule from `.context/server/processes.md`: any new per-process state must say how another process finds it.
 
 | State | Where it is found | Mechanism |
 | --- | --- | --- |

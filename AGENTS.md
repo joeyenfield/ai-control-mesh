@@ -4,19 +4,19 @@ Notes for coding agents (and people) changing this repository. `README.md` is th
 
 ## Read `.context/` before you change a component
 
-`.context/` holds the design of each component, one file each: how it is built, what it owns, what it must never do, where a change goes, how it is tested, and the checklists. **Before changing a component, read `.context/overview.md` and that component's file.** Don't guess from this file; the detail is there.
+`.context/` holds the design of each component: how it is built, what it owns, what it must never do, where a change goes, how it is tested, and the checklists. A small component has one file; a large one has a folder whose `README.md` has the design and rules and lists topic files (modules, flows, pages and so on). **Before changing a component, read `.context/overview.md`, then that component's file or folder `README.md` and the topic file for the part you're changing.** Don't guess from this file; the detail is there.
 
 | Working in | Read |
 | --- | --- |
 | Anything across components, or new here | `.context/overview.md` (roles, routes to a provider, a launch end to end, where state lives, ports) |
-| `server/` | `.context/server.md` (modules, flows, configuration and environment variables, rules for changes, several processes, tests, checklists for a new route, backend type, agent, setting or table) |
+| `server/` | `.context/server/` (modules, flows, configuration and environment variables, rules for changes, several processes, tests, checklists for a new route, backend type, agent, setting or table) |
 | `client/` | `.context/client.md` (launcher, agent-proxy, tokens, testing terminal hosting) |
-| `machine/` | `.context/machine.md` (fleet protocol, toggles, providers, containers, MCP bridge) |
-| `python/` | `.context/python.md`, plus `client.md` or `machine.md`, which it mirrors |
-| `ui/` | `.context/console.md` (pages, data layer, Machine page, checking visually, writing `docs/` pages). `.mcp.json` gives coding agents a browser (the Playwright MCP server) to open the demo and check pages; its traffic doesn't go through the agent's proxy, so the server doesn't record it (`docs/development.md`) |
+| `machine/` | `.context/machine/` (fleet protocol, toggles, providers, containers, MCP bridge) |
+| `python/` | `.context/python.md`, plus `client.md` or `machine/`, which it mirrors |
+| `ui/` | `.context/console/` (pages, data layer, Machine page, checking visually, writing `docs/` pages). `.mcp.json` gives coding agents a browser (the Playwright MCP server) to open the demo and check pages; its traffic doesn't go through the agent's proxy, so the server doesn't record it (`docs/development.md`) |
 | `android/` | `.context/android.md` |
-| `tools/`, `devhelpers/` (scripts, from-source stacks), Docker, `deploy/` (published-image Compose and Helm), `sandbox/`, `site/` | `.context/build-and-deploy.md` (versions, dist, installers and testing them, images, Compose, deploy) |
-| Sign-in, tokens, roles, tenants, sharing, machine grants, or any new route | `.context/auth.md` |
+| `tools/`, `devhelpers/` (scripts, from-source stacks), Docker, `deploy/` (published-image Compose and Helm), `sandbox/`, `site/` | `.context/build-and-deploy/` (versions, dist, installers and testing them, images, Compose, deploy) |
+| Sign-in, tokens, roles, tenants, sharing, machine grants, or any new route | `.context/auth/` |
 
 `.context/README.md` is the index of these files, with what each covers.
 
@@ -31,7 +31,7 @@ Reviewing the documentation is a step of every change. Before calling a change d
 - This file, when the layout, commands or rules below no longer match. `docs/development.md` repeats the layout, the setup and test commands and many of the rules for people: change both, or they drift.
 - `README.md`, only if the introduction or its links are now wrong.
 - Comments in `server/agent_server/defaults.py` (shipped agents and model tuning), when a setting's meaning changed.
-- Screenshots in `docs/screenshots/`, when a page they show changed visibly (`.context/console.md`, Checking changes visually).
+- Screenshots in `docs/screenshots/`, when a page they show changed visibly (`.context/console/workflow.md`, Checking changes visually).
 
 If nothing needed updating, say so when reporting the change.
 
@@ -52,13 +52,13 @@ The rules that shape everything (each explained in `.context/overview.md`):
 - **The server never manages a model server.** It only forwards agents' traffic. Listing, pulling, status, logs, settings and start/stop are fleet requests to the machine that runs it. Local backends come only from machines. The exception is the hosted APIs and gateways the server calls itself (backend types `anthropic` and `api`, `api_providers.py`: OpenAI, Anthropic, DeepSeek, OpenRouter and the like).
 - **Every upstream call to a machine's model server uses `runtime.tunnels.base_url(backend)`**, never `backend.url`.
 - **The Python programs do everything the Go ones do.** A change to `client/` or `machine/` is made in `python/` in the same change, with mirroring tests. The Go code is the reference. Any API change between the client or machine and the server is made in Go and Python and covered by `server/tests/test_client.py`, which runs the Go programs; `python/tests/test_contract.py` runs the same tests against the Python ones, so both must pass. The one Python-only program is `agent-tray` (`python/agent_py/tray.py`), a desktop helper that only runs the other programs' commands.
-- **Authentication is mandatory** (OIDC, protocol 2): no loopback trust, no access key, no anonymous mode. **Tenants come first**: check the tenant before roles, sharing or grants. Every new route goes into `ADMIN_ONLY`/`SITE_ADMIN_ONLY` as needed and checks sharing or machine features (`.context/auth.md`).
-- **One version, one protocol.** `VERSION` is the one hand-written version; raise `PROTOCOL` for a change older programs can't follow (`.context/build-and-deploy.md`). Build snapshots locally with `devhelpers/release_scripts/release.ps1|.sh website|services|installers`; no Actions runner is needed. To release a stable version: change `VERSION`, commit, tag `vX.Y.Z`, then build with `--stable` and publish explicitly (`docs/releases.md`). Tags do not start builds. A version commit and a pushed tag are hard to undo: only release when asked.
+- **Authentication is mandatory** (OIDC, protocol 2): no loopback trust, no access key, no anonymous mode. **Tenants come first**: check the tenant before roles, sharing or grants. Every new route goes into `ADMIN_ONLY`/`SITE_ADMIN_ONLY` as needed and checks sharing or machine features (`.context/auth/`).
+- **One version, one protocol.** `VERSION` is the one hand-written version; raise `PROTOCOL` for a change older programs can't follow (`.context/build-and-deploy/README.md`, Versions). Build snapshots locally with `devhelpers/release_scripts/release.ps1|.sh website|services|installers`; no Actions runner is needed. To release a stable version: change `VERSION`, commit, tag `vX.Y.Z`, then build with `--stable` and publish explicitly (`docs/releases.md`). Tags do not start builds. A version commit and a pushed tag are hard to undo: only release when asked.
 
 ## Layout
 
 ```text
-server/agent_server/   the server package (FastAPI): routes/, db/, translate/; .context/server.md has the module map
+server/agent_server/   the server package (FastAPI): routes/, db/, translate/; .context/server/modules.md has the module map
 server/tests/          pytest, one file per area; test_client.py builds the Go client and machine and runs them against a real server
 client/                agent and agent-proxy (Go module); cmd/, internal/
 machine/               agent-machine (Go module); cmd/, internal/
@@ -140,7 +140,7 @@ agent-machine run [--server <url>]       # keep this computer in the fleet, in t
 - **Upstream HTTP** uses the shared `runtime.client`, which keeps no cookies; never create your own (tests swap it for a mock transport).
 - **Secrets** never go in the settings (nothing `config export` writes is secret), in Redis or messages in the clear, or in logs and events.
 - **Anything that can run commands** (launches, shells, terminals, containers) is checked by the server and again by the machine. Keep both checks. Never add free-form docker arguments.
-- **A new long-lived connection** must be closed on restart (`_restart_when_idle`) and renew its token in place if a client program holds it open. **A new per-process state** must say how another process finds it (`.context/server.md`, Several processes).
+- **A new long-lived connection** must be closed on restart (`_restart_when_idle`) and renew its token in place if a client program holds it open. **A new per-process state** must say how another process finds it (`.context/server/processes.md`).
 - **The agent-proxy signs as its user**: loopback only, Host and Origin checked, `Proxy: nil` on every HTTP client and dialer.
 - **Tests**: follow the component's pattern in its `.context/` file. Never touch the real `logs/agent-server.sqlite3` or `certs/` (`conftest.py` fails a test that does).
 - **Style**: Python with `from __future__ import annotations`, a module docstring, dataclasses and type hints; Go `gofmt`, standard library first, `go.mod` at Go 1.24, built with `GOTOOLCHAIN=local`; comments explain why, not what. UI, README and docs text: plain short sentences, sentence case.
@@ -153,7 +153,7 @@ agent-machine run [--server <url>]       # keep this computer in the fleet, in t
 - Development is on Windows 11, with PowerShell 5.1 and Git Bash. Python 3.13 with no virtualenv (the server installed editable); Go 1.25 with `GOTOOLCHAIN=local`. `core.autocrlf=true`: keep a file's existing line endings.
 - `go get` fails TLS checks inside an intercepted agent session; run Go module downloads with `HTTPS_PROXY`/`HTTP_PROXY` unset.
 - **Never test on ports 8183, 8184 or 9999 on the dev machine**: a coding agent working here may itself run through that agent-proxy and server. Set `AI_PROXY_LOCAL_PORT`, `AI_PROXY_LOCAL_INTERCEPT_PORT`, `AI_PROXY_URL` and `AI_PROXY_CREDENTIALS` for test runs. The full port list is in `.context/overview.md`. `agent-server local`, the quickstart and the basic stack all bind 19999/20000, so run one at a time; testdata (49999/50000) and the demo (8199) can run beside them.
-- **The WSL Ubuntu user runs a real agent-machine in the real fleet.** Test installers, packages and services as a throwaway user in another distro (`.context/build-and-deploy.md`).
+- **The WSL Ubuntu user runs a real agent-machine in the real fleet.** Test installers, packages and services as a throwaway user in another distro (`.context/build-and-deploy/dist.md`).
 - Podman (`podman-machine-default`, normally stopped) is the container runtime here; Docker isn't installed, so use `podman compose` for the stacks and leave `deploy/compose/server` (Docker only) to another host. helm runs in the `FedoraLinux-44` WSL distro (`wsl -d FedoraLinux-44 -- sh -c 'cd /mnt/j/... && helm lint ...'`); kubeconform isn't installed anywhere here.
 - **Builds and releases run locally.** There are no GitHub Actions workflows. Run the checks above yourself, on both databases. `devhelpers/release_scripts/release.ps1|.sh` separates website, services and installers; publishing requires `--publish`, and updating `latest` requires `--stable --publish --promote`. Pushes and tags do not build or publish anything. See `docs/releases.md`.
 - The end-to-end suite (`devhelpers/basic/tests`) signs in 7 times, and the issuer allows 10 password attempts per address per 10 minutes: a rerun within 10 minutes fails until `podman compose restart auth`.
