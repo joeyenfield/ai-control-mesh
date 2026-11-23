@@ -787,12 +787,26 @@ h2 { font-size: clamp(28px, 3vw, 38px); }
 .rung a { display: inline-flex; align-items: center; min-height: 44px; margin-top: auto; color: var(--mint); font-size: 14px; text-decoration: none; }
 .rung a:hover { text-decoration: underline; }
 .arch-wide { margin-bottom: 32px; }
+/* The professional quickstart's parts list: what each part does, and what happens when it stops. */
+.node-stop { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #3d4862; font-size: 12px; line-height: 1.5; color: #c4cde0; }
+.node-stop em { font-style: normal; font-weight: 650; color: var(--k); }
+.arch-parts .zone-pod + .zone-grid, .arch-parts .zone-grid + .zone-pod { margin-top: 26px; }
+/* Its traffic lanes: who connects, on which path, to which role, and where that leads. */
+.lanes { list-style: none; display: grid; gap: 12px; margin: 0; padding: 0; }
+.lane { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(96px, .8fr) minmax(0, 1fr) minmax(72px, .6fr) minmax(0, 1.2fr); align-items: center; gap: 8px; }
+.lane-path { position: relative; padding: 16px 6px 4px; font: 10px/1.5 var(--mono); letter-spacing: .03em; text-align: center; overflow-wrap: anywhere; color: #c4cde0; }
+.lane-path::before { content: ""; position: absolute; top: 7px; left: 2px; right: 6px; height: 2px; background: linear-gradient(90deg, #8ce9c533, var(--mint)); }
+.lane-path::after { content: ""; position: absolute; top: 3px; right: 0; border: 5px solid transparent; border-left: 7px solid var(--mint); border-right: 0; }
 @media (max-width: 1100px) {
   .c4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
 }
 @media (max-width: 850px) {
   .c3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lane { grid-template-columns: minmax(0, 1fr); gap: 0; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .lane-path { padding: 8px 0 8px 22px; text-align: left; }
+  .lane-path::before { top: 0; bottom: 6px; left: 8px; right: auto; width: 2px; height: auto; background: linear-gradient(#8ce9c533, var(--mint)); }
+  .lane-path::after { top: auto; bottom: 0; left: 4px; right: auto; border: 5px solid transparent; border-top: 7px solid var(--mint); border-bottom: 0; }
   .arch-split { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 550px) {

@@ -22,6 +22,60 @@ To try the chart on your own computer first, use [Quickstart on Kubernetes](quic
 
 Everything reaches the outside world on two host names: `server.host` (the API, agents' traffic, machines, the console) and `auth.host` (sign-in). A third, `console.host`, is only for the standalone console.
 
+## What each part does
+
+```mermaid
+flowchart TB
+  people["People<br/>console in a browser or phone"]
+  dev["Developers' computers<br/>agent + agent-proxy"]
+  mach["Fleet machines<br/>agent-machine, model and MCP servers"]
+  subgraph k8s["Kubernetes namespace"]
+    ing["Ingress or Gateway API<br/>TLS, routes each path to a role"]
+    subgraph roles["agent-server, one Deployment per role"]
+      api["api<br/>console and its API"]
+      gw["gateway<br/>model calls, MCP relay"]
+      ic["intercept<br/>account agents' HTTPS"]
+      fl["fleet<br/>machines' connections, tunnels"]
+      rt["realtime<br/>terminals, live view"]
+      wk["worker<br/>retention, audit jobs"]
+    end
+    auth["agent-auth<br/>OIDC sign-in, tokens"]
+    pgb["PgBouncer"]
+    pg[("PostgreSQL<br/>everything kept")]
+    redis[("Redis / Valkey<br/>what pods tell each other")]
+  end
+  s3[("Object storage<br/>traces, terminal output")]
+  apis["Hosted model APIs<br/>and vendors"]
+  people & dev & mach -- "HTTPS, WebSockets" --> ing
+  ing -- "server.host, by path" --> roles
+  ing -- "auth.host" --> auth
+  roles --> pgb --> pg
+  auth --> pg
+  roles <--> redis
+  roles -- "traces, terminal output" --> s3
+  roles -- "hosted models, account agents" --> apis
+```
+
+Every arrow into the cluster is a connection made from outside. Machines and agents dial in, so nothing in the cluster needs to reach them.
+
+| Part | What it does | If it stops |
+| --- | --- | --- |
+| Ingress or Gateway API | Ends TLS for `server.host` and `auth.host` and sends each path to the role that serves it (a wrong role answers 404). Must keep WebSockets open an hour or more and must not buffer streamed replies. Yours to supply; the chart writes the routes. | Nothing is reachable. |
+| `api` | The console and its API: accounts, organizations, settings, machines' pages, sessions, requests, analytics, downloads. | The console is unavailable. Running agents keep working. |
+| `gateway` | Agents' model calls (`/v1/*`, `/anthropic/*`, `/session/<id>/*`): checks the caller and usage limits, picks the provider, streams the reply and records it. Relays shared MCP servers unless `mcp` runs apart. | Model calls fail. Scale it on open streams. |
+| `intercept` | Account agents (`claude-account`, `codex-account`, `copilot-account`, `antigravity-account`): decrypts their HTTPS with the server's CA, records it and reconnects to the vendor over verified TLS. | Account agents can't reach their vendor. Other agents are unaffected. |
+| `fleet` | Holds each machine's connection, and the tunnels back to its model servers, MCP servers, terminals and launches. | Machines reconnect to another pod within seconds; calls to local models wait until they do. |
+| `realtime` | Shared terminals and the live view: agents' terminal output to people watching or typing. | Viewers reconnect. The agents keep running. |
+| `worker` | Jobs one process runs for the whole install: retention deletion, usage pruning, audit checkpoints and exports, the first admin. Two pods, one active. | Nothing people see. Deletion and exports catch up later. |
+| `agent-auth` | The OIDC issuer: browser sign-in, device approval for `agent login` and `agent-machine login`, API credentials. Issues signed 30-minute access tokens that every server pod checks itself, and handles revocation. | No new sign-ins or refreshes. Tokens already issued work until they expire. |
+| Migrate Job | `agent-server db migrate`, before the install and every upgrade (a Helm hook). Server pods wait for the schema. | The install or upgrade stops before any pod changes. |
+| PostgreSQL | Everything kept: accounts, settings, sessions, request records, usage, the audit log. agent-auth has its own schema in the same database. | Everything stops. CloudNativePG fails over to a replica. |
+| PgBouncer | Pools the server pods' connections in transaction mode. The worker, the migrations and agent-auth connect directly. | Server pods go unready. Run two. |
+| Redis or Valkey | What pods tell each other: which pod holds which machine, live counters and limits, revoked tokens, terminal streams. Nothing in it is the only copy of anything kept. | Every server pod reports unready (`/ready` checks it), so the server is unavailable until it's back; then machines and viewers reconnect. The bundled Valkey is one instance: use a managed Redis or Sentinel for high availability. |
+| Object storage | Most of what's stored by size: full traces, terminal output, audit checkpoint copies. | Every server pod reports unready (`/ready` checks it). Use a highly available store. |
+
+In the small-team size (`values-single.yaml`) all six roles and agent-auth run in one pod, with SQLite in place of PostgreSQL, PgBouncer and Redis. The "if it stops" column is how the system is built to behave, not a measured guarantee: try each one in staging.
+
 ## Before you start
 
 Decide and prepare these. The install itself takes minutes; this list is what takes days in a real organization.
@@ -77,7 +131,7 @@ A file of your own, `mesh-values.yaml`, on top of `values-onprem.yaml`:
 
 ```yaml
 image:
-  tag: "2.1.69"              # pin it; empty means the chart's appVersion
+  tag: "2.1.70"              # pin it; empty means the chart's appVersion
 
 server:
   host: api.mesh.example.com
@@ -185,7 +239,7 @@ Until there's a setting for it, either:
 - build an image of your own that adds your CA to the bundle, push it to your registry, and set `image.repository`:
 
 ```dockerfile
-FROM ghcr.io/joeyenfield/agent-server:2.1.69
+FROM ghcr.io/joeyenfield/agent-server:2.1.70
 USER root
 COPY corp-root-ca.pem /tmp/corp-root-ca.pem
 RUN cat /tmp/corp-root-ca.pem >> "$(python -c 'import certifi; print(certifi.where())')" && rm /tmp/corp-root-ca.pem
@@ -240,7 +294,7 @@ Go through [A checklist for a public server](security.md#a-checklist-for-a-publi
 | Symptom | Likely cause |
 | --- | --- |
 | Server pods log `waiting for the database to reach version N (it is at 0)` while the migration Job has completed | They can't reach the database through PgBouncer. `kubectl -n mesh logs deploy/mesh-agent-mesh-pg-pooler-rw` says why (a failed login, or `auth_query` permissions). The worker and agent-auth connect directly, so they can look healthy meanwhile. |
-| CloudNativePG's `initdb` Job fails over and over | Its log has the failing SQL. A `syntax error at or near "$"` is the bootstrap SQL of charts released up to 2.1.69, and `permission denied` in the pooler's log is theirs too: install a later chart. |
+| CloudNativePG's `initdb` Job fails over and over | Its log has the failing SQL. A `syntax error at or near "$"` is the bootstrap SQL of charts released up to 2.1.69, and `permission denied` in the pooler's log is theirs too: install the 2.1.70 chart or later. |
 | Everything is ready, but every signed-in request is refused | The server can't reach or trust `https://<auth.host>`: DNS inside the cluster, a load balancer that doesn't loop back, or a private CA (above). From an api pod, with the same trust as the server: `python -c "import httpx; print(httpx.get('https://<auth.host>/.well-known/openid-configuration').status_code)"`. |
 | Sign-in is locked for everyone after a few wrong passwords | `auth.issuer.forwardedAllowIps` isn't set to the ingress ranges. |
 | `/ready` answers 503 | It names the check: database, Redis or blob storage. |

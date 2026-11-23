@@ -25,7 +25,7 @@
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=07098a9194">
+  <link rel="stylesheet" href="/styles.css?v=6a8c503423">
   <script src="/site.js?v=3f3c66faf2" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Quickstart","url":"https://aicontrolmesh.com/quickstart.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
@@ -575,6 +575,56 @@ helm uninstall mesh -n mesh</code></pre><pre class="qs-remove-cmd  when-purge-da
         <div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-cloud"/></svg>Hosted model APIs</b><small>OpenAI, Anthropic, OpenRouter and others, if you add them</small></div>
       </div>
       <figcaption>Replica counts are the example values’ minimums. Every role scales on its own, and pods reach each other on a private internal port. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/enterprise.md">Running it in an enterprise →</a></figcaption>
+    </figure>
+    <figure class="arch arch-parts" aria-labelledby="arch-pro-parts">
+      <div class="arch-head"><div><span class="arch-kicker">What’s included</span><h3 id="arch-pro-parts">What each part does</h3></div><ul class="arch-legend"><li class="k-edge">Entry</li><li class="k-server">Server roles</li><li class="k-auth">Sign-in</li><li class="k-data">Data</li><li class="k-machine">Outside the cluster</li></ul></div>
+      <div class="zone zone-cluster"><span class="zone-tag">In the cluster · what the chart installs</span>
+        <div class="zone-grid"><div class="node k-edge"><b><svg class="ni" aria-hidden="true"><use href="#i-route"/></svg>Ingress or Gateway API</b><small>Ends TLS for the two host names and sends each path to the role that serves it. It must keep WebSockets open for an hour or more and not buffer streamed replies.</small><span class="node-stop"><em>Yours to supply.</em> The chart writes the routes, not the controller.</span></div></div>
+        <div class="zone zone-pod"><span class="zone-tag">agent-server · one image, six roles</span>
+          <div class="zone-grid c3">
+            <div class="node k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>api</code></b><small>The console and its API: accounts, organizations, settings, machines’ pages, sessions, requests, analytics and downloads.</small><span class="node-stop"><em>If it stops:</em> the console is unavailable. Agents already running keep working.</span></div>
+            <div class="node k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>gateway</code></b><small>Every model call agents make (<code>/v1</code>, <code>/anthropic</code>, <code>/session/&lt;id&gt;</code>): checks the caller and limits, picks the provider, streams the reply, records it. Also relays shared MCP servers.</small><span class="node-stop"><em>If it stops:</em> agents’ model calls fail. Scale it on open streams.</span></div>
+            <div class="node k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>intercept</code></b><small>Agents on their own vendor accounts (Claude Code, Codex, Copilot): decrypts their HTTPS with the server’s CA, records it, and reconnects to the vendor over verified TLS.</small><span class="node-stop"><em>If it stops:</em> account agents can’t reach their vendor. Other agents are unaffected.</span></div>
+            <div class="node k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>fleet</code></b><small>Holds each machine’s connection, and the tunnels back to its model servers, MCP servers, terminals and launches. No machine needs an open port.</small><span class="node-stop"><em>If it stops:</em> machines reconnect to another pod within seconds; local-model calls wait.</span></div>
+            <div class="node k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>realtime</code></b><small>Shared terminals and the live view: carries agents’ terminal output to people watching or typing, in a browser or on a phone.</small><span class="node-stop"><em>If it stops:</em> viewers reconnect; the agents themselves keep running.</span></div>
+            <div class="node k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>worker</code></b><small>Jobs that run once for the whole install: retention deletion, usage pruning, audit checkpoints and exports, and the first admin. Two pods, one active.</small><span class="node-stop"><em>If it stops:</em> nothing people see; deletion and audit exports catch up later.</span></div>
+          </div>
+        </div>
+        <div class="zone-grid c2">
+          <div class="zone zone-pod"><span class="zone-tag">Sign-in</span>
+            <div class="zone-grid"><div class="node k-auth"><b><svg class="ni" aria-hidden="true"><use href="#i-key"/></svg><code>agent-auth</code></b><small>The OIDC issuer on its own host name. Browser sign-in, device approval for <code>agent login</code> and <code>agent-machine login</code>, API credentials for scripts. Issues signed 30-minute access tokens and handles revocation.</small><span class="node-stop"><em>If it stops:</em> no new sign-ins or token refreshes; tokens already issued work until they expire.</span></div></div>
+          </div>
+          <div class="zone zone-pod"><span class="zone-tag">Migrations</span>
+            <div class="zone-grid"><div class="node k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg>Migrate Job</b><small>Runs <code>agent-server db migrate</code> before install and every upgrade. Server pods wait for the schema, so old and new pods can share it during a rollout.</small><span class="node-stop"><em>If it fails:</em> the upgrade stops before any pod changes.</span></div></div>
+          </div>
+        </div>
+        <div class="zone zone-pod"><span class="zone-tag">Shared state</span>
+          <div class="zone-grid c3">
+            <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg>PostgreSQL</b><small>Everything kept: accounts, settings, sessions, request records, usage, the audit log. The issuer has its own schema in the same database.</small><span class="node-stop"><em>If it stops:</em> everything stops. CloudNativePG fails over to a replica.</span></div>
+            <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-pool"/></svg>PgBouncer</b><small>Pools the many server pods’ connections into a few on PostgreSQL, in transaction mode. The worker, migrations and agent-auth connect directly.</small><span class="node-stop"><em>If it stops:</em> server pods go unready. Run two.</span></div>
+            <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-bolt"/></svg>Redis or Valkey</b><small>What pods tell each other: which pod holds which machine, live counters and limits, revoked tokens, terminal streams. Nothing here is the only copy.</small><span class="node-stop"><em>If it stops:</em> server pods go unready until it’s back. The bundled Valkey is one instance; use a managed Redis for high availability.</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="arch-link"><span>Outside the cluster</span></div>
+      <div class="arch-row c3">
+        <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-bucket"/></svg>Object storage</b><small>Most of what’s stored by size: full traces of prompts and replies, terminal output, and copies of audit checkpoints. Any S3-compatible store.</small><span class="node-stop"><em>If it stops:</em> server pods go unready; their readiness check includes it.</span></div>
+        <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg>Fleet machines</b><small><code>agent-machine</code> on laptops, workstations or GPU boxes: runs model servers, MCP servers and agents in allowed folders. Dials out to the server.</small></div>
+        <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg>Developers’ computers</b><small><code>agent</code> starts a coding agent; its loopback agent-proxy signs its traffic as that person and carries it to the server.</small></div>
+      </div>
+      <figcaption>In the small-team size every role runs in one pod, with SQLite in place of PostgreSQL, PgBouncer and Redis. Recovery times are design intent, not measured guarantees: test them in staging. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/enterprise.md#what-each-part-does">Each part in the runbook →</a></figcaption>
+    </figure>
+    <figure class="arch" aria-labelledby="arch-pro-paths">
+      <div class="arch-head"><div><span class="arch-kicker">How traffic moves</span><h3 id="arch-pro-paths">Who talks to which part</h3></div><ul class="arch-legend"><li class="k-server">Server roles</li><li class="k-auth">Sign-in</li><li class="k-data">Where it’s kept</li></ul></div>
+      <ol class="lanes">
+        <li class="lane"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>Signing in</b><small>A person, <code>agent login</code> or <code>agent-machine login</code></small></div><span class="lane-path">auth.host · /authorize, /device, /token</span><div class="node k-auth"><b><code>agent-auth</code></b><small>Checks the password, issues tokens</small></div><span class="lane-path">keeps</span><div class="node k-data"><b>PostgreSQL</b><small>Its own schema: grants, token records</small></div></li>
+        <li class="lane"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>Using the console</b><small>A browser or phone</small></div><span class="lane-path">server.host · / and /api/*</span><div class="node k-server"><b><code>api</code></b><small>Pages, settings, sessions, analytics</small></div><span class="lane-path">reads and writes</span><div class="node k-data"><b>PostgreSQL</b><small>Through PgBouncer</small></div></li>
+        <li class="lane"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg>A model call</b><small>An agent, through its agent-proxy</small></div><span class="lane-path">/v1, /anthropic, /session/&lt;id&gt;</span><div class="node k-server"><b><code>gateway</code></b><small>Checks limits, picks the provider, streams</small></div><span class="lane-path">calls, then records</span><div class="node k-data"><b>A provider</b><small>A hosted API, or a machine’s model server through <code>fleet</code>; traces to object storage</small></div></li>
+        <li class="lane"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg>An account agent</b><small>Claude Code, Codex or Copilot on your own plan</small></div><span class="lane-path">WS /api/proxy/tunnel</span><div class="node k-server"><b><code>intercept</code></b><small>Decrypts, records, re-encrypts</small></div><span class="lane-path">forwards to</span><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-cloud"/></svg>The vendor</b><small>Public addresses only, verified TLS</small></div></li>
+        <li class="lane"><div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg>A machine</b><small><code>agent-machine</code>, anywhere</small></div><span class="lane-path">WS /api/machines/connect</span><div class="node k-server"><b><code>fleet</code></b><small>Holds its connection and tunnels</small></div><span class="lane-path">announces in</span><div class="node k-data"><b>Redis</b><small>Which pod holds which machine</small></div></li>
+        <li class="lane"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>Watching a terminal</b><small>The console’s Running agents</small></div><span class="lane-path">/api/terminals/*, /api/live</span><div class="node k-server"><b><code>realtime</code></b><small>Live output, typing if allowed</small></div><span class="lane-path">keeps</span><div class="node k-data"><b>Object storage</b><small>Terminal output, if the policy keeps it</small></div></li>
+      </ol>
+      <figcaption>A path that reaches the wrong role answers 404, so the routes the chart writes matter. Pods reach each other only on a private internal port that’s never routed. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/scaling.md#routing">Routing in detail →</a></figcaption>
     </figure>
   </section>
   <section class="quickstart section wrap" id="professional-step-1" aria-labelledby="professional-start-title">
