@@ -148,7 +148,7 @@ Recordings made before blob storage was turned on stay in the database and are r
 
 ## The Helm chart
 
-`deploy/helm/agent-mesh/` installs the server, agent-auth and optionally the console, PostgreSQL (CloudNativePG), PgBouncer and Valkey. Its [README](../deploy/helm/agent-mesh/README.md) has every value. To try the chart on a local cluster first, follow [Quickstart on Kubernetes](quickstart-kubernetes.md); this page is the reference for production. In short:
+`deploy/helm/agent-mesh/` installs the server, agent-auth and optionally the console, PostgreSQL (CloudNativePG), PgBouncer and Valkey. Its [README](../deploy/helm/agent-mesh/README.md) has every value. To try the chart on a local cluster first, follow [Quickstart on Kubernetes](quickstart-kubernetes.md); for a production install step by step, with its operation afterwards, follow [Running it in an enterprise](enterprise.md). This page is the reference. In short:
 
 ```bash
 # One pod, every role (SQLite on a volume, or an external PostgreSQL)

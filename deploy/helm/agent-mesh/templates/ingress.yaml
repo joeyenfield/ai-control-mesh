@@ -92,6 +92,10 @@ spec:
   {{- with $in.className }}
   ingressClassName: {{ . }}
   {{- end }}
+  {{- with $in.tls.serverSecretName }}
+  tls:
+    - {hosts: [{{ $host | quote }}], secretName: {{ . }}}
+  {{- end }}
   rules:
     - host: {{ $host | quote }}
       http:
@@ -116,6 +120,10 @@ metadata:
 spec:
   {{- with $in.className }}
   ingressClassName: {{ . }}
+  {{- end }}
+  {{- with $in.tls.serverSecretName }}
+  tls:
+    - {hosts: [{{ $host | quote }}], secretName: {{ . }}}
   {{- end }}
   rules:
     - host: {{ $host | quote }}

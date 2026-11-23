@@ -5,7 +5,14 @@ CloudNativePG: database mesh with the two roles and schemas of server/docker/pos
              grants that itself when it migrates: migrate.grant_issuer).
 postInitApplicationSQL runs once, at bootstrap, before the operator reconciles
 spec.managed.roles, so it creates mesh_auth without a password and the managed role then
-gives it LOGIN and its password.
+gives it LOGIN and its password. It runs on a freshly initialised data directory, so
+mesh_auth can't exist yet. No dollar-quoted blocks (DO $$ ... $$): the operator hands these
+statements to its initdb pod as container arguments, where Kubernetes turns $$ into $.
+With PgBouncer, database mesh and its schema public keep PUBLIC's default CONNECT and USAGE:
+the Pooler's auth query connects to mesh as cnpg_pooler_pgbouncer and calls
+public.user_search there, and the operator makes that role only after bootstrap (so it can't
+be granted here) and grants it CONNECT on database postgres alone. PostgreSQL 15+ already
+denies PUBLIC CREATE on schema public, and schemas mesh and mesh_auth are their owners' only.
 */ -}}
 {{- if .Values.postgresql.cloudnativepg.enabled }}
 {{- $cnpg := .Values.postgresql.cloudnativepg }}
@@ -90,13 +97,13 @@ spec:
       secret:
         name: {{ include "agent-mesh.cnpgApiSecret" . }}
       postInitApplicationSQL:
-        - >-
-          DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'mesh_auth')
-          THEN CREATE ROLE mesh_auth NOLOGIN; END IF; END $$
+        - CREATE ROLE mesh_auth NOLOGIN
         - CREATE SCHEMA IF NOT EXISTS mesh AUTHORIZATION mesh_api
         - CREATE SCHEMA IF NOT EXISTS mesh_auth AUTHORIZATION mesh_auth
+        {{- if not .Values.pgbouncer.enabled }}
         - REVOKE ALL ON SCHEMA public FROM PUBLIC
         - REVOKE ALL ON DATABASE mesh FROM PUBLIC
+        {{- end }}
         - GRANT CONNECT ON DATABASE mesh TO mesh_api, mesh_auth
   managed:
     roles:

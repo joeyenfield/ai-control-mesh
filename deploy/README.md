@@ -19,7 +19,7 @@ another registry or owner, such as a fork's `ghcr.io/<you>`.
 | To try two linked servers (peering) | [`compose/peer/`](compose/peer/README.md) | [Peering](../docs/peering.md#try-it) |
 | A server for real use with Docker Compose | [`compose/server/`](compose/server/compose.yaml) | [Deployment](../docs/deployment.md) |
 | To try the Helm chart on a local Kubernetes cluster | [`helm/quickstart/`](helm/quickstart/README.md) | [Quickstart on Kubernetes](../docs/quickstart-kubernetes.md) |
-| Kubernetes for real use | [`helm/agent-mesh/`](helm/agent-mesh/README.md), the chart | [Running several server processes](../docs/scaling.md) |
+| Kubernetes for real use | [`helm/agent-mesh/`](helm/agent-mesh/README.md), the chart | [Running it in an enterprise](../docs/enterprise.md), [Running several server processes](../docs/scaling.md) |
 
 [`compose/README.md`](compose/README.md) has more on the Compose folders.
 

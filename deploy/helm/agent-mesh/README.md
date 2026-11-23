@@ -2,7 +2,7 @@
 
 This chart runs AI Control Mesh on Kubernetes: `agent-server` (the API, the model gateway, HTTPS capture, the fleet and terminals), `agent-auth` (its OIDC issuer), and optionally the standalone console. Both programs come from one image, `ghcr.io/joeyenfield/agent-server`. The chart's `appVersion` is the repository's `VERSION`, and it is the image tag unless you set `image.tag`.
 
-For installs without Kubernetes, use Compose instead (`deploy/compose/`). A one-computer quickstart on a local cluster is in `deploy/helm/quickstart/`. The design behind the chart is in `docs/scaling-internals.md`, and running it in `docs/scaling.md`.
+For installs without Kubernetes, use Compose instead (`deploy/compose/`). A one-computer quickstart on a local cluster is in `deploy/helm/quickstart/`. The design behind the chart is in `docs/scaling-internals.md`, and running it in `docs/scaling.md`. `docs/enterprise.md` walks through a production install and its operation step by step.
 
 ## Modes
 
@@ -119,7 +119,7 @@ helm install mesh deploy/helm/agent-mesh -n mesh --create-namespace -f deploy/he
 helm install mesh deploy/helm/agent-mesh -n mesh --create-namespace -f deploy/helm/agent-mesh/values-onprem.yaml
 ```
 
-The chart creates database `mesh`, roles `mesh_api` (owner) and `mesh_auth`, and schemas `mesh` and `mesh_auth`, as `server/docker/postgres-init.sh` does. `mesh_auth` is made in `postInitApplicationSQL` and then given its password and `LOGIN` by `spec.managed.roles`. The passwords are generated into `kubernetes.io/basic-auth` Secrets, or you can name your own with `existingApiSecret` and `existingAuthSecret`. The `Cluster` is kept on uninstall. Set `postgresql.cloudnativepg.backup`.
+The chart creates database `mesh`, roles `mesh_api` (owner) and `mesh_auth`, and schemas `mesh` and `mesh_auth`, as `server/docker/postgres-init.sh` does. `mesh_auth` is made in `postInitApplicationSQL` and then given its password and `LOGIN` by `spec.managed.roles`. With `pgbouncer.enabled`, database `mesh` and its schema `public` keep PUBLIC's default `CONNECT` and `USAGE`: the Pooler's auth query connects as `cnpg_pooler_pgbouncer`, a role the operator creates after bootstrap and grants `CONNECT` on database `postgres` only. Schemas `mesh` and `mesh_auth` stay their owners' only either way. The passwords are generated into `kubernetes.io/basic-auth` Secrets, or you can name your own with `existingApiSecret` and `existingAuthSecret`. The `Cluster` is kept on uninstall. Set `postgresql.cloudnativepg.backup`.
 
 The bundled Valkey is **one instance with AOF persistence, not Sentinel**. `AI_PROXY_REDIS_URL` is a plain `redis://` URL. If Valkey restarts, presence and pub/sub are gone for a few seconds, and machines and terminal viewers reconnect. For high availability, run a managed Redis or an operator's and use `redis.external`.
 

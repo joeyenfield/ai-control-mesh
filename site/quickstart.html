@@ -25,11 +25,12 @@
   <link rel="icon" href="/assets/icon-192.png" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/site.webmanifest">
-  <link rel="stylesheet" href="/styles.css?v=e108b93638">
+  <link rel="stylesheet" href="/styles.css?v=07098a9194">
   <script src="/site.js?v=3f3c66faf2" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Quickstart","url":"https://aicontrolmesh.com/quickstart.html","isPartOf":{"@type":"WebSite","name":"AIControlMesh","url":"https://aicontrolmesh.com/"}}</script>
 </head>
 <body>
+  <svg class="svg-sprite" aria-hidden="true" focusable="false"><defs><symbol id="i-server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/><path d="M8 7h.01M8 17h.01"/></symbol><symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="12" r="3.5"/><path d="M11.5 12H20M17 12v3M20 12v2.5"/></symbol><symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></symbol><symbol id="i-machine" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/></symbol><symbol id="i-chip" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/></symbol><symbol id="i-browser" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M6 7h.01M8.5 7h.01"/></symbol><symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m7 10 3 2-3 2M12 15h5"/></symbol><symbol id="i-route" viewBox="0 0 24 24"><path d="M3 12h6M9 12c3 0 3-5 6-5h6M9 12c3 0 3 5 6 5h6M9 12h12"/></symbol><symbol id="i-pool" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 12h4M11 12c2.5 0 3-6 6-6M11 12c2.5 0 3 6 6 6"/></symbol><symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 6 13h5l-1 8 7-10h-5z"/></symbol><symbol id="i-bucket" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="8" ry="2.2"/><path d="M4 7l1.6 11.5A2 2 0 0 0 7.6 20h8.8a2 2 0 0 0 2-1.5L20 7"/></symbol><symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7 11.2 3.4 3.4 0 0 0 7 18z"/></symbol><symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 20h18M6 16v-5M11 16V6M16 16v-8M20 16v-3"/></symbol></defs></svg>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header wrap">
     <a class="brand" href="/" aria-label="AIControlMesh home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9"/><path d="M8 11h6l4 10h6"/></svg></span>AI Control Mesh</a>
@@ -64,7 +65,42 @@
 
   <div class="qs-guides" id="steps">
 <div class="qs-guide guide-basic" id="basic">
-  <section class="wrap qs-toc-section" aria-labelledby="basic-toc-title"><p class="eyebrow">Basic / 9 steps</p><h2 id="basic-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#basic-step-1">Run one command</a></li><li><a href="#quickstart-basic-step-2">Sign in</a></li><li><a href="#quickstart-basic-step-3">Check your machine</a></li><li><a href="#quickstart-basic-step-4">Start a model server</a></li><li><a href="#quickstart-basic-step-5">Add my-machine's model server as your own provider</a></li><li><a href="#quickstart-basic-step-6">Find a model and pull it</a></li><li><a href="#quickstart-basic-step-7">Start Qwen Code on my-machine</a></li><li><a href="#quickstart-basic-step-8">Ask it something</a></li><li><a href="#quickstart-basic-step-9">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#basic-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
+  <section class="wrap qs-toc-section" aria-labelledby="basic-toc-title"><p class="eyebrow">Basic / 9 steps</p><h2 id="basic-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#basic-step-1">Run one command</a></li><li><a href="#quickstart-basic-step-2">Sign in</a></li><li><a href="#quickstart-basic-step-3">Check your machine</a></li><li><a href="#quickstart-basic-step-4">Start a model server</a></li><li><a href="#quickstart-basic-step-5">Add my-machine's model server as your own provider</a></li><li><a href="#quickstart-basic-step-6">Find a model and pull it</a></li><li><a href="#quickstart-basic-step-7">Start Qwen Code on my-machine</a></li><li><a href="#quickstart-basic-step-8">Ask it something</a></li><li><a href="#quickstart-basic-step-9">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#basic-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p>
+    <figure class="arch when-one" aria-labelledby="arch-basic-one">
+      <div class="arch-head"><div><span class="arch-kicker">What you’ll have</span><h3 id="arch-basic-one">Everything in one container</h3></div><ul class="arch-legend"><li class="k-server">Server</li><li class="k-auth">Sign-in</li><li class="k-data">Data</li><li class="k-machine">Fleet machine</li></ul></div>
+      <div class="arch-row"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>Your browser</b><small>The console at localhost:19999</small></div></div>
+      <div class="arch-link"><span>HTTP on localhost</span></div>
+      <div class="zone"><span class="zone-tag">Your computer</span>
+        <div class="zone zone-pod"><span class="zone-tag">One container · ai-control-mesh</span>
+          <div class="zone-grid c3">
+            <div class="node node-hub k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>agent-server</code></b><small>API, console and model gateway: every role in one process</small></div>
+            <div class="node k-auth"><b><svg class="ni" aria-hidden="true"><use href="#i-key"/></svg><code>agent-auth</code></b><small>The sign-in service (OIDC)</small></div>
+            <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg>SQLite</b><small>Accounts, sessions and recordings, on the <code>/data</code> volume</small></div>
+            <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg><code>agent-machine</code></b><small><code>my-machine</code>, already in the fleet</small></div>
+            <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg>Coding agents</b><small>Claude Code, Codex, Qwen Code, OpenCode and more</small></div>
+            <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-chip"/></svg>Ollama</b><small>Runs a small model on your CPU or GPU</small></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>Model calls to Ollama stay on your computer; a hosted provider or an agent on your own vendor account still reaches that vendor. Remove the container and its volumes, and it’s gone.</figcaption>
+    </figure>
+    <figure class="arch when-local" aria-labelledby="arch-basic-local">
+      <div class="arch-head"><div><span class="arch-kicker">What you’ll have</span><h3 id="arch-basic-local">Installed on your computer, no containers</h3></div><ul class="arch-legend"><li class="k-server">Server</li><li class="k-auth">Sign-in</li><li class="k-data">Data</li><li class="k-machine">Fleet machine</li></ul></div>
+      <div class="arch-row"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>Your browser</b><small>The console at localhost:19999, and a tray icon</small></div></div>
+      <div class="arch-link"><span>HTTP on loopback</span></div>
+      <div class="zone"><span class="zone-tag">Your computer · for you alone</span>
+        <div class="zone-grid c3">
+          <div class="node node-hub k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>agent-server</code></b><small>Every role, on 127.0.0.1:19999</small></div>
+          <div class="node k-auth"><b><svg class="ni" aria-hidden="true"><use href="#i-key"/></svg><code>agent-auth</code></b><small>Sign-in, on 127.0.0.1:20000</small></div>
+          <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg>SQLite</b><small>In your home folder</small></div>
+          <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg><code>agent-machine</code></b><small>Your computer is the fleet machine</small></div>
+          <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg><code>agent</code></b><small>Starts coding agents through the server</small></div>
+          <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-chip"/></svg>Your model servers</b><small>Ollama, llama.cpp, LM Studio, or a hosted API</small></div>
+        </div>
+      </div>
+      <figcaption>Everything listens on loopback only. The uninstaller removes the programs, and optionally their data.</figcaption>
+    </figure>
+  </section>
   <section class="quickstart section wrap" id="basic-step-1" aria-labelledby="basic-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>
@@ -227,7 +263,28 @@ podman volume rm mesh-data mesh-home mesh-workspace</code></pre>
   </section>
 </div>
 <div class="qs-guide guide-intermediate" id="intermediate">
-  <section class="wrap qs-toc-section" aria-labelledby="intermediate-toc-title"><p class="eyebrow">Intermediate / 8 steps</p><h2 id="intermediate-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#intermediate-step-1">Start the stack</a></li><li><a href="#quickstart-step-2">Sign in</a></li><li><a href="#quickstart-step-3">Check the machines</a></li><li><a href="#quickstart-step-4">Add machine-1's model server as your own provider</a></li><li><a href="#quickstart-step-5">Find a model and pull it</a></li><li><a href="#quickstart-step-6">Start Qwen Code on machine-1</a></li><li><a href="#quickstart-step-7">Ask it something</a></li><li><a href="#quickstart-step-8">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#intermediate-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
+  <section class="wrap qs-toc-section" aria-labelledby="intermediate-toc-title"><p class="eyebrow">Intermediate / 8 steps</p><h2 id="intermediate-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#intermediate-step-1">Start the stack</a></li><li><a href="#quickstart-step-2">Sign in</a></li><li><a href="#quickstart-step-3">Check the machines</a></li><li><a href="#quickstart-step-4">Add machine-1's model server as your own provider</a></li><li><a href="#quickstart-step-5">Find a model and pull it</a></li><li><a href="#quickstart-step-6">Start Qwen Code on machine-1</a></li><li><a href="#quickstart-step-7">Ask it something</a></li><li><a href="#quickstart-step-8">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#intermediate-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p>
+    <figure class="arch" aria-labelledby="arch-intermediate">
+      <div class="arch-head"><div><span class="arch-kicker">What you’ll have</span><h3 id="arch-intermediate">A server, its database and a small fleet</h3></div><ul class="arch-legend"><li class="k-server">Server</li><li class="k-auth">Sign-in</li><li class="k-data">Data</li><li class="k-machine">Fleet machines</li></ul></div>
+      <div class="arch-row"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>Your browser</b><small>The console at localhost:19999, sign-in at :20000</small></div></div>
+      <div class="arch-link"><span>HTTP on localhost</span></div>
+      <div class="zone"><span class="zone-tag">One Compose project</span>
+        <div class="zone-grid c3">
+          <div class="node node-hub k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>server</code></b><small><code>agent-server</code>: API, console and gateway</small></div>
+          <div class="node k-auth"><b><svg class="ni" aria-hidden="true"><use href="#i-key"/></svg><code>auth</code></b><small><code>agent-auth</code>, the sign-in service</small></div>
+          <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg><code>postgres</code></b><small>PostgreSQL 17, one schema for each of them</small></div>
+        </div>
+        <div class="arch-link arch-link-up"><span>Machines dial out to the server</span></div>
+        <div class="zone-grid c3">
+          <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg><code>machine-1</code></b><small>The sandbox: <code>agent-machine</code> and the coding agents</small></div>
+          <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-chip"/></svg><code>ollama</code></b><small>machine-1’s model server, its models on a volume</small></div>
+          <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg><code>machine-2</code></b><small>A second machine that uses machine-1’s models</small></div>
+        </div>
+        <p class="zone-note">The server reaches machine-1’s Ollama back through the connection machine-1 opened, so no machine needs an open port.</p>
+      </div>
+      <figcaption>The same parts as a real install, on one computer. Only the passwords and the plain HTTP are for the demo.</figcaption>
+    </figure>
+  </section>
   <section class="quickstart section wrap" id="intermediate-step-1" aria-labelledby="intermediate-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>
@@ -326,7 +383,32 @@ podman compose -f deploy/compose/quickstart/compose.yaml -f deploy/compose/quick
   </section>
 </div>
 <div class="qs-guide guide-advanced" id="advanced">
-  <section class="wrap qs-toc-section" aria-labelledby="advanced-toc-title"><p class="eyebrow">Advanced / 9 steps</p><h2 id="advanced-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#advanced-step-1">Install the chart</a></li><li><a href="#quickstart-helm-step-2">Forward the two ports</a></li><li><a href="#quickstart-helm-step-3">Read the password and sign in</a></li><li><a href="#quickstart-helm-step-4">Let the machine in</a></li><li><a href="#quickstart-helm-step-5">Add k8s-machine's model server as your own provider</a></li><li><a href="#quickstart-helm-step-6">Find a model and pull it</a></li><li><a href="#quickstart-helm-step-7">Start Qwen Code on k8s-machine</a></li><li><a href="#quickstart-helm-step-8">Ask it something</a></li><li><a href="#quickstart-helm-step-9">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#advanced-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
+  <section class="wrap qs-toc-section" aria-labelledby="advanced-toc-title"><p class="eyebrow">Advanced / 9 steps</p><h2 id="advanced-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#advanced-step-1">Install the chart</a></li><li><a href="#quickstart-helm-step-2">Forward the two ports</a></li><li><a href="#quickstart-helm-step-3">Read the password and sign in</a></li><li><a href="#quickstart-helm-step-4">Let the machine in</a></li><li><a href="#quickstart-helm-step-5">Add k8s-machine's model server as your own provider</a></li><li><a href="#quickstart-helm-step-6">Find a model and pull it</a></li><li><a href="#quickstart-helm-step-7">Start Qwen Code on k8s-machine</a></li><li><a href="#quickstart-helm-step-8">Ask it something</a></li><li><a href="#quickstart-helm-step-9">See what it sent</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#advanced-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p>
+    <figure class="arch" aria-labelledby="arch-advanced">
+      <div class="arch-head"><div><span class="arch-kicker">What you’ll have</span><h3 id="arch-advanced">The Helm chart on a local cluster</h3></div><ul class="arch-legend"><li class="k-server">Server</li><li class="k-auth">Sign-in</li><li class="k-data">Data</li><li class="k-machine">Fleet machine</li></ul></div>
+      <div class="arch-row c2"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>Your browser</b><small>localhost:19999 and :20000</small></div><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg><code>kubectl port-forward</code></b><small>Carries both ports into the cluster</small></div></div>
+      <div class="arch-link"><span>Port-forward to two Services</span></div>
+      <div class="zone zone-cluster"><span class="zone-tag">Local cluster · namespace mesh</span>
+        <div class="zone-grid c2">
+          <div class="zone zone-pod"><span class="zone-tag">Pod · the chart, mode single</span>
+            <div class="zone-grid">
+              <div class="node node-hub k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>agent-server</code></b><small>Every role in one pod</small></div>
+              <div class="node k-auth"><b><svg class="ni" aria-hidden="true"><use href="#i-key"/></svg><code>agent-auth</code></b><small>A second container beside it</small></div>
+              <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg>SQLite</b><small>On a PersistentVolume</small></div>
+            </div>
+          </div>
+          <div class="zone zone-pod"><span class="zone-tag">Pod · quickstart-machine</span>
+            <div class="zone-grid">
+              <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg><code>agent-sandbox</code></b><small><code>agent-machine</code> and the coding agents</small></div>
+              <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-chip"/></svg>Ollama</b><small>The machine’s model server</small></div>
+              <div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-route"/></svg>Two relays</b><small>Its localhost:19999 and :20000 lead to the server’s Services</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption>The machine runs inside the cluster, because a machine that reaches the server through a port-forward would look like it’s on the server’s own loopback.</figcaption>
+    </figure>
+  </section>
   <section class="quickstart section wrap" id="advanced-step-1" aria-labelledby="advanced-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>
@@ -432,7 +514,69 @@ helm uninstall mesh -n mesh</code></pre><pre class="qs-remove-cmd  when-purge-da
   </section>
 </div>
 <div class="qs-guide guide-professional" id="professional">
-  <section class="wrap qs-toc-section" aria-labelledby="professional-toc-title"><p class="eyebrow">Professional / 7 steps</p><h2 id="professional-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#professional-step-1">Choose a size</a></li><li><a href="#pro-step-2">Host names, TLS and routing</a></li><li><a href="#pro-step-3">Your own secrets</a></li><li><a href="#pro-step-4">The database</a></li><li><a href="#pro-step-5">Install the chart</a></li><li><a href="#pro-step-6">Sign in and add your people</a></li><li><a href="#pro-step-7">Bring your machines and your providers</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#professional-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p></section>
+  <section class="wrap qs-toc-section" aria-labelledby="professional-toc-title"><p class="eyebrow">Professional / 7 steps</p><h2 id="professional-toc-title">Set it up, step by step.</h2><ol class="qs-toc"><li><a href="#professional-step-1">Choose a size</a></li><li><a href="#pro-step-2">Host names, TLS and routing</a></li><li><a href="#pro-step-3">Your own secrets</a></li><li><a href="#pro-step-4">The database</a></li><li><a href="#pro-step-5">Install the chart</a></li><li><a href="#pro-step-6">Sign in and add your people</a></li><li><a href="#pro-step-7">Bring your machines and your providers</a></li></ol><p class="qs-toc-remove">Finished with it? <a href="#professional-remove">Stop or remove it <span aria-hidden="true">↓</span></a></p>
+    <figure class="arch when-single" aria-labelledby="arch-pro-single">
+      <div class="arch-head"><div><span class="arch-kicker">What you’ll have · small team</span><h3 id="arch-pro-single">One pod behind your own HTTPS</h3></div><ul class="arch-legend"><li class="k-server">Server</li><li class="k-auth">Sign-in</li><li class="k-data">Data</li><li class="k-machine">Fleet machines</li></ul></div>
+      <div class="arch-row c3">
+        <div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>People</b><small>The console in a browser or on a phone</small></div>
+        <div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg>Developers’ computers</b><small><code>agent</code> and its agent-proxy</small></div>
+        <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg>Fleet machines</b><small><code>agent-machine</code>, model servers, MCP servers</small></div>
+      </div>
+      <div class="arch-link"><span>HTTPS · api.example.com · auth.example.com</span></div>
+      <div class="zone zone-cluster"><span class="zone-tag">Your Kubernetes cluster</span>
+        <div class="zone-grid"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-route"/></svg>Ingress or Gateway API</b><small>Your certificates and host names</small></div></div>
+        <div class="arch-link"><span>One Service each</span></div>
+        <div class="zone zone-pod"><span class="zone-tag">One pod · Recreate, so two never overlap</span>
+          <div class="zone-grid c3">
+            <div class="node node-hub k-server"><b><svg class="ni" aria-hidden="true"><use href="#i-server"/></svg><code>agent-server</code></b><small>Every role; migrates its own database</small></div>
+            <div class="node k-auth"><b><svg class="ni" aria-hidden="true"><use href="#i-key"/></svg><code>agent-auth</code></b><small>Sign-in, in the same pod</small></div>
+            <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg>SQLite</b><small>On a PersistentVolume; back it up</small></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>Machines and agents only ever connect out to the server, so they can be laptops, workstations or GPU boxes anywhere.</figcaption>
+    </figure>
+    <figure class="arch when-scaled" aria-labelledby="arch-pro-scaled">
+      <div class="arch-head"><div><span class="arch-kicker">What you’ll have · scaled</span><h3 id="arch-pro-scaled">A Deployment per role, on shared state</h3></div><ul class="arch-legend"><li class="k-server">Server roles</li><li class="k-auth">Sign-in</li><li class="k-data">Data</li><li class="k-machine">Fleet machines</li></ul></div>
+      <div class="arch-row c3">
+        <div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-browser"/></svg>People</b><small>The console in a browser or on a phone</small></div>
+        <div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-terminal"/></svg>Developers’ computers</b><small><code>agent</code> and its agent-proxy</small></div>
+        <div class="node k-machine"><b><svg class="ni" aria-hidden="true"><use href="#i-machine"/></svg>Fleet machines</b><small><code>agent-machine</code>, model servers, MCP servers</small></div>
+      </div>
+      <div class="arch-link"><span>HTTPS and WebSockets</span></div>
+      <div class="zone zone-cluster"><span class="zone-tag">Your Kubernetes cluster</span>
+        <div class="zone-grid"><div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-route"/></svg>Ingress or Gateway API</b><small>Sends each path to the role that serves it</small></div></div>
+        <div class="arch-link"><span>Routed by path</span></div>
+        <div class="arch-split">
+          <div class="zone zone-pod"><span class="zone-tag">agent-server roles</span>
+            <div class="zone-grid c3">
+              <div class="node node-many k-server"><b><code>api</code><span class="node-x">×2</span></b><small>Console and API</small></div>
+              <div class="node node-many k-server"><b><code>gateway</code><span class="node-x">×3</span></b><small>Model calls and MCP</small></div>
+              <div class="node node-many k-server"><b><code>intercept</code><span class="node-x">×3</span></b><small>Account agents’ HTTPS</small></div>
+              <div class="node node-many k-server"><b><code>fleet</code><span class="node-x">×3</span></b><small>Machines and tunnels</small></div>
+              <div class="node node-many k-server"><b><code>realtime</code><span class="node-x">×2</span></b><small>Terminals, live view</small></div>
+              <div class="node node-many k-server"><b><code>worker</code><span class="node-x">×2</span></b><small>Retention, audit jobs</small></div>
+            </div>
+          </div>
+          <div class="zone zone-pod"><span class="zone-tag">Sign-in</span>
+            <div class="zone-grid"><div class="node node-many k-auth"><b><code>agent-auth</code><span class="node-x">×2</span></b><small>OIDC issuer; signed access tokens</small></div></div>
+          </div>
+        </div>
+        <div class="arch-link"><span>Shared state</span></div>
+        <div class="zone-grid c3">
+          <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-db"/></svg>PostgreSQL</b><small><span class="when-onprem">CloudNativePG: a primary and two replicas</span><span class="when-cloud">Managed, such as RDS</span></small></div>
+          <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-pool"/></svg>Connection pooler</b><small><span class="when-onprem">PgBouncer ×2, in transaction mode</span><span class="when-cloud">RDS Proxy, or your own</span></small></div>
+          <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-bolt"/></svg>Redis</b><small><span class="when-onprem">The bundled Valkey</span><span class="when-cloud">Managed, such as ElastiCache</span>: presence, pub/sub, terminals</small></div>
+        </div>
+      </div>
+      <div class="arch-link"><span>Out of the cluster</span></div>
+      <div class="arch-row c2">
+        <div class="node k-data"><b><svg class="ni" aria-hidden="true"><use href="#i-bucket"/></svg>Object storage</b><small><span class="when-onprem">S3-compatible: Ceph, SeaweedFS, MinIO</span><span class="when-cloud">S3 through IRSA</span>. Traces and terminal output.</small></div>
+        <div class="node"><b><svg class="ni" aria-hidden="true"><use href="#i-cloud"/></svg>Hosted model APIs</b><small>OpenAI, Anthropic, OpenRouter and others, if you add them</small></div>
+      </div>
+      <figcaption>Replica counts are the example values’ minimums. Every role scales on its own, and pods reach each other on a private internal port. <a href="https://github.com/joeyenfield/ai-control-mesh/blob/master/docs/enterprise.md">Running it in an enterprise →</a></figcaption>
+    </figure>
+  </section>
   <section class="quickstart section wrap" id="professional-step-1" aria-labelledby="professional-start-title">
       <div class="quickstart-copy">
         <p class="eyebrow">Step 1</p>

@@ -104,7 +104,8 @@ try {
     await page.goto(url + pagePath);
     await page.locator('.site-footer').scrollIntoViewIfNeeded();
     await page.locator('img[loading="lazy"]').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
-    await page.evaluate(async () => Promise.all([...document.images].map(image => image.decode())));
+    // The screenshot viewer's image (site.js) has no source until a capture is opened.
+    await page.evaluate(async () => Promise.all([...document.images].filter(image => image.getAttribute('src')).map(image => image.decode())));
     await page.evaluate(() => window.scrollTo(0, 0));
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `No horizontal overflow at ${width}`);

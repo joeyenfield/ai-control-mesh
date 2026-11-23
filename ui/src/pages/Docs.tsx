@@ -48,6 +48,7 @@ export const DOC_SECTIONS: { title: string; pages: { id: string; label: string }
     title: "Run a server",
     pages: [
       { id: "deployment", label: "Deployment" },
+      { id: "enterprise", label: "Running it in an enterprise" },
       { id: "scaling", label: "Several server processes" },
       { id: "configuration", label: "Configuration" },
       { id: "security", label: "Security" },
